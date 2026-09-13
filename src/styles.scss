@@ -1,0 +1,171 @@
+/* Reset + global typography ==================================================== */
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+html, body {
+  height: 100%;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+  color: #111827;
+  background: #fafafa;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+a { color: inherit; text-decoration: none; }
+button { font-family: inherit; cursor: pointer; border: 0; background: none; }
+img { max-width: 100%; display: block; }
+ul { list-style: none; }
+
+:root {
+  --color-primary:   #4f46e5;
+  --color-primary-600:#4338ca;
+  --color-primary-50: #eef2ff;
+  --color-surface:   #ffffff;
+  --color-muted:     #6b7280;
+  --color-border:    #e5e7eb;
+  --color-success:   #10b981;
+  --color-warning:   #f59e0b;
+  --color-danger:    #ef4444;
+  --radius:          12px;
+  --radius-sm:       8px;
+  --shadow-sm:       0 1px 2px rgba(0,0,0,.05);
+  --shadow-md:       0 4px 12px rgba(0,0,0,.08);
+  --container:       1200px;
+}
+
+/* Layout helpers ================================================================= */
+
+.container {
+  width: 100%;
+  max-width: var(--container);
+  margin: 0 auto;
+  padding: 0 20px;
+}
+
+.page {
+  min-height: calc(100vh - 64px - 80px);
+  padding: 40px 0 60px;
+}
+
+/* Buttons ======================================================================== */
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 12px 22px;
+  font-size: 15px;
+  font-weight: 600;
+  border-radius: var(--radius-sm);
+  transition: background .15s ease, transform .1s ease, box-shadow .15s ease;
+}
+
+.btn-primary {
+  background: var(--color-primary);
+  color: #fff;
+  box-shadow: var(--shadow-sm);
+}
+.btn-primary:hover  { background: var(--color-primary-600); }
+.btn-primary:active { transform: translateY(1px); }
+
+.btn-outline {
+  border: 1px solid var(--color-border);
+  background: #fff;
+  color: var(--color-primary);
+}
+.btn-outline:hover { background: var(--color-primary-50); }
+
+.btn-block { width: 100%; }
+
+/* Cards ========================================================================== */
+
+.card {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-sm);
+  overflow: hidden;
+}
+
+/* Typography ===================================================================== */
+
+h1 { font-size: 36px; font-weight: 700; line-height: 1.15; }
+h2 { font-size: 24px; font-weight: 600; line-height: 1.2; }
+h3 { font-size: 18px; font-weight: 600; }
+p  { font-size: 15px; line-height: 1.55; color: #374151; }
+.muted { color: var(--color-muted); }
+
+/* Navbar + Footer ================================================================ */
+
+.navbar {
+  position: sticky; top: 0; z-index: 50;
+  height: 64px;
+  background: #fff;
+  border-bottom: 1px solid var(--color-border);
+}
+.navbar-inner {
+  height: 64px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.brand {
+  display: flex; align-items: center; gap: 10px;
+  font-weight: 700; font-size: 18px; letter-spacing: -.01em;
+}
+.brand-dot {
+  width: 12px; height: 12px; border-radius: 50%;
+  background: linear-gradient(135deg, var(--color-primary), #06b6d4);
+}
+
+.footer {
+  padding: 30px 0;
+  background: #fff;
+  border-top: 1px solid var(--color-border);
+  color: var(--color-muted);
+  font-size: 13px;
+  text-align: center;
+}
+
+/* Section headers ================================================================ */
+
+.section-title {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  margin-bottom: 20px;
+}
+
+/* Price ========================================================================== */
+
+.price {
+  font-size: 22px;
+  font-weight: 700;
+  color: #111827;
+}
+.price-small {
+  font-size: 15px;
+  font-weight: 600;
+  color: #111827;
+}
+
+/* Tags / chips =================================================================== */
+
+.badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 600;
+}
+.badge-in-stock { background: #ecfdf5; color: #065f46; }
+.badge-out-stock { background: #fef2f2; color: #991b1b; }
+
+/* Responsive ===================================================================== */
+
+@media (max-width: 640px) {
+  h1 { font-size: 28px; }
+  .page { padding: 24px 0 40px; }
+}

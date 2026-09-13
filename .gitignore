@@ -1,0 +1,29 @@
+# Build & cache
+dist/
+.angular/
+node_modules/
+
+# IDE / Editor
+.idea/
+.vscode/
+*.iml
+*.iws
+*.ipr
+.project
+.classpath
+.settings/
+
+# Env / Secrets / OS
+*.bat
+.env
+*.env
+.env.*
+private.md
+*.log
+.DS_Store
+Thumbs.db
+
+# Playwright / test
+playwright-report/
+test-results/
+coverage/
