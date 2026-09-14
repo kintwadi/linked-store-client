@@ -10,6 +10,10 @@ import { SignupPageComponent } from './pages/signup/signup-page.component';
 import { LoginPageComponent } from './pages/login/login-page.component';
 import { AdminDashboardPageComponent } from './pages/admin/admin-dashboard-page.component';
 import { authGuard } from './guards/auth.guard';
+import { StoreDashboardShellComponent } from './pages/store-dashboard/store-dashboard-shell.component';
+import { StoreProductsListComponent } from './pages/store-dashboard/store-products-list.component';
+import { StoreProductFormComponent } from './pages/store-dashboard/store-product-form.component';
+import { StoreTransactionsListComponent } from './pages/store-dashboard/store-transactions-list.component';
 
 export const routes: Routes = [
   { path: '',                        component: HomePageComponent,              title: 'Linked-Store' },
@@ -22,5 +26,12 @@ export const routes: Routes = [
   { path: 'signup',                  component: SignupPageComponent,             title: 'Sign up' },
   { path: 'login',                   component: LoginPageComponent,              title: 'Log in' },
   { path: 'admin',                   component: AdminDashboardPageComponent,     title: 'Admin | Linked-Store', canActivate: [authGuard], data: { requireStoreAdmin: true } },
+  { path: 'admin/stores/:storeId',   component: StoreDashboardShellComponent,    canActivate: [authGuard], data: { requireStoreAdmin: true }, children: [
+    { path: '', redirectTo: 'products', pathMatch: 'full' },
+    { path: 'products', component: StoreProductsListComponent },
+    { path: 'products/new', component: StoreProductFormComponent },
+    { path: 'products/:variantId', component: StoreProductFormComponent },
+    { path: 'transactions', component: StoreTransactionsListComponent },
+  ]},
   { path: '**',                      redirectTo: '' },
 ];

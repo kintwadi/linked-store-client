@@ -1,8 +1,9 @@
-import { Component, OnInit, signal, computed } from '@angular/core';
-import { CommonModule } from '@angular/common';
+import { Component, OnInit, signal, computed, inject, ChangeDetectorRef, SecurityContext } from '@angular/core';
+import { CommonModule, DatePipe } from '@angular/common';
 import { FormsModule, ReactiveFormsModule, FormBuilder, FormGroup, Validators } from '@angular/forms';
 import { RouterLink } from '@angular/router';
 import { HttpClient } from '@angular/common/http';
+import { DomSanitizer, SafeUrl } from '@angular/platform-browser';
 import { firstValueFrom } from 'rxjs';
 import { AuthService, AuthUser } from '../../services/auth.service';
 
@@ -11,278 +12,639 @@ type TabKey = 'stores' | 'users' | 'transactions';
 @Component({
   selector: 'app-admin-dashboard-page',
   standalone: true,
-  imports: [CommonModule, FormsModule, RouterLink, ReactiveFormsModule],
+  imports: [CommonModule, FormsModule, RouterLink, ReactiveFormsModule, DatePipe],
   styles: [`
     :host { display: block; }
     .wrap {
-      max-width: 1180px;
+      max-width: 1400px;
       margin: 0 auto;
-      padding: 24px 16px 48px;
+      padding: 28px 20px 80px;
       display: grid;
-      gap: 20px;
+      gap: 24px;
     }
     .back {
-      display: inline-flex;
-      align-items: center;
-      gap: 6px;
-      color: var(--color-muted);
-      text-decoration: none;
-      font-size: 14px;
+      display: inline-flex; align-items: center; gap: 6px;
+      color: var(--color-muted); text-decoration: none; font-size: 14px;
+      font-weight: 500;
     }
-    .back:hover { color: var(--color-ink); }
-    .page-header {
-      display: flex;
-      align-items: flex-start;
-      justify-content: space-between;
-      gap: 16px;
-      flex-wrap: wrap;
+    .back:hover { color: var(--color-ink, #111827); }
+
+    /* ============ HERO HEADER ============ */
+    .hero {
+      background: #fff;
+      border-radius: 20px;
+      padding: 28px 32px;
+      color: #111827;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+      position: relative;
+      overflow: hidden;
+      border: 1px solid #f3f4f6;
     }
-    .titles {
-      display: grid;
-      gap: 6px;
+    .hero::before { display: none; }
+    .hero-inner {
+      position: relative; z-index: 1;
+      display: flex; align-items: center; justify-content: space-between;
+      gap: 24px; flex-wrap: wrap;
     }
-    .page-title {
-      margin: 0;
-      font-size: 28px;
-      font-weight: 700;
-    }
-    .page-subtitle {
-      margin: 0;
-      font-size: 15px;
-      color: var(--color-muted);
-      line-height: 1.6;
-    }
-    .header-actions {
-      display: flex;
-      gap: 10px;
-      align-items: center;
-      flex-wrap: wrap;
-    }
-    .tabs {
-      display: flex;
-      gap: 4px;
-      padding: 4px;
+    .hero-left { display: grid; gap: 10px; max-width: 680px; }
+    .hero-greet {
+      display: inline-flex; align-items: center; gap: 8px;
+      padding: 5px 12px; border-radius: 999px;
       background: #f3f4f6;
-      border-radius: 10px;
+      color: #4b5563;
+      font-size: 13px; font-weight: 600;
+      justify-self: start;
+    }
+    .hero-title { margin: 0; font-size: 30px; font-weight: 800; letter-spacing: -0.01em; color: #111827; }
+    .hero-subtitle { margin: 0; font-size: 15px; color: #6b7280; line-height: 1.5; max-width: 600px; }
+    .hero-right { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; justify-content: flex-end; }
+    .user-chip {
+      display: flex; align-items: center; gap: 12px;
+      padding: 8px 14px 8px 8px;
+      background: #f9fafb;
+      border-radius: 999px;
+      border: 1px solid #e5e7eb;
+    }
+    .user-chip.purple {
+      background: #f5f3ff;
+      border-color: #ede9fe;
+    }
+    .avatar {
+      width: 38px; height: 38px; border-radius: 50%;
+      background: #f3f4f6;
+      display: inline-flex; align-items: center; justify-content: center;
+      font-weight: 700; color: #374151; font-size: 15px;
+      flex-shrink: 0;
+    }
+    .avatar.cyan { background: #e0f2fe; color: #0369a1; }
+    .avatar.blue { background: #dbeafe; color: #1d4ed8; }
+    .avatar.purple { background: #f3f4f6; color: #374151; }
+    .avatar.green { background: #d1fae5; color: #047857; }
+    .avatar.gray { background: #f3f4f6; color: #4b5563; }
+    .avatar.pink { background: #fce7f3; color: #9d174d; }
+    .user-chip .meta { display: grid; line-height: 1.15; }
+    .user-chip .name { font-size: 14px; font-weight: 700; color: #111827; }
+    .user-chip .badge-role {
+      font-size: 11px; font-weight: 600; padding: 2px 8px;
+      background: #eef2ff;
+      color: #4338ca;
+      border-radius: 999px; margin-top: 2px;
+      width: fit-content;
+    }
+
+    /* ============ STAT KPI CARDS ============ */
+    .stat-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 16px;
+    }
+    @media (max-width: 1024px) { .stat-grid { grid-template-columns: repeat(2, 1fr); } }
+    @media (max-width: 540px)  { .stat-grid { grid-template-columns: 1fr; } }
+
+    .stat-card {
+      position: relative;
+      background: #fff;
+      border-radius: 16px;
+      padding: 20px 22px;
+      border: 1px solid #f3f4f6;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+      overflow: hidden;
+      transition: transform .2s ease, box-shadow .2s ease;
+    }
+    .stat-card:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 12px 28px -14px rgba(0,0,0,0.18);
+    }
+    .stat-card::before {
+      content: '';
+      position: absolute; top: 0; left: 0; bottom: 0;
+      width: 4px;
+      border-radius: 16px 0 0 16px;
+    }
+    .stat-card.stores::before   { background: linear-gradient(180deg, #4f46e5, #7c3aed); }
+    .stat-card.onboarded::before { background: linear-gradient(180deg, #10b981, #06b6d4); }
+    .stat-card.users::before    { background: linear-gradient(180deg, #f59e0b, #ef4444); }
+    .stat-card.tx::before       { background: linear-gradient(180deg, #8b5cf6, #ec4899); }
+    .stat-top {
+      display: flex; align-items: flex-start; justify-content: space-between; gap: 10px;
+    }
+    .stat-icon {
+      width: 42px; height: 42px; border-radius: 12px;
+      display: inline-flex; align-items: center; justify-content: center;
+      font-size: 22px; line-height: 1;
+      flex-shrink: 0;
+    }
+    .stat-card.stores    .stat-icon { background: #eef2ff; color: #4338ca; }
+    .stat-card.onboarded .stat-icon { background: #d1fae5; color: #059669; }
+    .stat-card.users     .stat-icon { background: #fef3c7; color: #b45309; }
+    .stat-card.tx        .stat-icon { background: #ede9fe; color: #6d28d9; }
+    .stat-label {
+      font-size: 13px; color: #6b7280; font-weight: 500; letter-spacing: 0.01em;
+    }
+    .stat-value {
+      font-size: 28px; font-weight: 800; color: #111827;
+      letter-spacing: -0.02em; margin-top: 6px; line-height: 1;
+    }
+    .stat-sub {
+      margin-top: 8px; font-size: 12px; color: #6b7280; font-weight: 500;
+      display: inline-flex; align-items: center; gap: 5px;
+    }
+    .stat-sub .dot-ok  { color: #10b981; }
+    .stat-sub .dot-warn{ color: #f59e0b; }
+    .stat-sub .dot-err { color: #ef4444; }
+
+    /* ============ TABS ============ */
+    .tabs {
+      display: inline-flex; gap: 4px; padding: 4px;
+      background: #f3f4f6;
+      border-radius: 14px;
+      justify-self: start;
+      border: 1px solid #e5e7eb;
     }
     .tab {
-      padding: 10px 18px;
-      font-size: 14px;
-      font-weight: 500;
-      color: var(--color-muted);
-      background: transparent;
-      border: none;
-      border-radius: 8px;
-      cursor: pointer;
-      transition: all 0.15s ease;
+      display: inline-flex; align-items: center; gap: 8px;
+      padding: 10px 20px; font-size: 14px; font-weight: 600;
+      color: #6b7280; background: transparent;
+      border: none; border-radius: 10px; cursor: pointer;
+      transition: all 0.18s ease; white-space: nowrap;
     }
-    .tab:hover { color: var(--color-ink); }
+    .tab .ico { font-size: 15px; }
+    .tab:hover { color: #111827; background: rgba(255,255,255,0.5); }
     .tab.active {
+      background: #fff; color: #111827;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+    }
+
+    /* ============ CARD SECTIONS ============ */
+    .panel {
       background: #fff;
-      color: var(--color-ink);
-      box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+      border: 1px solid #f3f4f6;
+      border-radius: 18px;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+      overflow: hidden;
+      display: grid;
     }
-    .section-header {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: 12px;
-      flex-wrap: wrap;
-      margin-bottom: 4px;
+    .panel-head {
+      padding: 20px 24px 16px;
+      display: flex; align-items: center; justify-content: space-between;
+      gap: 16px; flex-wrap: wrap;
+      border-bottom: 1px solid #f3f4f6;
     }
-    .section-title {
-      margin: 0;
-      font-size: 18px;
-      font-weight: 600;
+    .panel-head h2 {
+      margin: 0; font-size: 18px; font-weight: 700; letter-spacing: -0.01em;
+      display: inline-flex; align-items: center; gap: 10px;
     }
-    .table-wrap {
-      overflow-x: auto;
+    .panel-head h2 .ico {
+      width: 30px; height: 30px; border-radius: 9px;
+      display: inline-flex; align-items: center; justify-content: center;
+      background: var(--color-primary-50); color: var(--color-primary);
+      font-size: 15px;
     }
+    .panel-head .muted {
+      font-size: 12px; color: #6b7280; font-weight: 500;
+    }
+    .panel-body { padding: 0; display: grid; }
+    .panel-body > * + * { border-top: 1px solid #f3f4f6; }
+
+    /* ============ TOASTS ============ */
+    .toasts {
+      position: fixed; right: 24px; bottom: 24px;
+      display: grid; gap: 10px; z-index: 100;
+      pointer-events: none;
+    }
+    .toast {
+      min-width: 300px; max-width: 440px;
+      padding: 12px 16px 12px 14px;
+      border-radius: 12px;
+      box-shadow: 0 12px 32px -10px rgba(0,0,0,0.25);
+      display: flex; align-items: flex-start; gap: 10px;
+      pointer-events: auto;
+      animation: toastIn .25s ease-out;
+      border: 1px solid transparent;
+    }
+    @keyframes toastIn { from { transform: translateY(8px); opacity: 0 } to { transform: translateY(0); opacity: 1 } }
+    .toast .t-ico {
+      width: 22px; height: 22px; border-radius: 50%;
+      display: inline-flex; align-items: center; justify-content: center;
+      font-size: 12px; flex-shrink: 0; margin-top: 1px; color: #fff; font-weight: 700;
+    }
+    .toast .t-body { display: grid; gap: 2px; flex: 1; }
+    .toast .t-title { font-size: 14px; font-weight: 700; color: #111827; }
+    .toast .t-msg   { font-size: 13px; color: #4b5563; line-height: 1.4; }
+    .toast.success { background: #ecfdf5; border-color: #a7f3d0; }
+    .toast.success .t-ico { background: #10b981; }
+    .toast.error   { background: #fef2f2; border-color: #fecaca; }
+    .toast.error .t-ico   { background: #ef4444; }
+    .toast.info    { background: #eff6ff; border-color: #bfdbfe; }
+    .toast.info .t-ico    { background: #3b82f6; }
+
+    /* ============ TABLES ============ */
+    .table-wrap { overflow-x: auto; }
     table {
-      width: 100%;
-      border-collapse: collapse;
+      width: 100%; border-collapse: separate; border-spacing: 0;
       font-size: 14px;
     }
     th {
-      text-align: left;
-      padding: 12px 14px;
-      font-weight: 600;
-      font-size: 12px;
-      text-transform: uppercase;
-      letter-spacing: 0.04em;
-      color: var(--color-muted);
+      text-align: left; padding: 14px 18px;
+      font-weight: 600; font-size: 12px;
+      text-transform: uppercase; letter-spacing: 0.05em; color: #6b7280;
       background: #f9fafb;
-      border-bottom: 1px solid var(--color-border);
+      position: sticky; top: 0; z-index: 1;
     }
+    th:first-child { border-radius: 18px 0 0 0; }
+    th:last-child  { border-radius: 0 18px 0 0; }
     td {
-      padding: 12px 14px;
-      border-bottom: 1px solid var(--color-border);
-      color: var(--color-ink);
-      vertical-align: middle;
+      padding: 16px 18px;
+      color: #111827; vertical-align: middle;
+      border-top: 1px solid #f3f4f6;
     }
-    tr:nth-child(even) td {
-      background: #fafafa;
+    tbody tr { transition: background .15s ease; }
+    tbody tr:hover td { background: #fafbff; }
+    tbody tr:hover td:first-child { border-radius: 0; }
+
+    .cell-identity {
+      display: flex; align-items: center; gap: 12px;
     }
-    tr:hover td {
-      background: #f5f5f5;
-    }
+    .cell-text { display: grid; gap: 3px; }
+    .cell-title { font-weight: 700; color: #111827; font-size: 14px; }
+    .cell-meta  { font-size: 12px; color: #6b7280; }
     .mono {
       font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
-      font-size: 12px;
-      background: #f9fafb;
-      padding: 3px 6px;
-      border-radius: 4px;
+      font-size: 12px; color: #4b5563;
     }
+
+    /* Status badge + chip upgrades */
+    .status-badge {
+      display: inline-flex; align-items: center; gap: 6px;
+      padding: 5px 11px;
+      border-radius: 999px; font-size: 12px; font-weight: 700;
+      letter-spacing: 0.01em;
+    }
+    .status-badge::before {
+      content: ''; width: 6px; height: 6px; border-radius: 50%;
+      background: currentColor; opacity: 0.7;
+    }
+    .status-badge.ok   { background: #ecfdf5; color: #059669; }
+    .status-badge.warn { background: #fffbeb; color: #b45309; }
+    .status-badge.err  { background: #fef2f2; color: #dc2626; }
+    .status-badge.info { background: #eef2ff; color: #4338ca; }
+
+    .chip {
+      display: inline-flex; align-items: center; gap: 5px;
+      padding: 4px 10px; font-size: 11px; font-weight: 700;
+      border-radius: 999px; background: #eef2ff; color: #4338ca;
+      letter-spacing: 0.02em;
+    }
+    .chip.warn { background: #fff7ed; color: #9a3412; }
+    .chip.err  { background: #fef2f2; color: #991b1b; }
+    .chip.ok   { background: #ecfdf5; color: #047857; }
+    .chip.purple { background: #f3e8ff; color: #6b21a8; }
+    .chip.info   { background: #eff6ff; color: #1d4ed8; }
+
+    /* Row action pills */
     .row-actions {
-      display: flex;
-      gap: 6px;
-      flex-wrap: wrap;
+      display: flex; gap: 6px; flex-wrap: wrap;
     }
     .row-actions .btn {
-      padding: 6px 10px;
-      font-size: 12px;
+      padding: 6px 11px; font-size: 12px; font-weight: 600;
+      border-radius: 8px; gap: 5px;
     }
-    .status-badge {
-      display: inline-flex;
-      align-items: center;
-      padding: 4px 10px;
-      border-radius: 999px;
-      font-size: 12px;
-      font-weight: 600;
+    .row-actions .btn .ico { font-size: 12px; }
+    .row-actions .btn-danger { color: #b91c1c; background: #fef2f2; border-color: #fecaca; }
+    .row-actions .btn-danger:hover { background: #fee2e2; color: #991b1b; }
+    .row-actions .btn-primary-stripe {
+      background: #ecfdf5; color: #047857; border: 1px solid #a7f3d0;
     }
-    .status-badge.ok {
+    .row-actions .btn-primary-stripe:hover { background: #d1fae5; }
+    .row-actions .btn-secondary-warn {
+      background: #fff7ed; color: #9a3412; border: 1px solid #fed7aa;
+    }
+    .row-actions .btn-secondary-warn:hover { background: #ffedd5; }
+
+    /* ============ STORE ADMIN CARD VIEW ============ */
+    .store-hero {
+      position: relative;
+      border-radius: 18px 18px 0 0;
+      background: #fff;
+      padding: 28px 28px 36px;
+      color: #111827;
+      overflow: hidden;
+      border-bottom: 1px solid #f3f4f6;
+    }
+    .store-hero::after { display: none; }
+    .store-hero-inner {
+      position: relative; z-index: 1;
+      display: flex; align-items: center; gap: 20px; flex-wrap: wrap;
+    }
+    .store-hero .logo-or-avatar {
+      width: 80px; height: 80px; border-radius: 20px;
+      background: #f3f4f6;
+      border: 2px solid #e5e7eb;
+      display: inline-flex; align-items: center; justify-content: center;
+      font-size: 30px; color: #4b5563;
+      overflow: hidden;
+      flex-shrink: 0;
+    }
+    .store-hero .logo-or-avatar img { width: 100%; height: 100%; object-fit: cover; }
+    .store-hero .titles { display: grid; gap: 6px; }
+    .store-hero .store-name {
+      font-size: 26px; font-weight: 800; letter-spacing: -0.01em; margin: 0; color: #111827;
+    }
+    .store-hero .store-meta {
+      display: inline-flex; gap: 10px; flex-wrap: wrap;
+      font-size: 13px; color: #6b7280;
+    }
+    .store-hero .store-meta .status-badge {
       background: #ecfdf5;
-      color: #059669;
+      color: #047857;
     }
-    .status-badge.warn {
-      background: #fffbeb;
-      color: #b45309;
+    .store-hero .store-meta .status-badge::before { background: #10b981; }
+
+    .store-body { padding: 0; display: grid; }
+    .store-quick-grid {
+      display: grid; grid-template-columns: repeat(4, 1fr);
+      gap: 0;
     }
-    .status-badge.err {
-      background: #fef2f2;
-      color: #dc2626;
+    @media (max-width: 900px) { .store-quick-grid { grid-template-columns: repeat(2, 1fr); } }
+    @media (max-width: 520px) { .store-quick-grid { grid-template-columns: 1fr; } }
+    .quick-stat {
+      padding: 20px 24px;
+      border-right: 1px solid #f3f4f6;
+      display: grid; gap: 4px;
     }
-    .status-badge.info {
-      background: var(--color-primary-50);
-      color: var(--color-primary);
+    .quick-stat:last-child { border-right: none; }
+    .quick-stat .k { font-size: 12px; color: #6b7280; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; }
+    .quick-stat .v { font-size: 22px; font-weight: 800; color: #111827; letter-spacing: -0.02em; }
+    .quick-stat .sub { font-size: 12px; color: #9ca3af; }
+
+    .info-section {
+      padding: 22px 24px;
+      display: grid; gap: 16px;
     }
-    .store-info-card {
-      display: grid;
-      gap: 10px;
+    .info-section + .info-section { border-top: 1px solid #f3f4f6; }
+    .info-row-grid {
+      display: grid; grid-template-columns: repeat(2, 1fr);
+      gap: 14px 24px;
     }
-    .store-info-card h3 {
-      margin: 0;
-      font-size: 18px;
-      font-weight: 600;
+    @media (max-width: 600px) { .info-row-grid { grid-template-columns: 1fr; } }
+    .info-item { display: grid; gap: 3px; }
+    .info-item .k { font-size: 12px; color: #6b7280; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; }
+    .info-item .v { font-size: 14px; color: #111827; font-weight: 500; }
+
+    .banner {
+      padding: 16px 18px;
+      border-radius: 14px;
+      display: flex; align-items: flex-start; gap: 12px;
     }
-    .info-grid {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 10px 20px;
+    .banner .banner-ico {
+      width: 36px; height: 36px; border-radius: 10px;
+      display: inline-flex; align-items: center; justify-content: center;
+      font-size: 18px; flex-shrink: 0;
     }
-    @media (max-width: 600px) {
-      .info-grid { grid-template-columns: 1fr; }
+    .banner .banner-text { display: grid; gap: 3px; flex: 1; }
+    .banner .banner-title { font-size: 14px; font-weight: 700; color: #111827; }
+    .banner .banner-msg   { font-size: 13px; color: #4b5563; line-height: 1.5; }
+    .banner .banner-actions { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 10px; }
+    .banner.info    { background: #eff6ff; border: 1px solid #bfdbfe; }
+    .banner.info    .banner-ico { background: #dbeafe; color: #1d4ed8; }
+    .banner.success { background: #ecfdf5; border: 1px solid #a7f3d0; }
+    .banner.success .banner-ico { background: #d1fae5; color: #047857; }
+    .banner.warn    { background: #fffbeb; border: 1px solid #fde68a; }
+    .banner.warn    .banner-ico { background: #fef3c7; color: #b45309; }
+    .banner.danger  { background: #fef2f2; border: 1px solid #fecaca; }
+    .banner.danger  .banner-ico { background: #fee2e2; color: #b91c1c; }
+
+    .actions-row {
+      display: flex; gap: 10px; flex-wrap: wrap;
     }
-    .info-row {
-      display: grid;
-      gap: 2px;
-    }
-    .info-row .k {
-      font-size: 12px;
-      color: var(--color-muted);
-      font-weight: 500;
-    }
-    .info-row .v {
-      font-size: 14px;
-      color: var(--color-ink);
-    }
-    .add-user-form {
-      display: grid;
-      gap: 12px;
-      padding: 16px;
+
+    /* ============ FORMS ============ */
+    .form-panel {
+      margin: 0 24px 20px;
+      padding: 20px 22px;
       background: #f9fafb;
-      border-radius: var(--radius-sm);
-      margin-top: 12px;
+      border: 1px dashed #d1d5db;
+      border-radius: 14px;
+      display: grid; gap: 16px;
+    }
+    .form-panel-head {
+      display: flex; align-items: center; justify-content: space-between; gap: 12px;
+      padding-bottom: 10px; border-bottom: 1px solid #e5e7eb;
+    }
+    .form-panel-title {
+      font-size: 15px; font-weight: 700; color: #111827;
+      display: inline-flex; align-items: center; gap: 8px;
+    }
+    .form-panel-title .ico {
+      width: 24px; height: 24px; border-radius: 7px;
+      background: #eef2ff; color: #4338ca;
+      display: inline-flex; align-items: center; justify-content: center;
+      font-size: 12px;
     }
     .form-grid-2 {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 12px;
+      display: grid; grid-template-columns: 1fr 1fr; gap: 14px 16px;
     }
-    @media (max-width: 600px) {
-      .form-grid-2 { grid-template-columns: 1fr; }
-    }
-    .form-field {
-      display: grid;
-      gap: 6px;
-    }
+    @media (max-width: 700px) { .form-grid-2 { grid-template-columns: 1fr; } }
+    .form-field { display: grid; gap: 6px; }
     .form-field label {
-      font-size: 13px;
-      font-weight: 600;
-      color: var(--color-ink);
+      font-size: 13px; font-weight: 600; color: #374151;
+      display: inline-flex; align-items: center; gap: 6px;
     }
-    .form-field input, .form-field select {
-      width: 100%;
-      box-sizing: border-box;
-      padding: 10px 12px;
-      font-size: 14px;
-      color: var(--color-ink);
-      background: #fff;
-      border: 1px solid var(--color-border);
-      border-radius: var(--radius-sm);
+    .form-field label .req { color: #ef4444; }
+    .form-field input, .form-field select, .form-field textarea {
+      width: 100%; box-sizing: border-box; padding: 11px 13px; font-size: 14px;
+      color: #111827; background: #fff;
+      border: 1px solid #d1d5db; border-radius: 10px;
+      font-family: inherit;
+      transition: border-color .15s ease, box-shadow .15s ease;
     }
-    .form-field input:focus, .form-field select:focus {
-      outline: none;
-      border-color: var(--color-primary);
-      box-shadow: 0 0 0 3px var(--color-primary-50);
+    .form-field input:focus, .form-field select:focus, .form-field textarea:focus {
+      outline: none; border-color: var(--color-primary);
+      box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.15);
     }
+    .form-footer {
+      display: flex; justify-content: flex-end; gap: 10px; flex-wrap: wrap;
+      padding-top: 4px;
+    }
+
+    /* ============ PAGINATION ============ */
     .pagination {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: 12px;
-      padding-top: 16px;
-      flex-wrap: wrap;
+      display: flex; align-items: center; justify-content: space-between;
+      gap: 12px; padding: 16px 24px; flex-wrap: wrap;
+      border-top: 1px solid #f3f4f6;
     }
-    .pagination-info {
-      font-size: 13px;
-      color: var(--color-muted);
-    }
-    .pagination-buttons {
-      display: flex;
-      gap: 8px;
-    }
-    .access-denied {
-      text-align: center;
-      padding: 48px 24px;
-    }
-    .access-denied h2 {
-      margin: 0 0 8px;
-      font-size: 24px;
-      color: #dc2626;
-    }
-    .access-denied p {
-      margin: 0 0 20px;
-      color: var(--color-muted);
-    }
+    .pagination-info { font-size: 13px; color: #6b7280; font-weight: 500; }
+    .pagination-buttons { display: flex; gap: 8px; }
+
+    .access-denied { text-align: center; padding: 48px 24px; }
+    .access-denied h2 { margin: 0 0 8px; font-size: 24px; color: #dc2626; }
+    .access-denied p  { margin: 0 0 20px; color: var(--color-muted); }
+
     .loading, .empty {
-      padding: 32px 16px;
-      text-align: center;
-      color: var(--color-muted);
-      font-size: 14px;
+      padding: 48px 24px; text-align: center; color: #6b7280; font-size: 14px;
     }
-    .error-box {
-      background: #fef2f2;
-      color: #991b1b;
-      border: 1px solid #fecaca;
-      border-radius: var(--radius-sm);
-      padding: 14px 16px;
-      font-size: 14px;
+    .empty {
+      display: grid; gap: 8px; justify-items: center;
+    }
+    .empty .ico {
+      width: 56px; height: 56px; border-radius: 16px;
+      background: #f3f4f6; color: #9ca3af;
+      display: inline-flex; align-items: center; justify-content: center;
+      font-size: 26px; margin-bottom: 4px;
+    }
+    .empty h4 { margin: 0; font-size: 16px; font-weight: 700; color: #111827; }
+    .empty p  { margin: 0; font-size: 13px; color: #6b7280; max-width: 360px; }
+
+    /* ============ MODAL UPGRADE ============ */
+    .modal-backdrop {
+      position: fixed; inset: 0; background: rgba(17, 24, 39, 0.6);
+      backdrop-filter: blur(4px);
+      display: grid; place-items: start center;
+      padding: 48px 16px; z-index: 50;
+      animation: fadeIn 0.18s ease-out;
+    }
+    @keyframes fadeIn { from { opacity: 0 } to { opacity: 1 } }
+    .modal {
+      width: 100%; max-width: 620px;
+      background: #fff; border-radius: 18px;
+      box-shadow: 0 40px 80px -20px rgba(0,0,0,0.35), 0 0 0 1px rgba(0,0,0,0.05);
+      display: grid; gap: 0; overflow: hidden;
+      animation: slideUp 0.25s cubic-bezier(.2,.9,.3,1);
+    }
+    @keyframes slideUp { from { transform: translateY(16px) scale(.98); opacity: 0 } to { transform: translateY(0) scale(1); opacity: 1 } }
+    .modal-header {
+      padding: 20px 24px;
+      display: flex; align-items: flex-start;
+      gap: 14px;
+      background: linear-gradient(180deg, #f9fafb 0%, #fff 100%);
+      border-bottom: 1px solid #f3f4f6;
+    }
+    .modal-header.danger {
+      background: linear-gradient(180deg, #fef2f2 0%, #fff 100%);
+      border-bottom-color: #fecaca;
+    }
+    .modal-title {
+      display: inline-flex; align-items: center; gap: 10px;
+      flex-shrink: 0;
+    }
+    .modal-title .ico {
+      width: 34px; height: 34px; border-radius: 10px;
+      display: inline-flex; align-items: center; justify-content: center;
+      font-size: 16px;
+    }
+    .modal-title.edit .ico    { background: #eef2ff; color: #4338ca; }
+    .modal-title.delete .ico  { background: #fee2e2; color: #b91c1c; }
+    .modal-title-text {
+      display: grid;
+      gap: 2px;
+      flex: 1;
+      min-width: 0;
+    }
+    .modal-title-text .muted { font-size: 12px; }
+    .modal-header h3 { margin: 0; font-size: 17px; font-weight: 700; letter-spacing: -0.01em; }
+    .modal-close {
+      width: 32px; height: 32px; border-radius: 8px;
+      display: inline-flex; align-items: center; justify-content: center;
+      background: transparent; border: 0; cursor: pointer;
+      font-size: 20px; line-height: 1; color: #6b7280;
+      transition: background .15s;
+      flex-shrink: 0;
+      margin-left: auto;
+    }
+    .modal-close:hover { background: #f3f4f6; color: #111827; }
+    .modal-body {
+      padding: 22px 24px;
+      display: grid; gap: 18px;
+      max-height: 68vh; overflow-y: auto;
+    }
+    .modal-body .form-panel {
+      margin: 0; padding: 0; background: transparent; border: 0;
+    }
+    .modal-footer {
+      padding: 16px 24px; border-top: 1px solid #f3f4f6;
+      display: flex; justify-content: space-between; align-items: center;
+      gap: 12px; flex-wrap: wrap;
+      background: #fafafa;
+    }
+    .modal-footer .buttons { display: flex; gap: 10px; flex-wrap: wrap; justify-content: flex-end; }
+    .confirm-text { font-size: 14px; color: #374151; line-height: 1.6; }
+    .confirm-text strong { color: #b91c1c; }
+    .confirm-box-list {
+      background: #fef2f2; border: 1px solid #fecaca;
+      border-radius: 12px; padding: 14px 16px 14px 14px;
+      font-size: 13px; color: #991b1b;
+      display: grid; gap: 6px;
+      list-style: none;
+      margin: 0;
+    }
+    .confirm-box-list li {
+      display: flex; align-items: center; gap: 8px;
+      line-height: 1.4;
+    }
+    .confirm-box-list li .ico {
+      flex-shrink: 0;
+      width: 18px;
+      display: inline-flex;
+      justify-content: center;
+    }
+
+    .mono {
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+      font-size: 12px; background: #f3f4f6; padding: 3px 7px; border-radius: 6px;
+      font-weight: 500;
     }
   `],
   template: `
     <div class="wrap">
       <a class="back" routerLink="/">← Back to home</a>
+
+      <!-- Floating toasts -->
+      <div class="toasts">
+        @if (stripeFallback()) {
+          <div class="toast info">
+            <span class="t-ico">🔗</span>
+            <div class="t-body">
+              <span class="t-title">Popup blocked — open manually</span>
+              <span class="t-msg">
+                <a [href]="stripeFallback()!.url" target="_blank" rel="noopener noreferrer"
+                   style="color:#2563eb;text-decoration:underline;font-weight:600;">
+                  ➜ {{ stripeFallback()!.label }}
+                </a>
+              </span>
+            </div>
+          </div>
+        }
+        @if (storesSuccess()) {
+          <div class="toast success">
+            <span class="t-ico">✓</span>
+            <div class="t-body"><span class="t-title">Success</span><span class="t-msg">{{ storesSuccess() }}</span></div>
+          </div>
+        }
+        @if (storesError()) {
+          <div class="toast error">
+            <span class="t-ico">!</span>
+            <div class="t-body"><span class="t-title">Something went wrong</span><span class="t-msg">{{ storesError() }}</span></div>
+          </div>
+        }
+        @if (userSuccess()) {
+          <div class="toast success">
+            <span class="t-ico">✓</span>
+            <div class="t-body"><span class="t-title">Success</span><span class="t-msg">{{ userSuccess() }}</span></div>
+          </div>
+        }
+        @if (userError()) {
+          <div class="toast error">
+            <span class="t-ico">!</span>
+            <div class="t-body"><span class="t-title">Something went wrong</span><span class="t-msg">{{ userError() }}</span></div>
+          </div>
+        }
+        @if (editStoreError()) {
+          <div class="toast error">
+            <span class="t-ico">!</span>
+            <div class="t-body"><span class="t-title">Save failed</span><span class="t-msg">{{ editStoreError() }}</span></div>
+          </div>
+        }
+      </div>
 
       @if (!isAdminish()) {
         <div class="card access-denied">
@@ -291,326 +653,868 @@ type TabKey = 'stores' | 'users' | 'transactions';
           <a class="btn btn-primary" routerLink="/">Return to home</a>
         </div>
       } @else {
-        <div class="page-header">
-          <div class="titles">
-            <h1 class="page-title">Admin Dashboard</h1>
-            <p class="page-subtitle">Manage stores, users, and view transaction history.</p>
-          </div>
-          <div class="header-actions">
-            <span class="status-badge info">{{ currentUser()?.name || currentUser()?.email }}</span>
-            <button class="btn btn-secondary" (click)="onLogout()" [disabled]="loggingOut()">
-              @if (loggingOut()) { Logging out… } @else { Log out }
-            </button>
-          </div>
-        </div>
 
+        <!-- ============ HERO ============ -->
+        <header class="hero">
+          <div class="hero-inner">
+            <div class="hero-left">
+              <span class="hero-greet">
+                @if (isGlobalAdmin()) { 🌐 Global Control Center } @else { 🏪 Your Store Dashboard }
+              </span>
+              <h1 class="hero-title">Welcome back, {{ greetingName() }}</h1>
+              <p class="hero-subtitle">
+                @if (isGlobalAdmin()) {
+                  Oversee every store, manage operators, review payouts, and monitor the network in real time.
+                } @else {
+                  Manage your store, set up Stripe payments, handle your team, and track customer orders — all from one place.
+                }
+              </p>
+            </div>
+            <div class="hero-right">
+              <div class="user-chip">
+                <div class="avatar" [class.purple]="isGlobalAdmin()" [class.cyan]="!isGlobalAdmin()">
+                  {{ avatarInitials(currentUser()) }}
+                </div>
+                <div class="meta">
+                  <span class="name">{{ currentUser()?.name || currentUser()?.email }}</span>
+                  <span class="badge-role">
+                    @if (isGlobalAdmin()) { Global Admin }
+                    @else if (currentUser()?.role === 'OWNER') { Owner }
+                    @else if (currentUser()?.role === 'STORE_ADMIN') { Store Admin }
+                    @else { {{ currentUser()?.role || 'Operator' }} }
+                  </span>
+                </div>
+              </div>
+              <button class="btn btn-secondary"
+                      (click)="onLogout()" [disabled]="loggingOut()">
+                @if (loggingOut()) { Logging out… } @else { Log out }
+              </button>
+            </div>
+          </div>
+        </header>
+
+        <!-- ============ KPI STAT CARDS ============ -->
+        <section class="stat-grid">
+          <div class="stat-card stores">
+            <div class="stat-top">
+              <div>
+                <div class="stat-label">Total Stores</div>
+                <div class="stat-value">{{ kpiTotalStores() }}</div>
+              </div>
+              <div class="stat-icon">🏪</div>
+            </div>
+            <div class="stat-sub"><span class="dot-ok">●</span> {{ kpiActiveStores() }} active · {{ kpiSuspendedStores() }} suspended</div>
+          </div>
+          <div class="stat-card onboarded">
+            <div class="stat-top">
+              <div>
+                <div class="stat-label">Stripe Connected</div>
+                <div class="stat-value">{{ kpiOnboarded() }}<span style="font-size:14px;color:#6b7280;font-weight:600;"> / {{ kpiTotalStores() }}</span></div>
+              </div>
+              <div class="stat-icon">💳</div>
+            </div>
+            <div class="stat-sub"><span [class]="kpiOnboardedPct() >= 80 ? 'dot-ok' : 'dot-warn'">●</span> {{ kpiOnboardedPct() }}% onboarding coverage</div>
+          </div>
+          <div class="stat-card users">
+            <div class="stat-top">
+              <div>
+                <div class="stat-label">Team Members</div>
+                <div class="stat-value">{{ kpiTotalUsers() }}</div>
+              </div>
+              <div class="stat-icon">👥</div>
+            </div>
+            <div class="stat-sub"><span class="dot-ok">●</span> {{ kpiActiveUsers() }} active · {{ kpiAdminUsers() }} admin</div>
+          </div>
+          <div class="stat-card tx">
+            <div class="stat-top">
+              <div>
+                <div class="stat-label">Transactions</div>
+                <div class="stat-value">{{ totalTxVolume() }}</div>
+              </div>
+              <div class="stat-icon">📦</div>
+            </div>
+            <div class="stat-sub"><span class="dot-ok">●</span> {{ txTotalCount() }} total · {{ activeTab() === 'transactions' ? 'showing below' : 'tab Transactions' }}</div>
+          </div>
+        </section>
+
+        <!-- ============ TABS ============ -->
         <div class="tabs">
-          <button class="tab" [class.active]="activeTab() === 'stores'" (click)="activeTab.set('stores')">Stores</button>
-          <button class="tab" [class.active]="activeTab() === 'users'" (click)="activeTab.set('users')">Users</button>
-          <button class="tab" [class.active]="activeTab() === 'transactions'" (click)="activeTab.set('transactions')">Transactions</button>
+          <button class="tab" [class.active]="activeTab() === 'stores'" (click)="activeTab.set('stores')">
+            <span class="ico">🏪</span> Stores
+          </button>
+          <button class="tab" [class.active]="activeTab() === 'users'" (click)="activeTab.set('users')">
+            <span class="ico">👥</span> Users
+          </button>
+          <button class="tab" [class.active]="activeTab() === 'transactions'" (click)="activeTab.set('transactions')">
+            <span class="ico">📦</span> Transactions
+          </button>
         </div>
 
+        <!-- ============ STORES TAB ============ -->
         @if (activeTab() === 'stores') {
-          <section class="card" style="display: grid; gap: 16px;">
-            <div class="section-header">
-              <h2 class="section-title">Stores</h2>
+          <section class="panel">
+            <div class="panel-head">
+              <div>
+                <h2><span class="ico">🏪</span> @if (isGlobalAdmin()) { All Stores } @else { My Store }</h2>
+                <span class="muted">
+                  @if (isGlobalAdmin()) { Manage every location in the network, from onboarding to subscription status. }
+                  @else { Review your store details, complete Stripe onboarding, and manage settings. }
+                </span>
+              </div>
+              @if (isGlobalAdmin()) {
+                <button class="btn btn-primary" (click)="showAddStore.set(!showAddStore())">
+                  @if (showAddStore()) { ✕ Cancel } @else { ＋ New store }
+                </button>
+              }
             </div>
 
-            @if (storesLoading()) {
-              <div class="loading">Loading stores…</div>
-            } @else if (storesError()) {
-              <div class="error-box">{{ storesError() }}</div>
-            } @else if (isGlobalAdmin()) {
-              <div class="table-wrap">
-                <table>
-                  <thead>
-                    <tr>
-                      <th>ID</th>
-                      <th>Name</th>
-                      <th>Lat</th>
-                      <th>Lng</th>
-                      <th>Onboarded</th>
-                      <th>Subscription</th>
-                      <th>Users</th>
-                      <th>Tx</th>
-                      <th>Actions</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    @for (store of stores(); track store.id) {
-                      <tr>
-                        <td><span class="mono">{{ store.id?.slice(0, 10) }}…</span></td>
-                        <td>{{ store.businessName || store.name || '—' }}</td>
-                        <td>{{ store.latitude ?? '—' }}</td>
-                        <td>{{ store.longitude ?? '—' }}</td>
-                        <td>
-                          <span class="status-badge" [class.ok]="store.onboarded" [class.warn]="!store.onboarded">
-                            {{ store.onboarded ? 'Yes' : 'No' }}
-                          </span>
-                        </td>
-                        <td>
-                          <span class="status-badge info">
-                            {{ store.subscriptionStatus || store.plan || 'Standard' }}
-                          </span>
-                        </td>
-                        <td>{{ store.usersCount ?? '—' }}</td>
-                        <td>{{ store.txCount ?? '—' }}</td>
-                        <td>
-                          <div class="row-actions">
-                            <button class="btn btn-secondary" (click)="onEditStore(store)">Edit</button>
-                            <button class="btn btn-secondary" (click)="onSuspendStore(store)">
-                              {{ store.suspended ? 'Unsuspend' : 'Suspend' }}
-                            </button>
-                          </div>
-                        </td>
-                      </tr>
-                    } @empty {
-                      <tr>
-                        <td colspan="9" class="empty">No stores found.</td>
-                      </tr>
-                    }
-                  </tbody>
-                </table>
-              </div>
-            } @else {
-              @if (myStore()) {
-                <div class="store-info-card">
-                  <h3>{{ myStore()!.businessName || myStore()!.name || 'Your Store' }}</h3>
-                  <div class="info-grid">
-                    <div class="info-row">
-                      <span class="k">Store ID</span>
-                      <span class="v"><span class="mono">{{ myStore()!.id }}</span></span>
-                    </div>
-                    <div class="info-row">
-                      <span class="k">Business Name</span>
-                      <span class="v">{{ myStore()!.businessName || myStore()!.name || '—' }}</span>
-                    </div>
-                    <div class="info-row">
-                      <span class="k">Location</span>
-                      <span class="v">{{ myStore()!.latitude }}, {{ myStore()!.longitude }}</span>
-                    </div>
-                    <div class="info-row">
-                      <span class="k">Onboarded</span>
-                      <span class="v">
-                        <span class="status-badge" [class.ok]="myStore()!.onboarded" [class.warn]="!myStore()!.onboarded">
-                          {{ myStore()!.onboarded ? 'Yes' : 'No' }}
-                        </span>
-                      </span>
-                    </div>
-                    <div class="info-row">
-                      <span class="k">Subscription</span>
-                      <span class="v">
-                        <span class="status-badge info">
-                          {{ myStore()!.subscriptionStatus || myStore()!.plan || 'Standard' }}
-                        </span>
-                      </span>
-                    </div>
-                    <div class="info-row">
-                      <span class="k">Users</span>
-                      <span class="v">{{ myStore()!.usersCount ?? '—' }}</span>
-                    </div>
-                    <div class="info-row">
-                      <span class="k">Transactions</span>
-                      <span class="v">{{ myStore()!.txCount ?? '—' }}</span>
-                    </div>
+            @if (isGlobalAdmin() && showAddStore()) {
+              <form class="form-panel" [formGroup]="addStoreForm" (ngSubmit)="onCreateStore()">
+                <div class="form-panel-head">
+                  <div class="form-panel-title"><span class="ico">＋</span> Register a new store</div>
+                  <span class="muted">Fields with <span style="color:#ef4444;">*</span> are required</span>
+                </div>
+                <div class="form-grid-2">
+                  <div class="form-field">
+                    <label for="s-name">Business name <span class="req">*</span></label>
+                    <input id="s-name" formControlName="businessName" type="text" placeholder="e.g. Brooklyn Sneaker Co." />
+                  </div>
+                  <div class="form-field">
+                    <label for="s-sub">Subscription status</label>
+                    <select id="s-sub" formControlName="subscriptionStatus">
+                      <option value="ACTIVE">🟢 ACTIVE</option>
+                      <option value="PENDING">🟡 PENDING</option>
+                      <option value="SUSPENDED">🟠 SUSPENDED</option>
+                      <option value="CANCELED">🔴 CANCELED</option>
+                    </select>
+                  </div>
+                  <div class="form-field">
+                    <label for="s-lat">Latitude <span class="req">*</span></label>
+                    <input id="s-lat" formControlName="latitude" type="number" step="any" placeholder="40.708978" />
+                  </div>
+                  <div class="form-field">
+                    <label for="s-lng">Longitude <span class="req">*</span></label>
+                    <input id="s-lng" formControlName="longitude" type="number" step="any" placeholder="-73.956555" />
+                  </div>
+                  <div class="form-field">
+                    <label for="s-logo">Logo URL</label>
+                    <input id="s-logo" formControlName="logoUrl" type="text" placeholder="https://... (optional)" />
+                  </div>
+                  <div class="form-field">
+                    <label for="s-hero">Hero image URL</label>
+                    <input id="s-hero" formControlName="heroImageUrl" type="text" placeholder="https://... (optional)" />
                   </div>
                 </div>
-              } @else {
-                <div class="empty">No store information available.</div>
-              }
+                <div class="form-footer">
+                  <button type="button" class="btn btn-secondary" (click)="showAddStore.set(false)">Cancel</button>
+                  <button type="submit" class="btn btn-primary"
+                          [disabled]="creatingStore() || !addStoreForm.valid">
+                    @if (creatingStore()) { Creating… } @else { ✓ Create store }
+                  </button>
+                </div>
+              </form>
             }
+
+            <div class="panel-body">
+              @if (storesLoading()) {
+                <div class="loading">Loading stores…</div>
+              } @else if (isGlobalAdmin()) {
+                <div class="table-wrap">
+                  <table>
+                    <thead>
+                      <tr>
+                        <th style="min-width: 260px;">Store</th>
+                        <th>Location</th>
+                        <th>Onboarded</th>
+                        <th>Subscription</th>
+                        <th>Users</th>
+                        <th>Tx</th>
+                        <th style="min-width: 420px;">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      @for (store of stores(); track store.id) {
+                        <tr>
+                          <td>
+                            <div class="cell-identity">
+                              <div class="avatar purple">🏪</div>
+                              <div class="cell-text">
+                                <span class="cell-title">{{ store.businessName || '—' }}</span>
+                                <span class="cell-meta mono">{{ store.id?.slice(0, 14) }}…</span>
+                              </div>
+                            </div>
+                          </td>
+                          <td>
+                            @if (store.latitude != null) {
+                              <span class="mono">📍 {{ store.latitude }}, {{ store.longitude }}</span>
+                            } @else { — }
+                          </td>
+                          <td>
+                            <span class="status-badge"
+                                  [class.ok]="store.onboarded" [class.warn]="!store.onboarded">
+                              {{ store.onboarded ? 'Ready' : 'Setup needed' }}
+                            </span>
+                          </td>
+                          <td>
+                            <span class="status-badge"
+                                  [class.ok]="store.subscriptionStatus === 'ACTIVE'"
+                                  [class.warn]="store.subscriptionStatus === 'PENDING' || store.subscriptionStatus === 'SUSPENDED'"
+                                  [class.err]="store.subscriptionStatus === 'CANCELED'"
+                                  [class.info]="!store.subscriptionStatus || store.subscriptionStatus === 'TRIAL'">
+                              {{ store.subscriptionStatus || '—' }}
+                            </span>
+                          </td>
+                          <td><strong style="font-weight:700;">{{ store.usersCount ?? 0 }}</strong></td>
+                          <td><strong style="font-weight:700;">{{ store.transactionCount ?? 0 }}</strong></td>
+                          <td>
+                            <div class="row-actions">
+                              <button class="btn btn-secondary" (click)="openEditStore(store)">
+                                <span class="ico">✎</span> Edit
+                              </button>
+                              <button class="btn"
+                                      [class.btn-secondary-warn]="!(store.subscriptionStatus === 'SUSPENDED' || store.subscriptionStatus === 'CANCELED')"
+                                      [class.btn-secondary]="store.subscriptionStatus === 'SUSPENDED' || store.subscriptionStatus === 'CANCELED'"
+                                      [disabled]="suspending[store.id]"
+                                      (click)="toggleSuspendStore(store)">
+                                <span class="ico">
+                                  @if (store.subscriptionStatus === 'SUSPENDED' || store.subscriptionStatus === 'CANCELED') { ✓ } @else { 🔒 }
+                                </span>
+                                @if (store.subscriptionStatus === 'SUSPENDED' || store.subscriptionStatus === 'CANCELED') { Activate } @else { Suspend }
+                              </button>
+                              <button class="btn btn-primary-stripe"
+                                      [disabled]="onboarding[store.id]"
+                                      (click)="onboardStore(store)">
+                                <span class="ico">💳</span>
+                                @if (store.onboarded) { Re-onboard } @else { Setup Stripe }
+                              </button>
+                              <button class="btn btn-secondary" [routerLink]="['/admin', 'stores', store.id]">
+                                <span class="ico">🏬</span> Store Admin
+                              </button>
+                              @if (store.onboarded) {
+                                <button class="btn btn-secondary"
+                                        [disabled]="loginLinking[store.id]"
+                                        (click)="loginLinkStore(store)">
+                                  <span class="ico">↗</span> Stripe
+                                </button>
+                              }
+                              <button class="btn btn-danger"
+                                      [disabled]="deleting[store.id]"
+                                      (click)="openDeleteStore(store)">
+                                <span class="ico">🗑</span> Delete
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      } @empty {
+                        <tr>
+                          <td colspan="7">
+                            <div class="empty">
+                              <div class="ico">🏪</div>
+                              <h4>No stores yet</h4>
+                              <p>Click <b>+ New store</b> above to register your first store in the network.</p>
+                            </div>
+                          </td>
+                        </tr>
+                      }
+                    </tbody>
+                  </table>
+                </div>
+              } @else {
+                <!-- STORE ADMIN: My Store pretty card -->
+                @if (myStore()) {
+                  <div>
+                    <div class="store-hero">
+                      <div class="store-hero-inner">
+                        <div class="logo-or-avatar">
+                          @if (myStore()!.logoUrl) { <img [src]="myStore()!.logoUrl" alt="" onerror="this.style.display='none'" /> }
+                          @else { 🏪 }
+                        </div>
+                        <div class="titles">
+                          <h2 class="store-name">{{ myStore()!.businessName || 'Your Store' }}</h2>
+                          <div class="store-meta">
+                            <span class="status-badge"
+                                  [class.ok]="myStore()!.subscriptionStatus === 'ACTIVE'"
+                                  [class.warn]="myStore()!.subscriptionStatus === 'SUSPENDED' || myStore()!.subscriptionStatus === 'PENDING'"
+                                  [class.err]="myStore()!.subscriptionStatus === 'CANCELED'">
+                              {{ myStore()!.subscriptionStatus || '—' }}
+                            </span>
+                            <span>ID: <span style="font-family:ui-monospace;opacity:.95;">{{ myStore()!.id?.slice(0,12) }}…</span></span>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div class="store-quick-grid">
+                      <div class="quick-stat">
+                        <span class="k">Team members</span>
+                        <span class="v">{{ myStore()!.usersCount ?? 0 }}</span>
+                        <span class="sub">across all roles</span>
+                      </div>
+                      <div class="quick-stat">
+                        <span class="k">Transactions</span>
+                        <span class="v">{{ myStore()!.transactionCount ?? 0 }}</span>
+                        <span class="sub">total orders</span>
+                      </div>
+                      <div class="quick-stat">
+                        <span class="k">Stripe status</span>
+                        <span class="v" [style.color]="myStore()!.onboarded ? '#059669' : '#b45309'">
+                          {{ myStore()!.onboarded ? 'Connected' : 'Pending' }}
+                        </span>
+                        <span class="sub">{{ myStore()!.onboarded ? 'payouts enabled' : 'onboarding required' }}</span>
+                      </div>
+                      <div class="quick-stat">
+                        <span class="k">Location</span>
+                        <span class="v" style="font-size:16px;">📍</span>
+                        <span class="sub mono">{{ myStore()!.latitude }}, {{ myStore()!.longitude }}</span>
+                      </div>
+                    </div>
+
+                    <div class="info-section">
+                      <h3 style="font-size:15px;font-weight:700;margin:0;">Store details</h3>
+                      <div class="info-row-grid">
+                        <div class="info-item"><span class="k">Store ID</span><span class="v"><span class="mono">{{ myStore()!.id }}</span></span></div>
+                        <div class="info-item"><span class="k">Business name</span><span class="v">{{ myStore()!.businessName || '—' }}</span></div>
+                        <div class="info-item"><span class="k">Latitude</span><span class="v">{{ myStore()!.latitude }}</span></div>
+                        <div class="info-item"><span class="k">Longitude</span><span class="v">{{ myStore()!.longitude }}</span></div>
+                      </div>
+                    </div>
+
+                    <div class="info-section">
+                      @if (myStore()!.onboarded) {
+                        <div class="banner success">
+                          <div class="banner-ico">✅</div>
+                          <div class="banner-text">
+                            <div class="banner-title">Stripe Connect enabled</div>
+                            <div class="banner-msg">
+                              Your account is fully onboarded. Customers can pay, and settlements will flow directly to your bank.
+                              You can re-visit onboarding any time to update your information or payout settings.
+                            </div>
+                            <div class="banner-actions">
+                              <a class="btn btn-primary" [routerLink]="['/admin','stores', myStore()?.id]"
+                                 style="background:var(--color-primary);border-color:var(--color-primary);color:#fff;box-shadow:var(--shadow-sm);">
+                                🛍 Manage Products &amp; Inventory
+                              </a>
+                              <button class="btn btn-ghost" style="background:#fff;color:#047857;border:1px solid #a7f3d0;"
+                                      [disabled]="onboarding['me']" (click)="onboardMyStore()">
+                                🔄 Re-open Stripe Onboarding
+                              </button>
+                              <button class="btn btn-secondary"
+                                      style="background:#047857;color:#fff;border-color:#047857;"
+                                      [disabled]="loginLinking['me']" (click)="loginLinkMyStore()">
+                                ↗ Open Stripe Dashboard
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+                      } @else {
+                        <div class="banner warn">
+                          <div class="banner-ico">⚠️</div>
+                          <div class="banner-text">
+                            <div class="banner-title">You need to complete Stripe onboarding</div>
+                            <div class="banner-msg">
+                              Before customers can pay for orders fulfilled by your store, we need to set up your Stripe Express
+                              account. This takes about 3 minutes. You'll need bank account details for payouts.
+                            </div>
+                            <div class="banner-actions">
+                              <a class="btn btn-primary" [routerLink]="['/admin','stores', myStore()?.id]"
+                                 style="background:var(--color-primary);border-color:var(--color-primary);color:#fff;box-shadow:var(--shadow-sm);">
+                                🛍 Manage Products &amp; Inventory
+                              </a>
+                              <button class="btn btn-primary"
+                                      style="background:#b45309;border-color:#b45309;"
+                                      [disabled]="onboarding['me']" (click)="onboardMyStore()">
+                                💳 Complete Stripe Onboarding →
+                              </button>
+                              @if (myStore()!.onboarded) {
+                                <button class="btn btn-secondary"
+                                        [disabled]="loginLinking['me']" (click)="loginLinkMyStore()">
+                                  ↗ Open Stripe Dashboard
+                                </button>
+                              }
+                            </div>
+                          </div>
+                        </div>
+                      }
+                    </div>
+
+                    <div class="info-section">
+                      <div class="actions-row">
+                        <button class="btn btn-secondary" (click)="openEditMyStore()">
+                          ✎ Edit store details
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                } @else {
+                  <div class="empty">
+                    <div class="ico">🏪</div>
+                    <h4>No store information available</h4>
+                    <p>Your account may not be linked to a store yet. Please contact support.</p>
+                  </div>
+                }
+              }
+            </div>
           </section>
         }
 
         @if (activeTab() === 'users') {
-          <section class="card" style="display: grid; gap: 16px;">
-            <div class="section-header">
-              <h2 class="section-title">Users</h2>
+          <section class="panel">
+            <div class="panel-head">
+              <div>
+                <h2><span class="ico">👥</span> @if (isGlobalAdmin()) { All Operators } @else { My Team }</h2>
+                <span class="muted">
+                  @if (isGlobalAdmin()) { Invite team members, assign roles, and manage access across every store. }
+                  @else { Manage your in-store team and their permissions. }
+                </span>
+              </div>
               <button class="btn btn-primary" (click)="showAddUser.set(!showAddUser())" [disabled]="addingUser()">
-                @if (showAddUser()) { Cancel } @else { + Add user }
+                @if (showAddUser()) { <span class="ico">✕</span> Cancel } @else { <span class="ico">＋</span> Add operator }
               </button>
             </div>
 
             @if (showAddUser()) {
-              <form class="add-user-form" [formGroup]="addUserForm" (ngSubmit)="onAddUser()">
+              <form class="form-panel" [formGroup]="addUserForm" (ngSubmit)="onAddUser()">
+                <div class="form-panel-head">
+                  <div class="form-panel-title"><span class="ico">＋</span> @if (isGlobalAdmin()) { Add a new operator } @else { Invite team member }</div>
+                  <span class="muted">Fields with <span style="color:#ef4444;">*</span> are required</span>
+                </div>
                 <div class="form-grid-2">
                   <div class="form-field">
-                    <label for="u-email">Email</label>
+                    <label for="u-email">Email <span class="req">*</span></label>
                     <input id="u-email" type="email" formControlName="email" placeholder="user@example.com" />
                   </div>
                   <div class="form-field">
-                    <label for="u-name">Name</label>
-                    <input id="u-name" type="text" formControlName="name" placeholder="Full name" />
+                    <label for="u-name">Full name <span class="req">*</span></label>
+                    <input id="u-name" type="text" formControlName="name" placeholder="Jane Doe" />
                   </div>
                   <div class="form-field">
                     <label for="u-role">Role</label>
                     <select id="u-role" formControlName="role">
-                      <option value="STORE_ADMIN">Store Admin</option>
-                      <option value="OWNER">Owner</option>
-                      <option value="CLERK">Clerk / Staff</option>
-                      <option value="RUNNER">Runner / Fulfillment</option>
+                      @if (isGlobalAdmin()) {
+                        <option value="OWNER">👑 Owner</option>
+                      }
+                      <option value="STORE_ADMIN">🛠 Store Admin</option>
+                      <option value="CLERK">🧾 Clerk / Front Desk</option>
+                      <option value="RUNNER">🏃 Runner / Fulfillment</option>
                     </select>
                   </div>
                   <div class="form-field">
                     <label for="u-phone">Phone</label>
                     <input id="u-phone" type="text" formControlName="phone" placeholder="+1 555 000 0000" />
                   </div>
+                  @if (isGlobalAdmin()) {
+                    <div class="form-field">
+                      <label for="u-store">Store</label>
+                      <select id="u-store" formControlName="storeId">
+                        <option [value]="null" disabled>-- Select a store --</option>
+                        @for (s of stores(); track s.id) {
+                          <option [value]="s.id">{{ s.businessName || s.id }}</option>
+                        }
+                      </select>
+                    </div>
+                  }
+                  <div class="form-field">
+                    <label for="u-password">Password <span class="req">*</span></label>
+                    <input id="u-password" type="password" formControlName="password" placeholder="At least 8 characters" autocomplete="new-password" />
+                  </div>
                 </div>
-                <div class="form-field">
-                  <label for="u-password">Password</label>
-                  <input id="u-password" type="password" formControlName="password" placeholder="At least 8 characters" />
-                </div>
-                <div style="display: flex; justify-content: flex-end;">
+                <div class="form-footer">
+                  <button type="button" class="btn btn-secondary" (click)="showAddUser.set(false)">Cancel</button>
                   <button type="submit" class="btn btn-primary" [disabled]="addingUser() || !addUserForm.valid">
-                    @if (addingUser()) { Saving… } @else { Save user }
+                    @if (addingUser()) { Saving… } @else { <span class="ico">✓</span> Save operator }
                   </button>
                 </div>
               </form>
             }
 
-            @if (userError()) {
-              <div class="error-box">{{ userError() }}</div>
-            }
-
-            @if (usersLoading()) {
-              <div class="loading">Loading users…</div>
-            } @else {
-              <div class="table-wrap">
-                <table>
-                  <thead>
-                    <tr>
-                      <th>Name</th>
-                      <th>Email</th>
-                      <th>Role</th>
-                      <th>Phone</th>
-                      <th>Status</th>
-                      <th>Actions</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    @for (u of users(); track u.id || u.userId) {
+            <div class="panel-body">
+              @if (usersLoading()) {
+                <div class="loading">Loading users…</div>
+              } @else if (users().length > 0) {
+                <div class="table-wrap">
+                  <table>
+                    <thead>
                       <tr>
-                        <td>{{ u.name || u.fullName || '—' }}</td>
-                        <td>{{ u.email }}</td>
-                        <td>
-                          <span class="status-badge info">{{ u.role || '—' }}</span>
-                        </td>
-                        <td>{{ u.phone || '—' }}</td>
-                        <td>
-                          <span class="status-badge"
-                                [class.ok]="u.status === 'ACTIVE' || !u.status || u.active"
-                                [class.err]="u.status === 'SUSPENDED' || u.status === 'DISABLED'"
-                                [class.warn]="u.status === 'PENDING'">
-                            {{ u.status || (u.active ? 'ACTIVE' : 'INACTIVE') }}
-                          </span>
-                        </td>
-                        <td>
-                          <div class="row-actions">
-                            <button class="btn btn-secondary" (click)="onToggleUserStatus(u)">
-                              {{ u.status === 'SUSPENDED' || u.status === 'DISABLED' || u.active === false ? 'Activate' : 'Suspend' }}
-                            </button>
-                          </div>
-                        </td>
+                        <th style="min-width: 240px;">Operator</th>
+                        <th>Store</th>
+                        <th>Role</th>
+                        <th>Status</th>
+                        <th style="min-width: 240px;">Actions</th>
                       </tr>
-                    } @empty {
-                      <tr>
-                        <td colspan="6" class="empty">No users found.</td>
-                      </tr>
-                    }
-                  </tbody>
-                </table>
-              </div>
-            }
+                    </thead>
+                    <tbody>
+                      @for (u of users(); track u.id || u.userId) {
+                        <tr>
+                          <td>
+                            <div class="cell-identity">
+                              <div class="avatar"
+                                   [class.purple]="u.isGlobalAdmin || u.role === 'OWNER'"
+                                   [class.blue]="u.role === 'STORE_ADMIN'"
+                                   [class.gray]="u.role !== 'STORE_ADMIN' && !u.isGlobalAdmin && u.role !== 'OWNER'">
+                                {{ avatarInitials(u) }}
+                              </div>
+                              <div class="cell-text">
+                                <span class="cell-title">
+                                  {{ u.name || u.fullName || '—' }}
+                                  @if (u.isGlobalAdmin) { <span class="chip purple" style="margin-left:6px;">GLOBAL ADMIN</span> }
+                                </span>
+                                <span class="cell-meta">{{ u.email }}</span>
+                              </div>
+                            </div>
+                          </td>
+                          <td>
+                            @if (u.storeName) {
+                              <span class="mono">🏪 {{ u.storeName }}</span>
+                            } @else {
+                              <span class="muted">—</span>
+                            }
+                          </td>
+                          <td>
+                            <span class="chip"
+                                  [class.purple]="u.isGlobalAdmin || u.role === 'OWNER'"
+                                  [class.ok]="u.role === 'GLOBAL_ADMIN'"
+                                  [class.warn]="u.role === 'STORE_ADMIN'"
+                                  [class.info]="u.role === 'CLERK' || u.role === 'RUNNER'">
+                              @if (u.role === 'OWNER' || u.isGlobalAdmin) { 👑 }
+                              @else if (u.role === 'STORE_ADMIN') { 🛠 }
+                              @else if (u.role === 'CLERK') { 🧾 }
+                              @else if (u.role === 'RUNNER') { 🏃 }
+                              {{ u.role || '—' }}
+                            </span>
+                          </td>
+                          <td>
+                            <span class="status-badge"
+                                  [class.ok]="!u.status || u.status === 'ACTIVE'"
+                                  [class.err]="u.status === 'SUSPENDED' || u.status === 'DELETED' || u.status === 'DISABLED'"
+                                  [class.warn]="u.status === 'INVITED' || u.status === 'PENDING'">
+                              {{ u.status || 'ACTIVE' }}
+                            </span>
+                            @if (u.hasPassword === false) { <span class="chip warn" style="margin-left:6px;">No password</span> }
+                          </td>
+                          <td>
+                            <div class="row-actions">
+                              <button class="btn"
+                                      [class.btn-secondary-warn]="!(u.status === 'SUSPENDED' || u.status === 'DELETED' || u.status === 'DISABLED')"
+                                      [class.btn-secondary]="u.status === 'SUSPENDED' || u.status === 'DELETED' || u.status === 'DISABLED'"
+                                      [disabled]="togglingUserStatus[u.id || u.userId]"
+                                      (click)="onToggleUserStatus(u)">
+                                <span class="ico">
+                                  @if (u.status === 'SUSPENDED' || u.status === 'DELETED' || u.status === 'DISABLED') { ✓ } @else { 🔒 }
+                                </span>
+                                @if (u.status === 'SUSPENDED' || u.status === 'DELETED' || u.status === 'DISABLED') { Activate } @else { Suspend }
+                              </button>
+                              @if (!u.isGlobalAdmin || u.id !== currentUser()?.userId) {
+                                <button class="btn btn-danger"
+                                        [disabled]="deletingUser[u.id || u.userId]"
+                                        (click)="openDeleteUser(u)">
+                                  <span class="ico">🗑</span> Remove
+                                </button>
+                              }
+                            </div>
+                          </td>
+                        </tr>
+                      }
+                    </tbody>
+                  </table>
+                </div>
+              } @else {
+                <div class="empty">
+                  <div class="ico">👥</div>
+                  <h4>No operators yet</h4>
+                  <p>@if (isGlobalAdmin()) { Add your first team member above to help manage the network. } @else { Invite your first team member to help run the store. }</p>
+                </div>
+              }
+            </div>
           </section>
         }
 
         @if (activeTab() === 'transactions') {
-          <section class="card" style="display: grid; gap: 16px;">
-            <div class="section-header">
-              <h2 class="section-title">Transactions</h2>
+          <section class="panel">
+            <div class="panel-head">
+              <div>
+                <h2><span class="ico">📦</span> Transactions</h2>
+                <span class="muted">Track every split-ledger order from originating host to fulfilling neighbor store.</span>
+              </div>
             </div>
 
-            @if (txLoading()) {
-              <div class="loading">Loading transactions…</div>
-            } @else if (txError()) {
-              <div class="error-box">{{ txError() }}</div>
-            } @else {
-              <div class="table-wrap">
-                <table>
-                  <thead>
-                    <tr>
-                      <th>ID</th>
-                      <th>Stores</th>
-                      <th>Status</th>
-                      <th>Total</th>
-                      <th>Created</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    @for (tx of pagedTransactions(); track tx.id) {
+            <div class="panel-body">
+              @if (txLoading()) {
+                <div class="loading">Loading transactions…</div>
+              } @else if (transactions().length > 0) {
+                <div class="table-wrap">
+                  <table>
+                    <thead>
                       <tr>
-                        <td><span class="mono">{{ tx.id?.slice(0, 12) }}…</span></td>
-                        <td>{{ tx.originatingStoreName || tx.storeName || tx.fulfillingStoreName || '—' }}</td>
-                        <td>
-                          <span class="status-badge" [class]="txStatusClass(tx.status)">
-                            {{ tx.status || '—' }}
-                          </span>
-                        </td>
-                        <td>{{ formatMoney(tx.totalRetailCents ?? tx.totalCents ?? tx.amountCents, tx.currency) }}</td>
-                        <td>{{ tx.createdAt | date:'short' }}</td>
+                        <th style="min-width: 160px;">ID</th>
+                        <th style="min-width: 280px;">Stores</th>
+                        <th>Status</th>
+                        <th>Total</th>
+                        <th>Created</th>
                       </tr>
-                    } @empty {
-                      <tr>
-                        <td colspan="5" class="empty">No transactions found.</td>
-                      </tr>
-                    }
-                  </tbody>
-                </table>
-              </div>
-
-              <div class="pagination">
-                <span class="pagination-info">
-                  Showing {{ pageStart() + 1 }}–{{ pageEnd() }} of {{ transactions().length }}
-                </span>
-                <div class="pagination-buttons">
-                  <button class="btn btn-secondary" (click)="txPage.set(txPage() - 1)" [disabled]="txPage() === 0">
-                    ← Prev
-                  </button>
-                  <button class="btn btn-secondary" (click)="txPage.set(txPage() + 1)" [disabled]="pageEnd() >= transactions().length">
-                    Next →
-                  </button>
+                    </thead>
+                    <tbody>
+                      @for (tx of pagedTransactions(); track tx.id) {
+                        <tr>
+                          <td><span class="mono">{{ tx.id?.slice(0, 14) }}…</span></td>
+                          <td>
+                            @if (tx.originatingStoreName && tx.fulfillingStoreName && tx.originatingStoreName !== tx.fulfillingStoreName) {
+                              <div style="display: grid; gap: 4px;">
+                                <div style="display:flex;align-items:center;gap:8px;">
+                                  <span class="chip purple" style="font-size:11px;">HOST</span>
+                                  <span>{{ tx.originatingStoreName }}</span>
+                                </div>
+                                <div style="display:flex;align-items:center;gap:8px;">
+                                  <span class="chip ok" style="font-size:11px;">FULFILL</span>
+                                  <span>{{ tx.fulfillingStoreName }}</span>
+                                </div>
+                              </div>
+                            } @else {
+                              <span class="mono">🏪 {{ tx.originatingStoreName || tx.fulfillingStoreName || tx.storeName || '—' }}</span>
+                            }
+                          </td>
+                          <td>
+                            <span class="status-badge" [class]="txStatusClass(tx.status)">
+                              {{ tx.status || '—' }}
+                            </span>
+                          </td>
+                          <td><strong style="font-weight:700;">{{ formatMoney(tx.totalRetailCents ?? tx.totalCents ?? tx.amountCents, tx.currency) }}</strong></td>
+                          <td>{{ tx.createdAt | date:'short' }}</td>
+                        </tr>
+                      }
+                    </tbody>
+                  </table>
                 </div>
-              </div>
-            }
+
+                <div class="pagination">
+                  <span class="pagination-info">
+                    @if (transactions().length > 0) {
+                      Page {{ txPage() + 1 }} / {{ totalTxPages() }} · {{ pageStart() + 1 }}–{{ pageEnd() }} of {{ txTotalCount() }}
+                    } @else { 0 records }
+                  </span>
+                  <div class="pagination-buttons">
+                    <button class="btn btn-secondary" (click)="txPage.set(txPage() - 1)" [disabled]="txPage() === 0">← Prev</button>
+                    <button class="btn btn-secondary" (click)="txPage.set(txPage() + 1)"
+                            [disabled]="pageEnd() >= (transactions().length)">Next →</button>
+                  </div>
+                </div>
+              } @else {
+                <div class="empty">
+                  <div class="ico">📦</div>
+                  <h4>No transactions yet</h4>
+                  <p>Orders flowing through the split-ledger network will appear here.</p>
+                </div>
+              }
+            </div>
           </section>
         }
+      }
+
+      <!-- Edit Store Modal -->
+      @if (editStoreOpen()) {
+        <div class="modal-backdrop" (click.self)="closeEditStore()">
+          <div class="modal" role="dialog" aria-modal="true" aria-labelledby="edit-store-title">
+            <div class="modal-header">
+              <div class="modal-title edit">
+                <span class="ico">✎</span>
+              </div>
+              <div class="modal-title-text">
+                <h3 id="edit-store-title">
+                  @if (editStoreIsMine()) { Edit my store } @else { Edit store }
+                </h3>
+                <span class="muted">Update location details, subscription state, and branding.</span>
+              </div>
+              <button class="modal-close" (click)="closeEditStore()" aria-label="Close">×</button>
+            </div>
+            <div class="modal-body">
+              <form style="padding: 0; margin-top: 0; background: transparent;"
+                    [formGroup]="editStoreForm" (ngSubmit)="onSubmitEditStore()">
+                <div class="form-grid-2">
+                  <div class="form-field">
+                    <label for="es-name">Business name <span class="req">*</span></label>
+                    <input id="es-name" formControlName="businessName" type="text" />
+                  </div>
+                  <div class="form-field">
+                    <label for="es-sub">Subscription status</label>
+                    <select id="es-sub" formControlName="subscriptionStatus">
+                      <option value="ACTIVE">🟢 ACTIVE</option>
+                      <option value="PENDING">🟡 PENDING</option>
+                      <option value="TRIAL">🔵 TRIAL</option>
+                      <option value="SUSPENDED">🟠 SUSPENDED</option>
+                      <option value="CANCELED">🔴 CANCELED</option>
+                    </select>
+                  </div>
+                  <div class="form-field">
+                    <label for="es-lat">Latitude <span class="req">*</span></label>
+                    <input id="es-lat" formControlName="latitude" type="number" step="any" />
+                  </div>
+                  <div class="form-field">
+                    <label for="es-lng">Longitude <span class="req">*</span></label>
+                    <input id="es-lng" formControlName="longitude" type="number" step="any" />
+                  </div>
+                  <div class="form-field">
+                    <label for="es-logo">Logo URL</label>
+                    <input id="es-logo" formControlName="logoUrl" type="text" placeholder="https://… (optional)" />
+                  </div>
+                  <div class="form-field">
+                    <label for="es-hero">Hero image URL</label>
+                    <input id="es-hero" formControlName="heroImageUrl" type="text" placeholder="https://… (optional)" />
+                  </div>
+                </div>
+              </form>
+            </div>
+            <div class="modal-footer">
+              <button class="btn btn-secondary" (click)="closeEditStore()">Cancel</button>
+              <button class="btn btn-primary" (click)="onSubmitEditStore()"
+                      [disabled]="savingEditStore() || !editStoreForm.valid">
+                @if (savingEditStore()) { <span class="ico">⟳</span> Saving… } @else { <span class="ico">✓</span> Save changes }
+              </button>
+            </div>
+          </div>
+        </div>
+      }
+
+      <!-- Delete Store Modal -->
+      @if (deleteStoreOpen()) {
+        <div class="modal-backdrop" (click.self)="closeDeleteStore()">
+          <div class="modal" role="alertdialog" aria-modal="true" aria-labelledby="del-store-title">
+            <div class="modal-header danger">
+              <div class="modal-title delete">
+                <span class="ico">🗑</span>
+              </div>
+              <div class="modal-title-text">
+                <h3 id="del-store-title">Cancel store subscription</h3>
+                <span class="muted">This store will become inactive and leave the network.</span>
+              </div>
+              <button class="modal-close" (click)="closeDeleteStore()" aria-label="Close">×</button>
+            </div>
+            <div class="modal-body">
+              <p class="confirm-text">
+                You are about to <strong>cancel the subscription</strong> of store
+                <strong>"{{ deleteStoreTarget()?.businessName || '' }}"</strong>.
+              </p>
+              <ul class="confirm-box-list">
+                <li><span class="ico">✕</span> Store will no longer appear in customer search results</li>
+                <li><span class="ico">🛒</span> No new orders can be hosted or fulfilled</li>
+                <li><span class="ico">📝</span> Historical records and transactions are kept for audit</li>
+                <li><span class="ico">⚠️</span> This action cannot be undone through the dashboard</li>
+              </ul>
+            </div>
+            <div class="modal-footer">
+              <button class="btn btn-secondary" (click)="closeDeleteStore()">Keep store</button>
+              <button class="btn btn-danger-filled"
+                      [disabled]="deleting[deleteStoreTarget()?.id]"
+                      (click)="confirmDeleteStore()">
+                @if (deleting[deleteStoreTarget()?.id]) { <span class="ico">⟳</span> Canceling… } @else { <span class="ico">🗑</span> Yes, cancel subscription }
+              </button>
+            </div>
+          </div>
+        </div>
+      }
+
+      <!-- Delete User Modal -->
+      @if (deleteUserOpen()) {
+        <div class="modal-backdrop" (click.self)="closeDeleteUser()">
+          <div class="modal" role="alertdialog" aria-modal="true" aria-labelledby="del-user-title">
+            <div class="modal-header danger">
+              <div class="modal-title delete">
+                <span class="ico">🗑</span>
+              </div>
+              <div class="modal-title-text">
+                <h3 id="del-user-title">Remove operator</h3>
+                <span class="muted">Revoke all access from this team member.</span>
+              </div>
+              <button class="modal-close" (click)="closeDeleteUser()" aria-label="Close">×</button>
+            </div>
+            <div class="modal-body">
+              <p class="confirm-text">
+                Remove <strong>{{ deleteUserTarget()?.name || deleteUserTarget()?.email }}</strong>
+                ({{ deleteUserTarget()?.email }}) from this system?
+              </p>
+              <ul class="confirm-box-list">
+                <li><span class="ico">🔑</span> All login tokens and sessions will be immediately revoked</li>
+                <li><span class="ico">🚫</span> Operator can no longer sign in or access the dashboard</li>
+                <li><span class="ico">📋</span> Record is soft-deleted (status DELETED) — not erased</li>
+                <li><span class="ico">↺</span> A global admin can re-invite the same email later</li>
+              </ul>
+            </div>
+            <div class="modal-footer">
+              <button class="btn btn-secondary" (click)="closeDeleteUser()">Keep operator</button>
+              <button class="btn btn-danger-filled"
+                      [disabled]="deletingUser[deleteUserTarget()?.id]"
+                      (click)="confirmDeleteUser()">
+                @if (deletingUser[deleteUserTarget()?.id]) { <span class="ico">⟳</span> Removing… } @else { <span class="ico">🗑</span> Yes, remove operator }
+              </button>
+            </div>
+          </div>
+        </div>
       }
     </div>
   `,
 })
 export class AdminDashboardPageComponent implements OnInit {
+  readonly fb = inject(FormBuilder);
+  readonly http = inject(HttpClient);
+  readonly authService = inject(AuthService);
+
   readonly activeTab = signal<TabKey>('stores');
   readonly currentUser = signal<AuthUser | null>(null);
 
   readonly stores = signal<any[]>([]);
   readonly storesLoading = signal(false);
   readonly storesError = signal<string | null>(null);
+  readonly storesSuccess = signal<string | null>(null);
   readonly myStore = signal<any | null>(null);
 
   readonly users = signal<any[]>([]);
   readonly usersLoading = signal(false);
   readonly userError = signal<string | null>(null);
+  readonly userSuccess = signal<string | null>(null);
   readonly showAddUser = signal(false);
   readonly addingUser = signal(false);
   readonly addUserForm: FormGroup;
 
   readonly transactions = signal<any[]>([]);
+  readonly txTotalCount = signal(0);
+  readonly txTotalPages = signal(0);
   readonly txLoading = signal(false);
   readonly txError = signal<string | null>(null);
   readonly txPage = signal(0);
   readonly txPageSize = 10;
 
   readonly loggingOut = signal(false);
+
+  readonly showAddStore = signal(false);
+  readonly creatingStore = signal(false);
+  readonly addStoreForm: FormGroup;
+
+  // Edit store modal
+  readonly editStoreOpen = signal(false);
+  readonly editStoreTarget = signal<any | null>(null);
+  readonly editStoreIsMine = signal(false);
+  readonly savingEditStore = signal(false);
+  readonly editStoreError = signal<string | null>(null);
+  readonly editStoreForm: FormGroup;
+
+  // Delete store modal
+  readonly deleteStoreOpen = signal(false);
+  readonly deleteStoreTarget = signal<any | null>(null);
+
+  // Delete user modal
+  readonly deleteUserOpen = signal(false);
+  readonly deleteUserTarget = signal<any | null>(null);
+
+  readonly onboarding: Record<string, boolean> = {};
+  readonly loginLinking: Record<string, boolean> = {};
+  readonly suspending: Record<string, boolean> = {};
+  readonly deleting: Record<string, boolean> = {};
+  readonly togglingUserStatus: Record<string, boolean> = {};
+  readonly deletingUser: Record<string, boolean> = {};
+
+  readonly stripeFallback = signal<{ url: SafeUrl; label: string } | null>(null);
+
+  private readonly cdr = inject(ChangeDetectorRef);
+  private readonly sanitizer = inject(DomSanitizer);
+  private touch(): void { this.cdr.markForCheck(); }
 
   readonly isGlobalAdmin = computed(() => {
     const u = this.currentUser();
@@ -634,19 +1538,105 @@ export class AdminDashboardPageComponent implements OnInit {
 
   readonly pageStart = computed(() => this.txPage() * this.txPageSize);
   readonly pageEnd = computed(() => Math.min(this.pageStart() + this.txPageSize, this.transactions().length));
+  readonly totalTxPages = computed(() => Math.max(1, Math.ceil((this.txTotalCount() || this.transactions().length) / this.txPageSize)));
 
-  constructor(
-    private readonly authService: AuthService,
-    private readonly http: HttpClient,
-    private readonly fb: FormBuilder,
-  ) {
-    this.currentUser.set(authService.currentUser$.getValue());
+  readonly greetingName = computed(() => {
+    const u = this.currentUser();
+    if (!u) return 'there';
+    const full = u.name;
+    if (full) {
+      const first = full.split(' ')[0];
+      if (first) return first.charAt(0).toUpperCase() + first.slice(1);
+    }
+    if (u.email) {
+      const at = u.email.indexOf('@');
+      const local = at > 0 ? u.email.slice(0, at) : u.email;
+      if (local) return local.charAt(0).toUpperCase() + local.slice(1);
+    }
+    return 'there';
+  });
+
+  readonly kpiTotalStores = computed(() => this.stores().length);
+  readonly kpiActiveStores = computed(() =>
+    this.stores().filter((s: any) => s.subscriptionStatus === 'ACTIVE').length
+  );
+  readonly kpiSuspendedStores = computed(() =>
+    this.stores().filter((s: any) => s.subscriptionStatus === 'SUSPENDED' || s.subscriptionStatus === 'CANCELED').length
+  );
+  readonly kpiOnboarded = computed(() =>
+    this.stores().filter((s: any) => !!s.onboarded).length
+  );
+  readonly kpiOnboardedPct = computed(() => {
+    const tot = this.kpiTotalStores();
+    if (!tot) return 0;
+    return Math.round((this.kpiOnboarded() * 100) / tot);
+  });
+  readonly kpiTotalUsers = computed(() => this.users().length);
+  readonly kpiActiveUsers = computed(() =>
+    this.users().filter((u: any) => !u.status || u.status === 'ACTIVE' || u.status === 'INVITED').length
+  );
+  readonly kpiAdminUsers = computed(() =>
+    this.users().filter((u: any) =>
+      u.role === 'GLOBAL_ADMIN' || u.role === 'OWNER' || u.role === 'STORE_ADMIN' || u.isGlobalAdmin
+    ).length
+  );
+  readonly totalTxVolume = computed(() => {
+    const list = this.transactions();
+    if (!list.length) return this.formatMoney(0, 'USD');
+    let total = 0;
+    for (const tx of list) {
+      total += Number(tx.totalRetailCents ?? tx.totalCents ?? tx.amountCents ?? 0);
+    }
+    const sample = list.find((t: any) => t.currency);
+    return this.formatMoney(total, sample?.currency ?? 'USD');
+  });
+
+  avatarInitials(u: any): string {
+    if (!u) return 'U';
+    const full = u.name || u.fullName;
+    if (full) {
+      const parts = full.trim().split(/\s+/).filter(Boolean);
+      if (parts.length > 0) {
+        let out = '';
+        for (let i = 0; i < Math.min(2, parts.length); i++) {
+          out += parts[i].charAt(0).toUpperCase();
+        }
+        if (out) return out;
+      }
+    }
+    if (u.email) {
+      const ch = u.email.charAt(0).toUpperCase();
+      if (ch) return ch;
+    }
+    return 'U';
+  }
+
+  constructor() {
+    this.currentUser.set(this.authService.currentUser$.getValue());
     this.addUserForm = this.fb.group({
       email: ['', [Validators.required, Validators.email]],
       name: ['', [Validators.required]],
       role: ['STORE_ADMIN', [Validators.required]],
       phone: [''],
+      storeId: [null as string | null],
       password: ['', [Validators.required, Validators.minLength(8)]],
+    });
+    this.addStoreForm = this.fb.group({
+      businessName: ['', [Validators.required]],
+      subscriptionStatus: ['ACTIVE'],
+      latitude: [40.7128, [Validators.required]],
+      longitude: [-74.0060, [Validators.required]],
+      logoUrl: [''],
+      heroImageUrl: [''],
+    });
+    this.editStoreForm = this.fb.group({
+      id: [null as string | null],
+      businessName: ['', [Validators.required]],
+      subscriptionStatus: ['ACTIVE'],
+      latitude: [null as number | null, [Validators.required]],
+      longitude: [null as number | null, [Validators.required]],
+      logoUrl: [''],
+      heroImageUrl: [''],
     });
   }
 
@@ -656,10 +1646,11 @@ export class AdminDashboardPageComponent implements OnInit {
 
   ngOnInit(): void {
     if (!this.isAdminish()) return;
-    this.loadStores();
-    this.loadUsers();
-    this.loadTransactions();
-    this.refreshMe();
+    void this.refreshMe().then(() => {
+      void this.loadStores();
+      void this.loadUsers();
+      void this.loadTransactions();
+    });
   }
 
   private async refreshMe(): Promise<void> {
@@ -671,112 +1662,517 @@ export class AdminDashboardPageComponent implements OnInit {
     }
   }
 
+  clearStoreMessagesSoon(): void {
+    setTimeout(() => { this.storesError.set(null); this.storesSuccess.set(null); }, 4000);
+  }
+  clearUserMessagesSoon(): void {
+    setTimeout(() => { this.userError.set(null); this.userSuccess.set(null); }, 4000);
+  }
+
+  // ---------------- STORES ----------------
+
   private async loadStores(): Promise<void> {
     this.storesLoading.set(true);
     this.storesError.set(null);
     try {
       const api = this.api();
-      const res = await firstValueFrom(this.http.get<any>(`${api}/admin/stores`));
-      const arr = Array.isArray(res) ? res : (res?.stores ?? res?.data ?? []);
-      this.stores.set(arr);
-      const u = this.currentUser();
-      if (!this.isGlobalAdmin() && u?.storeId) {
-        const mine = arr.find((s: any) => s.id === u.storeId) || arr[0] || null;
-        this.myStore.set(mine);
-      } else if (!this.isGlobalAdmin() && arr.length === 1) {
-        this.myStore.set(arr[0]);
+      if (this.isGlobalAdmin()) {
+        const res = await firstValueFrom(this.http.get<any>(`${api}/admin/stores`));
+        const arr = Array.isArray(res) ? res : (res?.stores ?? res?.data ?? []);
+        this.stores.set(arr);
+      } else {
+        try {
+          const me = await firstValueFrom(this.http.get<any>(`${api}/admin/stores/me`));
+          this.stores.set([me]);
+          this.myStore.set(me);
+        } catch (err: any) {
+          this.myStore.set(null);
+          this.stores.set([]);
+          this.storesError.set(err?.error?.message ?? err?.message ?? 'Could not load your store.');
+        }
       }
     } catch (err: any) {
-      this.storesError.set(err?.message ?? 'Failed to load stores.');
+      this.storesError.set(err?.error?.message ?? err?.message ?? 'Failed to load stores.');
     } finally {
       this.storesLoading.set(false);
     }
   }
+
+  async onCreateStore(): Promise<void> {
+    if (!this.addStoreForm.valid) return;
+    this.creatingStore.set(true);
+    this.storesError.set(null);
+    this.storesSuccess.set(null);
+    try {
+      const api = this.api();
+      const v = this.addStoreForm.value;
+      const payload = {
+        businessName: v.businessName,
+        subscriptionStatus: v.subscriptionStatus || undefined,
+        latitude: Number(v.latitude),
+        longitude: Number(v.longitude),
+        logoUrl: v.logoUrl || undefined,
+        heroImageUrl: v.heroImageUrl || undefined,
+      };
+      const created: any = await firstValueFrom(this.http.post(`${api}/admin/stores`, payload));
+      this.addStoreForm.reset({
+        businessName: '', subscriptionStatus: 'ACTIVE',
+        latitude: 40.7128, longitude: -74.0060, logoUrl: '', heroImageUrl: '',
+      });
+      this.showAddStore.set(false);
+      this.storesSuccess.set(`Store “${created.businessName}” created.`);
+      this.clearStoreMessagesSoon();
+      await this.loadStores();
+    } catch (err: any) {
+      this.storesError.set(err?.error?.message ?? err?.message ?? 'Failed to create store.');
+    } finally {
+      this.creatingStore.set(false);
+    }
+  }
+
+  openEditStore(store: any): void {
+    this.editStoreTarget.set(store);
+    this.editStoreIsMine.set(false);
+    this.editStoreError.set(null);
+    this.editStoreForm.patchValue({
+      id: store.id,
+      businessName: store.businessName ?? '',
+      subscriptionStatus: store.subscriptionStatus ?? 'ACTIVE',
+      latitude: store.latitude ?? null,
+      longitude: store.longitude ?? null,
+      logoUrl: store.logoUrl ?? '',
+      heroImageUrl: store.heroImageUrl ?? '',
+    });
+    this.editStoreOpen.set(true);
+  }
+
+  openEditMyStore(): void {
+    const mine = this.myStore();
+    if (!mine) return;
+    this.editStoreTarget.set(mine);
+    this.editStoreIsMine.set(true);
+    this.editStoreError.set(null);
+    this.editStoreForm.patchValue({
+      id: mine.id,
+      businessName: mine.businessName ?? '',
+      subscriptionStatus: mine.subscriptionStatus ?? 'ACTIVE',
+      latitude: mine.latitude ?? null,
+      longitude: mine.longitude ?? null,
+      logoUrl: mine.logoUrl ?? '',
+      heroImageUrl: mine.heroImageUrl ?? '',
+    });
+    this.editStoreOpen.set(true);
+  }
+
+  closeEditStore(): void {
+    this.editStoreOpen.set(false);
+    this.editStoreTarget.set(null);
+    this.editStoreIsMine.set(false);
+    this.editStoreError.set(null);
+  }
+
+  async onSubmitEditStore(): Promise<void> {
+    if (!this.editStoreForm.valid) return;
+    const store = this.editStoreTarget();
+    if (!store) return;
+    this.savingEditStore.set(true);
+    this.editStoreError.set(null);
+    try {
+      const api = this.api();
+      const v = this.editStoreForm.value;
+      const payload = {
+        businessName: v.businessName,
+        subscriptionStatus: v.subscriptionStatus || undefined,
+        latitude: Number(v.latitude),
+        longitude: Number(v.longitude),
+        logoUrl: v.logoUrl || undefined,
+        heroImageUrl: v.heroImageUrl || undefined,
+      };
+      const path = this.editStoreIsMine()
+        ? `${api}/admin/stores/me`
+        : `${api}/admin/stores/${encodeURIComponent(store.id)}`;
+      const updated: any = await firstValueFrom(this.http.put(path, payload));
+      this.editStoreOpen.set(false);
+      this.editStoreTarget.set(null);
+      if (this.editStoreIsMine()) {
+        this.myStore.set(updated);
+      }
+      this.storesSuccess.set(`Saved changes to “${updated.businessName}”.`);
+      this.clearStoreMessagesSoon();
+      await this.loadStores();
+    } catch (err: any) {
+      this.editStoreError.set(err?.error?.message ?? err?.message ?? 'Failed to save changes.');
+    } finally {
+      this.savingEditStore.set(false);
+    }
+  }
+
+  async toggleSuspendStore(store: any): Promise<void> {
+    const id = store.id;
+    if (!id) return;
+    this.suspending[id] = true;
+    this.touch();
+    try {
+      const api = this.api();
+      const curr = store.subscriptionStatus;
+      const next = (curr === 'SUSPENDED' || curr === 'CANCELED') ? 'ACTIVE' : 'SUSPENDED';
+      await firstValueFrom(this.http.put(`${api}/admin/stores/${encodeURIComponent(id)}/subscription-status`, {
+        subscriptionStatus: next,
+      }));
+      this.storesSuccess.set(`Store ${next === 'SUSPENDED' ? 'suspended' : 'activated'}.`);
+      this.clearStoreMessagesSoon();
+      await this.loadStores();
+    } catch (err: any) {
+      this.storesError.set(err?.error?.message ?? err?.message ?? 'Failed to update status.');
+    } finally {
+      this.suspending[id] = false;
+      this.touch();
+    }
+  }
+
+  openDeleteStore(store: any): void {
+    this.deleteStoreTarget.set(store);
+    this.deleteStoreOpen.set(true);
+  }
+  closeDeleteStore(): void {
+    this.deleteStoreTarget.set(null);
+    this.deleteStoreOpen.set(false);
+  }
+  async confirmDeleteStore(): Promise<void> {
+    const store = this.deleteStoreTarget();
+    if (!store?.id) return;
+    this.deleting[store.id] = true;
+    this.touch();
+    try {
+      const api = this.api();
+      await firstValueFrom(this.http.delete(`${api}/admin/stores/${encodeURIComponent(store.id)}`));
+      this.deleteStoreOpen.set(false);
+      this.deleteStoreTarget.set(null);
+      this.storesSuccess.set(`Subscription canceled for “${store.businessName}”.`);
+      this.clearStoreMessagesSoon();
+      await this.loadStores();
+    } catch (err: any) {
+      this.storesError.set(err?.error?.message ?? err?.message ?? 'Failed to delete store.');
+    } finally {
+      this.deleting[store.id] = false;
+      this.touch();
+    }
+  }
+
+  // ---- Stripe onboarding / login link ----
+
+  private openExternalPopup(url: string, label: string): boolean {
+    const popup = window.open('', '_blank', 'noopener,noreferrer');
+    if (popup) {
+      try { popup.location.href = url; } catch { popup.close(); return false; }
+      return true;
+    }
+    const safe = this.sanitizer.sanitize(SecurityContext.URL, url);
+    if (safe) {
+      this.stripeFallback.set({
+        url: this.sanitizer.bypassSecurityTrustUrl(safe),
+        label,
+      });
+      setTimeout(() => this.stripeFallback.set(null), 60000);
+    }
+    return false;
+  }
+
+  private redirectPreOpenedPopup(popup: Window | null, url: string, label: string): boolean {
+    if (popup) {
+      try { popup.location.href = url; return true; } catch { popup.close(); }
+    }
+    return this.openExternalPopup(url, label);
+  }
+
+  async onboardStore(store: any): Promise<void> {
+    const id = store.id;
+    if (!id) {
+      this.storesError.set('Store record has no id — please refresh and try again.');
+      this.clearStoreMessagesSoon();
+      return;
+    }
+    this.stripeFallback.set(null);
+    this.onboarding[id] = true;
+    this.touch();
+    this.storesError.set(null);
+    const popup = window.open('', '_blank', 'noopener,noreferrer');
+    try {
+      const api = this.api();
+      const body = {
+        returnUrl: `${window.location.origin}/admin`,
+        refreshUrl: `${window.location.origin}/admin`,
+      };
+      const res: any = await firstValueFrom(
+        this.http.post(`${api}/admin/stores/${encodeURIComponent(id)}/connect/onboarding-link`, body)
+      );
+      if (res?.url) {
+        this.storesSuccess.set(res.message ? `Notice: ${res.message}` : 'Opening Stripe onboarding…');
+        this.clearStoreMessagesSoon();
+        await this.loadStores();
+        if (!this.redirectPreOpenedPopup(popup, res.url, 'Open Stripe Onboarding')) {
+          this.storesError.set('Your browser blocked the popup — click the link below to open Stripe.');
+        }
+      } else {
+        if (popup) popup.close();
+        this.storesError.set(res?.message || 'No URL returned from Stripe.');
+      }
+    } catch (err: any) {
+      if (popup) popup.close();
+      this.storesError.set(err?.error?.message ?? err?.message ?? 'Failed to generate Stripe onboarding link.');
+    } finally {
+      this.onboarding[id] = false;
+      this.touch();
+    }
+  }
+
+  async loginLinkStore(store: any): Promise<void> {
+    const id = store.id;
+    if (!id) {
+      this.storesError.set('Store record has no id — please refresh and try again.');
+      this.clearStoreMessagesSoon();
+      return;
+    }
+    this.stripeFallback.set(null);
+    this.loginLinking[id] = true;
+    this.touch();
+    const popup = window.open('', '_blank', 'noopener,noreferrer');
+    try {
+      const api = this.api();
+      const res: any = await firstValueFrom(
+        this.http.post(`${api}/admin/stores/${encodeURIComponent(id)}/connect/login-link`, {})
+      );
+      if (res?.url) {
+        if (res.chargesEnabled === false || res.payoutsEnabled === false) {
+          this.storesSuccess.set(
+            `Stripe account not fully ready: chargesEnabled=${res.chargesEnabled}, payoutsEnabled=${res.payoutsEnabled}. Dashboard opens in new tab.`
+          );
+          this.clearStoreMessagesSoon();
+        }
+        if (!this.redirectPreOpenedPopup(popup, res.url, 'Open Stripe Dashboard')) {
+          if (!this.storesSuccess()) this.storesError.set('Popup blocked — click the link below to open Stripe Dashboard.');
+        }
+      } else {
+        if (popup) popup.close();
+        this.storesError.set(res?.message || 'Could not generate Stripe dashboard link.');
+      }
+    } catch (err: any) {
+      if (popup) popup.close();
+      this.storesError.set(err?.error?.message ?? err?.message ?? 'Failed to open Stripe dashboard.');
+    } finally {
+      this.loginLinking[id] = false;
+      this.touch();
+    }
+  }
+
+  async onboardMyStore(): Promise<void> {
+    this.stripeFallback.set(null);
+    this.onboarding['me'] = true;
+    this.touch();
+    this.storesError.set(null);
+    const popup = window.open('', '_blank', 'noopener,noreferrer');
+    try {
+      const api = this.api();
+      const body = {
+        returnUrl: `${window.location.origin}/admin`,
+        refreshUrl: `${window.location.origin}/admin`,
+      };
+      const res: any = await firstValueFrom(
+        this.http.post(`${api}/admin/stores/me/connect/onboarding-link`, body)
+      );
+      if (res?.url) {
+        if (res.message) {
+          this.storesSuccess.set(res.message);
+          this.clearStoreMessagesSoon();
+        }
+        await this.loadStores();
+        if (!this.redirectPreOpenedPopup(popup, res.url, 'Open Stripe Onboarding')) {
+          if (!this.storesSuccess()) this.storesError.set('Popup blocked — use the Stripe link below.');
+        }
+      } else {
+        if (popup) popup.close();
+        this.storesError.set(res?.message || 'No URL returned.');
+      }
+    } catch (err: any) {
+      if (popup) popup.close();
+      this.storesError.set(err?.error?.message ?? err?.message ?? 'Failed to generate onboarding link.');
+    } finally {
+      this.onboarding['me'] = false;
+      this.touch();
+    }
+  }
+
+  async loginLinkMyStore(): Promise<void> {
+    this.stripeFallback.set(null);
+    this.loginLinking['me'] = true;
+    this.touch();
+    const popup = window.open('', '_blank', 'noopener,noreferrer');
+    try {
+      const api = this.api();
+      const res: any = await firstValueFrom(
+        this.http.post(`${api}/admin/stores/me/connect/login-link`, {})
+      );
+      if (res?.url) {
+        if (res.chargesEnabled === false || res.payoutsEnabled === false) {
+          this.storesSuccess.set(
+            `Account not fully ready: chargesEnabled=${res.chargesEnabled}, payoutsEnabled=${res.payoutsEnabled}.`
+          );
+          this.clearStoreMessagesSoon();
+        }
+        if (!this.redirectPreOpenedPopup(popup, res.url, 'Open Stripe Dashboard')) {
+          if (!this.storesSuccess()) this.storesError.set('Popup blocked — use the Stripe link below.');
+        }
+      } else {
+        if (popup) popup.close();
+        this.storesError.set(res?.message || 'Could not generate Stripe dashboard link.');
+      }
+    } catch (err: any) {
+      if (popup) popup.close();
+      this.storesError.set(err?.error?.message ?? err?.message ?? 'Failed to open Stripe dashboard.');
+    } finally {
+      this.loginLinking['me'] = false;
+      this.touch();
+    }
+  }
+
+  // ---------------- USERS ----------------
 
   private async loadUsers(): Promise<void> {
     this.usersLoading.set(true);
     this.userError.set(null);
     try {
       const api = this.api();
-      const u = this.currentUser();
-      const suffix = u?.storeId && !this.isGlobalAdmin() ? `?storeId=${encodeURIComponent(u.storeId)}` : '';
-      const res = await firstValueFrom(this.http.get<any>(`${api}/admin/users${suffix}`));
+      const res = await firstValueFrom(this.http.get<any>(`${api}/admin/users`));
       const arr = Array.isArray(res) ? res : (res?.users ?? res?.data ?? []);
       this.users.set(arr);
     } catch (err: any) {
-      this.userError.set(err?.message ?? 'Failed to load users.');
+      this.userError.set(err?.error?.message ?? err?.message ?? 'Failed to load users.');
     } finally {
       this.usersLoading.set(false);
-    }
-  }
-
-  private async loadTransactions(): Promise<void> {
-    this.txLoading.set(true);
-    this.txError.set(null);
-    try {
-      const api = this.api();
-      const u = this.currentUser();
-      const suffix = u?.storeId && !this.isGlobalAdmin() ? `?storeId=${encodeURIComponent(u.storeId)}` : '';
-      const res = await firstValueFrom(this.http.get<any>(`${api}/admin/transactions${suffix}`));
-      const arr = Array.isArray(res) ? res : (res?.items ?? res?.transactions ?? res?.data ?? []);
-      this.transactions.set(arr);
-    } catch (err: any) {
-      this.txError.set(err?.message ?? 'Failed to load transactions.');
-    } finally {
-      this.txLoading.set(false);
     }
   }
 
   async onAddUser(): Promise<void> {
     if (!this.addUserForm.valid) return;
     this.addingUser.set(true);
+    this.userError.set(null);
+    this.userSuccess.set(null);
     try {
       const api = this.api();
       const v = this.addUserForm.value;
-      const u = this.currentUser();
-      const payload: any = {
+      const payload: Record<string, any> = {
         email: v.email,
         name: v.name,
         role: v.role,
         phone: v.phone || undefined,
         password: v.password,
       };
-      if (u?.storeId) payload.storeId = u.storeId;
+      if (this.isGlobalAdmin()) {
+        payload['storeId'] = v.storeId || null;
+      } else {
+        const u = this.currentUser();
+        if (u?.storeId) payload['storeId'] = u.storeId;
+      }
       await firstValueFrom(this.http.post(`${api}/admin/users`, payload));
       this.addUserForm.reset({ role: 'STORE_ADMIN' });
       this.showAddUser.set(false);
+      this.userSuccess.set('Operator added.');
+      this.clearUserMessagesSoon();
       await this.loadUsers();
     } catch (err: any) {
-      this.userError.set(err?.error?.message ?? err?.message ?? 'Failed to create user.');
+      this.userError.set(err?.error?.message ?? err?.message ?? 'Failed to create operator.');
     } finally {
       this.addingUser.set(false);
     }
   }
 
-  onToggleUserStatus(user: any): void {
+  async onToggleUserStatus(user: any): Promise<void> {
     const id = user.id || user.userId;
     if (!id) return;
-    const suspended = user.status === 'SUSPENDED' || user.status === 'DISABLED' || user.active === false;
-    const newStatus = suspended ? 'ACTIVE' : 'SUSPENDED';
-    const api = this.api();
-    firstValueFrom(
-      this.http.patch(`${api}/admin/users/${encodeURIComponent(id)}/status`, { status: newStatus })
-    ).then(() => this.loadUsers()).catch(() => this.loadUsers());
+    this.togglingUserStatus[id] = true;
+    this.touch();
+    try {
+      const api = this.api();
+      const suspended = user.status === 'SUSPENDED' || user.status === 'DELETED' || user.status === 'DISABLED';
+      const nextStatus = suspended ? 'ACTIVE' : 'SUSPENDED';
+      await firstValueFrom(this.http.put(`${api}/admin/users/${encodeURIComponent(id)}`, { status: nextStatus }));
+      this.userSuccess.set(`Operator ${nextStatus === 'SUSPENDED' ? 'suspended' : 'reactivated'}.`);
+      this.clearUserMessagesSoon();
+      await this.loadUsers();
+    } catch (err: any) {
+      this.userError.set(err?.error?.message ?? err?.message ?? 'Failed to update status.');
+    } finally {
+      this.togglingUserStatus[id] = false;
+      this.touch();
+    }
   }
 
-  onEditStore(store: any): void {
-    alert(`Edit store: ${store.businessName || store.name || store.id}`);
+  openDeleteUser(u: any): void {
+    this.deleteUserTarget.set(u);
+    this.deleteUserOpen.set(true);
   }
-
-  onSuspendStore(store: any): void {
-    const id = store.id;
+  closeDeleteUser(): void {
+    this.deleteUserTarget.set(null);
+    this.deleteUserOpen.set(false);
+  }
+  async confirmDeleteUser(): Promise<void> {
+    const u = this.deleteUserTarget();
+    const id = u?.id || u?.userId;
     if (!id) return;
-    const suspended = !!store.suspended;
-    const api = this.api();
-    firstValueFrom(
-      this.http.patch(`${api}/admin/stores/${encodeURIComponent(id)}/status`, { suspended: !suspended })
-    ).then(() => this.loadStores()).catch(() => this.loadStores());
+    this.deletingUser[id] = true;
+    this.touch();
+    try {
+      const api = this.api();
+      await firstValueFrom(this.http.delete(`${api}/admin/users/${encodeURIComponent(id)}`));
+      this.deleteUserOpen.set(false);
+      this.deleteUserTarget.set(null);
+      this.userSuccess.set(`Removed operator ${u?.name || u?.email}.`);
+      this.clearUserMessagesSoon();
+      await this.loadUsers();
+    } catch (err: any) {
+      this.userError.set(err?.error?.message ?? err?.message ?? 'Failed to remove operator.');
+    } finally {
+      this.deletingUser[id] = false;
+      this.touch();
+    }
   }
+
+  // ---------------- TRANSACTIONS ----------------
+
+  private async loadTransactions(): Promise<void> {
+    this.txLoading.set(true);
+    this.txError.set(null);
+    try {
+      const api = this.api();
+      const page = this.txPage();
+      const size = this.txPageSize;
+      const u = this.currentUser();
+      const qp = new URLSearchParams();
+      qp.set('page', String(page));
+      qp.set('pageSize', String(size));
+      if (!this.isGlobalAdmin() && u?.storeId) {
+        qp.set('storeId', u.storeId);
+      }
+      const res = await firstValueFrom(this.http.get<any>(`${api}/admin/transactions?${qp.toString()}`));
+      if (res && typeof res === 'object' && !Array.isArray(res)) {
+        const items = Array.isArray(res.items) ? res.items : [];
+        this.transactions.set(items);
+        this.txTotalCount.set(Number(res.totalCount ?? items.length));
+        this.txTotalPages.set(Number(res.totalPages ?? Math.ceil(items.length / size)));
+      } else {
+        const arr = Array.isArray(res) ? res : [];
+        this.transactions.set(arr);
+        this.txTotalCount.set(arr.length);
+        this.txTotalPages.set(Math.max(1, Math.ceil(arr.length / size)));
+      }
+    } catch (err: any) {
+      this.txError.set(err?.error?.message ?? err?.message ?? 'Failed to load transactions.');
+    } finally {
+      this.txLoading.set(false);
+    }
+  }
+
+  // ---------------- MISC ----------------
 
   async onLogout(): Promise<void> {
     if (this.loggingOut()) return;
@@ -803,7 +2199,7 @@ export class AdminDashboardPageComponent implements OnInit {
   formatMoney(cents: number | undefined | null, currency: string | undefined): string {
     if (cents === undefined || cents === null) return '—';
     const c = currency || 'USD';
-    const n = cents / 100;
+    const n = Number(cents) / 100;
     return new Intl.NumberFormat('en-US', { style: 'currency', currency: c }).format(n);
   }
 }
