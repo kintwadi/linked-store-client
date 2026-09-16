@@ -913,19 +913,31 @@ export class StoreProductFormComponent implements OnInit {
         status: raw.status || 'ACTIVE',
       };
 
+      let responseProductId: string | null = null;
+      let responseVariantId: string | null = null;
+
       if (this.isEditMode() && this.variantId) {
-        await firstValueFrom(
-          this.http.put(`${api}/admin/stores/${pathPart}/inventory/${encodeURIComponent(this.variantId)}`, payload)
+        const resp = await firstValueFrom(
+          this.http.put<any>(`${api}/admin/stores/${pathPart}/inventory/${encodeURIComponent(this.variantId)}`, payload)
         );
+        responseProductId = resp?.productId ?? null;
+        responseVariantId = resp?.variantId ?? this.variantId;
         this.showSuccess('Product updated successfully.');
       } else {
-        await firstValueFrom(
-          this.http.post(`${api}/admin/stores/${pathPart}/inventory`, payload)
+        const resp = await firstValueFrom(
+          this.http.post<any>(`${api}/admin/stores/${pathPart}/inventory`, payload)
         );
+        responseProductId = resp?.productId ?? null;
+        responseVariantId = resp?.variantId ?? null;
         this.showSuccess('Product created successfully.');
       }
 
-      setTimeout(() => this.navigateBack(), 500);
+      const productId = responseProductId ?? responseVariantId;
+      if (productId) {
+        setTimeout(() => this.router.navigate(['/p', productId, 'qr']), 450);
+      } else {
+        setTimeout(() => this.navigateBack(), 500);
+      }
     } catch (err: any) {
       console.error('Save failed', err);
       this.showError(err?.error?.message || 'Failed to save product. Please try again.');

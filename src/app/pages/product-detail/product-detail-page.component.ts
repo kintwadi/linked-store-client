@@ -1,8 +1,11 @@
 import { ChangeDetectorRef, Component, computed, HostListener, OnDestroy, OnInit, signal } from '@angular/core';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { CommonModule } from '@angular/common';
+import { HttpClient } from '@angular/common/http';
+import { firstValueFrom } from 'rxjs';
 import { Product, SimilarProductsResult } from '../../shared/models/product.model';
 import { ProductService } from '../../services/product.service';
+import { AuthService } from '../../services/auth.service';
 
 type ReservationStatus = 'idle' | 'pending' | 'accepted' | 'denied' | 'expired';
 
@@ -278,6 +281,113 @@ type ReservationStatus = 'idle' | 'pending' | 'accepted' | 'denied' | 'expired';
       .meta-row { grid-template-columns: 1fr; }
       .gallery .arrow { width: 36px; height: 36px; font-size: 16px; }
     }
+
+    /* ============ HELD RESERVATION BANNER ============ */
+    .held-banner {
+      border-radius: 18px;
+      padding: 18px 20px;
+      display: grid;
+      gap: 14px;
+      background: linear-gradient(135deg, #6d28d9 0%, #4c1d95 100%);
+      color: #fff;
+      box-shadow: 0 10px 28px -14px rgba(109,40,217,0.55);
+      border: 1px solid rgba(255,255,255,0.08);
+    }
+    .held-head {
+      display: flex; align-items: flex-start; justify-content: space-between;
+      gap: 12px; flex-wrap: wrap;
+    }
+    .held-title {
+      display: inline-flex; align-items: center; gap: 10px;
+      font-size: 17px; font-weight: 800; letter-spacing: -0.01em;
+    }
+    .held-title .dot {
+      width: 9px; height: 9px; border-radius: 50%;
+      background: #22c55e;
+      box-shadow: 0 0 0 4px rgba(34,197,94,0.25);
+      animation: liveBlink 2s ease-in-out infinite;
+    }
+    @keyframes liveBlink {
+      0%,100% { opacity: 1; }
+      50%     { opacity: 0.45; }
+    }
+    .held-sub {
+      margin: 0;
+      font-size: 13px; color: rgba(255,255,255,0.82);
+      line-height: 1.5;
+      max-width: 560px;
+    }
+    .held-timer-wrap {
+      display: grid;
+      gap: 10px;
+      background: rgba(0,0,0,0.18);
+      padding: 12px 16px;
+      border-radius: 14px;
+      border: 1px solid rgba(255,255,255,0.08);
+    }
+    .held-timer-head {
+      display: flex; align-items: center; justify-content: space-between;
+      gap: 12px; flex-wrap: wrap;
+      font-size: 12px; color: rgba(255,255,255,0.75);
+      font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em;
+    }
+    .held-timer {
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+      font-size: 34px; font-weight: 800;
+      letter-spacing: -0.01em;
+      line-height: 1;
+    }
+    .held-timer.soon { color: #fecaca; animation: heldShake 1.2s ease-in-out infinite; }
+    @keyframes heldShake {
+      0%,100% { transform: translateX(0); }
+      25%     { transform: translateX(-1px); }
+      75%     { transform: translateX(1px); }
+    }
+    .held-bar {
+      height: 6px; background: rgba(255,255,255,0.12); border-radius: 999px; overflow: hidden;
+    }
+    .held-bar-fill {
+      height: 100%;
+      background: linear-gradient(90deg, #34d399 0%, #fbbf24 60%, #f87171 100%);
+      border-radius: 999px;
+      transition: width .3s ease;
+    }
+    .held-actions {
+      display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+    }
+    .btn-ghost-light {
+      background: rgba(255,255,255,0.08);
+      color: #fff;
+      border: 1px solid rgba(255,255,255,0.18);
+      padding: 10px 16px; border-radius: 999px;
+      font-size: 13px; font-weight: 700;
+      cursor: pointer;
+      transition: background .15s ease;
+    }
+    .btn-ghost-light:hover { background: rgba(255,255,255,0.14); }
+    .btn-ghost-light[disabled] { opacity: .55; cursor: not-allowed; }
+    .btn-primary-checkout {
+      background: #fff;
+      color: #4c1d95;
+      border: 1px solid #fff;
+      padding: 10px 18px; border-radius: 999px;
+      font-size: 13px; font-weight: 800;
+      cursor: pointer;
+      transition: transform .15s ease, box-shadow .15s ease;
+      box-shadow: 0 10px 20px -14px rgba(0,0,0,0.35);
+    }
+    .btn-primary-checkout:hover { transform: translateY(-1px); box-shadow: 0 14px 24px -14px rgba(0,0,0,0.45); }
+    .btn-primary-checkout[disabled] { opacity: .55; cursor: not-allowed; }
+    .cancel-btn-danger {
+      background: transparent;
+      color: #fecaca;
+      border: 1px solid rgba(254,202,202,0.35);
+      padding: 10px 16px; border-radius: 999px;
+      font-size: 13px; font-weight: 700;
+      cursor: pointer;
+    }
+    .cancel-btn-danger:hover { background: rgba(254,202,202,0.1); color: #fff; border-color: rgba(254,202,202,0.55); }
+    .cancel-btn-danger[disabled] { opacity: .55; cursor: not-allowed; }
   `],
   template: `
     <a routerLink="/" class="back-link">← Back to home</a>
@@ -395,17 +505,63 @@ type ReservationStatus = 'idle' | 'pending' | 'accepted' | 'denied' | 'expired';
               </div>
             }
 
-            <button
-              class="btn btn-primary btn-block"
-              (click)="onRequestNow()"
-              [disabled]="requesting() || reservationStatus() === 'pending'">
-              @if (reservationStatus() === 'pending')  { Waiting… }
-              @if (reservationStatus() === 'accepted') { Reserved ✓ }
-              @if (reservationStatus() === 'denied' || reservationStatus() === 'expired') { Try again }
-              @if (reservationStatus() === 'idle') {
-                {{ requesting() ? 'Reserving…' : 'Request Now' }}
-              }
-            </button>
+            @if (reservationStatus() === 'accepted' && reservation()) {
+              <div class="held-banner" role="status" aria-live="polite">
+                <div class="held-head">
+                  <div style="display: grid; gap: 6px;">
+                    <div class="held-title">
+                      <span class="dot"></span>
+                      Held · Waiting for store confirmation
+                    </div>
+                    <p class="held-sub">
+                      We've reserved this item for 15 minutes. The store is confirming they have it ready — once they mark it
+                      available you can complete checkout. If you change your mind you can release the hold below.
+                    </p>
+                  </div>
+                </div>
+
+                <div class="held-timer-wrap">
+                  <div class="held-timer-head">
+                    <span>⏱ Hold time remaining</span>
+                    <span>{{ countdownMinutesLeft() }} min left</span>
+                  </div>
+                  <div class="held-timer" [class.soon]="currentSecondsLeftPublic() > 0 && currentSecondsLeftPublic() < 180">
+                    {{ formattedCountdown() }}
+                  </div>
+                  <div class="held-bar" aria-hidden="true">
+                    <div class="held-bar-fill" [style.width.%]="100 - countdownProgressPct()"></div>
+                  </div>
+                </div>
+
+                <div class="held-actions">
+                  <button class="btn-primary-checkout"
+                          type="button"
+                          (click)="goToCheckout()"
+                          [disabled]="requesting()">
+                    💳 Continue to checkout
+                  </button>
+                  <button class="cancel-btn-danger"
+                          type="button"
+                          (click)="onCancelHold()"
+                          [disabled]="cancelling() || requesting()">
+                    @if (cancelling()) { Releasing… }
+                    @else { ✗ Cancel hold }
+                  </button>
+                </div>
+              </div>
+            } @else {
+              <button
+                class="btn btn-primary btn-block"
+                (click)="onRequestNow()"
+                [disabled]="requesting() || reservationStatus() === 'pending'">
+                @if (reservationStatus() === 'pending')  { Waiting… }
+                @if (reservationStatus() === 'accepted') { Reserved ✓ }
+                @if (reservationStatus() === 'denied' || reservationStatus() === 'expired') { Try again }
+                @if (reservationStatus() === 'idle') {
+                  {{ requesting() ? 'Reserving…' : 'Request Now' }}
+                }
+              </button>
+            }
           </div>
 
           <dl class="meta-row">
@@ -458,6 +614,7 @@ export class ProductDetailPageComponent implements OnInit, OnDestroy {
   readonly product = signal<Product | null>(null);
   readonly similarProducts = signal<Product[]>([]);
   readonly requesting = signal(false);
+  readonly cancelling = signal(false);
   readonly requestResult = signal<{ ok: boolean; message: string } | null>(null);
   readonly activeSlide = signal(0);
   readonly reservationStatus = signal<ReservationStatus>('idle');
@@ -502,11 +659,21 @@ export class ProductDetailPageComponent implements OnInit, OnDestroy {
     return Math.max(0, Math.ceil(diffMs / 1000));
   }
 
+  currentSecondsLeftPublic(): number {
+    return this.currentSecondsRemaining();
+  }
+
+  countdownMinutesLeft(): number {
+    return Math.floor(this.currentSecondsRemaining() / 60);
+  }
+
   constructor(
     readonly products: ProductService,
     private readonly route: ActivatedRoute,
     private readonly router: Router,
     private readonly cdr: ChangeDetectorRef,
+    private readonly http: HttpClient,
+    private readonly auth: AuthService,
   ) {}
 
   ngOnInit(): void {
@@ -629,21 +796,26 @@ export class ProductDetailPageComponent implements OnInit, OnDestroy {
   private startCountdown(reservationResult: any): void {
     this.clearCountdown();
     const total = ProductDetailPageComponent.COUNTDOWN_SECONDS;
-    this.deadlineMs.set(Date.now() + total * 1000);
+    // Prefer server-side expiresAt epoch (ISO string or millis) when available; fall back to local clock.
+    let deadline = 0;
+    const iso: string | undefined | null = reservationResult?.expiresAt ?? reservationResult?.lock?.expiresAt;
+    if (iso && typeof iso === 'string') {
+      const t = new Date(iso).getTime();
+      if (t && !Number.isNaN(t)) deadline = t;
+    } else if (reservationResult?.deadlineMs && typeof reservationResult.deadlineMs === 'number') {
+      deadline = reservationResult.deadlineMs;
+    } else if (reservationResult?.countdownSeconds && typeof reservationResult.countdownSeconds === 'number') {
+      deadline = Date.now() + Math.floor(reservationResult.countdownSeconds * 1000);
+    }
+    if (!deadline || deadline <= Date.now()) {
+      deadline = Date.now() + total * 1000;
+    }
+    this.deadlineMs.set(deadline);
     this.reservationStatus.set('pending');
 
     window.setTimeout(() => {
       if (this.reservationStatus() === 'pending') {
         this.reservationStatus.set('accepted');
-        this.clearCountdown();
-        const state = {
-          transactionId: reservationResult.transactionId,
-          qrSecureToken: reservationResult.qrSecureToken,
-          qrFallbackCode: reservationResult.qrFallbackCode,
-          reservation: structuredClone(reservationResult),
-        };
-        const extras = { state, replaceUrl: false };
-        try { this.router.navigate(['/checkout'], extras); return; } catch { /* fallthrough */ }
         this.tick.update((t) => t + 1);
       }
     }, 1500);
@@ -652,12 +824,56 @@ export class ProductDetailPageComponent implements OnInit, OnDestroy {
       this.tick.update((t) => t + 1);
       const remaining = this.currentSecondsRemaining();
       if (remaining <= 0) {
-        if (this.reservationStatus() === 'pending') {
+        if (this.reservationStatus() === 'pending' || this.reservationStatus() === 'accepted') {
           this.reservationStatus.set('expired');
         }
         this.clearCountdown();
       }
     }, 250);
+  }
+
+  goToCheckout(): void {
+    const reservationResult = this.reservation();
+    if (!reservationResult) return;
+    this.clearCountdown();
+    const state = {
+      transactionId: reservationResult.transactionId,
+      qrSecureToken: reservationResult.qrSecureToken,
+      qrFallbackCode: reservationResult.qrFallbackCode,
+      reservation: structuredClone(reservationResult),
+    };
+    const extras = { state, replaceUrl: false };
+    try { this.router.navigate(['/checkout'], extras); return; } catch { /* fallthrough */ }
+    this.tick.update((t) => t + 1);
+  }
+
+  async onCancelHold(): Promise<void> {
+    if (this.cancelling()) return;
+    const reservationResult = this.reservation();
+    const txId: string | undefined = reservationResult?.transactionId;
+    if (!txId) return;
+    this.cancelling.set(true);
+    try {
+      const api = this.auth.resolveApiBasePublic();
+      const url = `${api}/reservations/${encodeURIComponent(txId)}/cancel`;
+      const res: any = await firstValueFrom(this.http.post(url, {})).catch((e: any) => e?.error ?? null);
+      this.clearCountdown();
+      this.deadlineMs.set(Date.now() - 1000);
+      this.reservationStatus.set('idle');
+      this.reservation.set(null);
+      this.requestResult.set({
+        ok: true,
+        message: (res?.status ? `Hold released (${String(res.status).toLowerCase()}). ` : '') +
+          'The item is available for other customers.',
+      });
+    } catch (e: any) {
+      this.requestResult.set({
+        ok: false,
+        message: e?.error?.message ?? e?.message ?? 'Failed to release hold. It will auto-expire.',
+      });
+    } finally {
+      this.cancelling.set(false);
+    }
   }
 
   private clearCountdown(): void {

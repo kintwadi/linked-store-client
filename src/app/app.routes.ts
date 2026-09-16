@@ -1,6 +1,7 @@
 import { Routes } from '@angular/router';
 import { HomePageComponent } from './pages/home/home-page.component';
 import { ProductDetailPageComponent } from './pages/product-detail/product-detail-page.component';
+import { ProductQrSharePageComponent } from './pages/product-detail/product-qr-share-page.component';
 import { CheckoutPageComponent } from './pages/checkout/checkout-page.component';
 import { CheckoutSuccessPageComponent } from './pages/checkout/checkout-success-page.component';
 import { CheckoutCancelPageComponent } from './pages/checkout/checkout-cancel-page.component';
@@ -18,6 +19,7 @@ import { StoreTransactionsListComponent } from './pages/store-dashboard/store-tr
 export const routes: Routes = [
   { path: '',                        component: HomePageComponent,              title: 'Linked-Store' },
   { path: 'p/:productId',            component: ProductDetailPageComponent,     title: 'Product' },
+  { path: 'p/:productId/qr',         component: ProductQrSharePageComponent,    title: 'Product QR · Share' },
   { path: 'checkout',                component: CheckoutPageComponent,           title: 'Checkout' },
   { path: 'checkout/success',        component: CheckoutSuccessPageComponent,    title: 'Payment successful' },
   { path: 'checkout/cancel',         component: CheckoutCancelPageComponent,     title: 'Payment canceled' },

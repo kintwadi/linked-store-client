@@ -3,7 +3,56 @@ import { CommonModule } from '@angular/common';
 import { Router, RouterLink } from '@angular/router';
 import { HttpClient } from '@angular/common/http';
 import { firstValueFrom } from 'rxjs';
+import { DomSanitizer, SafeUrl } from '@angular/platform-browser';
 import { ProductService } from '../../services/product.service';
+
+type StoreRow = any & {
+  _onboardingUrl?: string | null;
+  _onboardingLoading?: boolean;
+  _dashboardSafeUrl?: SafeUrl | null;
+  _dashboardUrl?: string | null;
+  _dashboardLoading?: boolean;
+  country?: string;
+};
+
+const COUNTRY_OPTIONS: readonly { code: string; label: string; currency: string }[] = [
+  { code: 'US', label: 'United States',                   currency: 'USD' },
+  { code: 'GB', label: 'United Kingdom',                  currency: 'GBP' },
+  { code: 'DE', label: 'Germany',                         currency: 'EUR' },
+  { code: 'FR', label: 'France',                          currency: 'EUR' },
+  { code: 'IT', label: 'Italy',                           currency: 'EUR' },
+  { code: 'ES', label: 'Spain',                           currency: 'EUR' },
+  { code: 'NL', label: 'Netherlands',                     currency: 'EUR' },
+  { code: 'BE', label: 'Belgium',                         currency: 'EUR' },
+  { code: 'AT', label: 'Austria',                         currency: 'EUR' },
+  { code: 'PT', label: 'Portugal',                        currency: 'EUR' },
+  { code: 'IE', label: 'Ireland',                         currency: 'EUR' },
+  { code: 'SE', label: 'Sweden',                          currency: 'SEK' },
+  { code: 'DK', label: 'Denmark',                         currency: 'DKK' },
+  { code: 'NO', label: 'Norway',                          currency: 'NOK' },
+  { code: 'CH', label: 'Switzerland',                     currency: 'CHF' },
+  { code: 'PL', label: 'Poland',                          currency: 'PLN' },
+  { code: 'CZ', label: 'Czechia',                         currency: 'CZK' },
+  { code: 'HU', label: 'Hungary',                         currency: 'HUF' },
+  { code: 'RO', label: 'Romania',                         currency: 'RON' },
+  { code: 'BG', label: 'Bulgaria',                        currency: 'BGN' },
+  { code: 'HR', label: 'Croatia',                         currency: 'HRK' },
+  { code: 'SK', label: 'Slovakia',                        currency: 'EUR' },
+  { code: 'SI', label: 'Slovenia',                        currency: 'EUR' },
+  { code: 'LT', label: 'Lithuania',                       currency: 'EUR' },
+  { code: 'LV', label: 'Latvia',                          currency: 'EUR' },
+  { code: 'EE', label: 'Estonia',                         currency: 'EUR' },
+  { code: 'LU', label: 'Luxembourg',                      currency: 'EUR' },
+  { code: 'CY', label: 'Cyprus',                          currency: 'EUR' },
+  { code: 'MT', label: 'Malta',                           currency: 'EUR' },
+  { code: 'FI', label: 'Finland',                         currency: 'EUR' },
+  { code: 'GR', label: 'Greece',                          currency: 'EUR' },
+  { code: 'CA', label: 'Canada',                          currency: 'CAD' },
+  { code: 'AU', label: 'Australia',                       currency: 'AUD' },
+  { code: 'NZ', label: 'New Zealand',                     currency: 'NZD' },
+  { code: 'IS', label: 'Iceland',                         currency: 'ISK' },
+  { code: 'LI', label: 'Liechtenstein',                   currency: 'CHF' },
+];
 
 const DEFAULT_PUBLIC_ORIGIN = 'https://linked-store.app';
 
@@ -46,6 +95,39 @@ declare global {
     __FRONTEND_PUBLIC_ORIGIN__?: string;
     __API_BASE_ORIGIN__?: string;
   }
+}
+
+function guessCountryCode(store: any): string | null {
+  const knowns: Array<[RegExp, string]> = [
+    [/\b(US|United States|U\.S\.|USA)\b/i, 'US'],
+    [/\b(Germany|Deutschland|DE)\b/i, 'DE'],
+    [/\b(France|Français|FR)\b/i, 'FR'],
+    [/\b(UK|United Kingdom|Britain|England|Scotland|Wales|GB)\b/i, 'GB'],
+    [/\b(Spain|España|ES)\b/i, 'ES'],
+    [/\b(Italy|Italia|IT)\b/i, 'IT'],
+    [/\b(Netherlands|Nederland|NL)\b/i, 'NL'],
+    [/\b(Belgium|Belgi[ëe]|BE)\b/i, 'BE'],
+    [/\b(Austria|Österreich|AT)\b/i, 'AT'],
+    [/\b(Portugal|PT)\b/i, 'PT'],
+    [/\b(Ireland|IE)\b/i, 'IE'],
+    [/\b(Sweden|Sverige|SE)\b/i, 'SE'],
+    [/\b(Denmark|Danmark|DK)\b/i, 'DK'],
+    [/\b(Norway|Norge|NO)\b/i, 'NO'],
+    [/\b(Switzerland|Schweiz|Suisse|CH)\b/i, 'CH'],
+    [/\b(Poland|Polska|PL)\b/i, 'PL'],
+    [/\b(Czechia|Czech|Česko|CZ)\b/i, 'CZ'],
+    [/\b(Hungary|Magyarország|HU)\b/i, 'HU'],
+    [/\b(Romania|România|RO)\b/i, 'RO'],
+    [/\b(Bulgaria|България|BG)\b/i, 'BG'],
+    [/\b(Croatia|Hrvatska|HR)\b/i, 'HR'],
+    [/\b(Canada|CA)\b/i, 'CA'],
+    [/\b(Australia|AU)\b/i, 'AU'],
+    [/\b(New Zealand|NZ|Aotearoa)\b/i, 'NZ'],
+  ];
+  const hay = [store.businessAddress, store.city, store.country, store.region, store.state, store.street, store.displayName, store.businessName]
+    .filter(Boolean).join(' | ');
+  for (const [rx, code] of knowns) if (rx.test(hay)) return code;
+  return null;
 }
 
 @Component({
@@ -179,6 +261,30 @@ declare global {
       flex: 1;
       min-width: 160px;
     }
+    .country-row {
+      display: grid;
+      gap: 6px;
+    }
+    .country-row label {
+      font-size: 13px;
+      font-weight: 600;
+      color: #111827;
+    }
+    .country-row select {
+      width: 100%;
+      padding: 10px 12px;
+      border-radius: 10px;
+      border: 1px solid var(--color-border);
+      background: #fff;
+      font-size: 14px;
+      color: #111827;
+      box-shadow: 0 1px 2px rgba(16, 24, 40, 0.05);
+    }
+    .country-row select:focus {
+      outline: none;
+      border-color: var(--color-primary);
+      box-shadow: 0 0 0 3px rgba(79, 110, 247, 0.15);
+    }
     .empty, .loading, .error {
       padding: 40px 20px;
       text-align: center;
@@ -258,6 +364,16 @@ declare global {
 
               <div class="card-actions">
                 @if (!store.onboarded) {
+                  <div class="country-row" style="width:100%;min-width:240px;">
+                    <label for="country-{{ store.id }}">Merchant country</label>
+                    <select id="country-{{ store.id }}"
+                            [value]="store.country || 'US'"
+                            (change)="onCountryChange(store, $any($event.target).value)">
+                      @for (c of COUNTRY_OPTIONS; track c.code) {
+                        <option [value]="c.code">{{ c.label }} · {{ c.currency }}</option>
+                      }
+                    </select>
+                  </div>
                   <button
                     class="btn btn-primary"
                     (click)="onConnectStripe(store)"
@@ -269,16 +385,26 @@ declare global {
                     }
                   </button>
                 } @else {
-                  <button
-                    class="btn btn-ghost"
-                    (click)="onManageDashboard(store)"
-                    [disabled]="processingStoreId() === store.id">
-                    @if (processingStoreId() === store.id) {
-                      Loading…
-                    } @else {
+                  @if (store._dashboardSafeUrl) {
+                    <a
+                      class="btn btn-ghost"
+                      [href]="store._dashboardSafeUrl"
+                      target="_blank"
+                      rel="noopener noreferrer">
                       Manage Stripe dashboard
-                    }
-                  </button>
+                    </a>
+                  } @else {
+                    <button
+                      class="btn btn-ghost"
+                      (click)="onManageDashboard(store)"
+                      [disabled]="processingStoreId() === store.id">
+                      @if (processingStoreId() === store.id || store._dashboardLoading) {
+                        Loading…
+                      } @else {
+                        Manage Stripe dashboard
+                      }
+                    </button>
+                  }
                 }
               </div>
             </div>
@@ -290,26 +416,43 @@ declare global {
 })
 export class StoreOnboardingPageComponent implements OnInit {
   readonly loading = signal(true);
-  readonly stores = signal<any[]>([]);
+  readonly stores = signal<StoreRow[]>([]);
   readonly error = signal<string | null>(null);
   readonly processingStoreId = signal<string | null>(null);
+  readonly COUNTRY_OPTIONS = COUNTRY_OPTIONS;
 
   constructor(
     private readonly products: ProductService,
     private readonly router: Router,
     private readonly http: HttpClient,
+    private readonly sanitizer: DomSanitizer,
   ) {}
 
   ngOnInit(): void {
     this.loadStores();
   }
 
+  onCountryChange(store: StoreRow, value: string): void {
+    store.country = value || 'US';
+    store._onboardingUrl = null;
+  }
+
   private async loadStores(): Promise<void> {
     const api = resolveApiBase();
     try {
       const res = await firstValueFrom(this.http.get<any>(`${api}/stores`));
-      const arr = Array.isArray(res) ? res : (res?.stores ?? res?.data ?? []);
+      const arrRaw: StoreRow[] = Array.isArray(res) ? res : (res?.stores ?? res?.data ?? []);
+      const arr = arrRaw.map(s => ({
+        ...s,
+        country: guessCountryCode(s) || 'US',
+        _onboardingUrl: null,
+        _onboardingLoading: false,
+        _dashboardUrl: null,
+        _dashboardSafeUrl: null,
+        _dashboardLoading: false,
+      }));
       this.stores.set(arr);
+      for (const s of arr) if (s.onboarded) void this.ensureDashboardLink(s);
     } catch (err: any) {
       const msg = err?.message ?? 'Failed to load stores.';
       this.error.set(msg);
@@ -318,24 +461,79 @@ export class StoreOnboardingPageComponent implements OnInit {
     }
   }
 
-  async onConnectStripe(store: any): Promise<void> {
+  private async ensureOnboardingLink(store: StoreRow): Promise<string | null> {
+    if (store._onboardingUrl) return store._onboardingUrl;
+    if (store._onboardingLoading) {
+      return await new Promise(resolve => {
+        const start = Date.now();
+        const iv = window.setInterval(() => {
+          if (store._onboardingUrl || !store._onboardingLoading || Date.now() - start > 15000) {
+            window.clearInterval(iv);
+            resolve(store._onboardingUrl ?? null);
+          }
+        }, 80);
+      });
+    }
+    store._onboardingLoading = true;
     const api = resolveApiBase();
-    this.processingStoreId.set(store.id);
+    const origin = resolvePublicOrigin();
+    const url = `${origin}/store/onboarding`;
     try {
-      const origin = resolvePublicOrigin();
-      const url = `${origin}/store/onboarding`;
+      const country = (store.country || 'US').toUpperCase();
+      const defaultCurrency = COUNTRY_OPTIONS.find(o => o.code === country)?.currency || 'USD';
       const res = await firstValueFrom(
         this.http.post<any>(`${api}/connect/onboarding-link`, {
           storeId: store.id,
           refreshUrl: url,
           returnUrl: url,
+          country,
+          defaultCurrency,
         })
       );
-      if (res?.url) {
-        window.location.href = res.url;
-      } else {
-        throw new Error(res?.message ?? 'Stripe did not return an onboarding URL.');
-      }
+      const u = res?.url ?? null;
+      store._onboardingUrl = u;
+      return u;
+    } finally {
+      store._onboardingLoading = false;
+    }
+  }
+
+  private async ensureDashboardLink(store: StoreRow): Promise<string | null> {
+    if (store._dashboardUrl) return store._dashboardUrl;
+    if (store._dashboardLoading) {
+      return await new Promise(resolve => {
+        const start = Date.now();
+        const iv = window.setInterval(() => {
+          if (store._dashboardUrl || !store._dashboardLoading || Date.now() - start > 15000) {
+            window.clearInterval(iv);
+            resolve(store._dashboardUrl ?? null);
+          }
+        }, 80);
+      });
+    }
+    store._dashboardLoading = true;
+    const api = resolveApiBase();
+    try {
+      const res = await firstValueFrom(
+        this.http.post<any>(`${api}/connect/login-link`, { storeId: store.id })
+      );
+      const u = res?.url ?? null;
+      store._dashboardUrl = u;
+      if (u) store._dashboardSafeUrl = this.sanitizer.bypassSecurityTrustUrl(u);
+      return u;
+    } finally {
+      store._dashboardLoading = false;
+    }
+  }
+
+  async onConnectStripe(store: StoreRow): Promise<void> {
+    this.processingStoreId.set(store.id);
+    try {
+      const url = await this.ensureOnboardingLink(store);
+      if (!url) throw new Error('Stripe did not return an onboarding URL.');
+      // Navigate the CURRENT tab. Stripe explicitly returns users here via returnUrl/refreshUrl.
+      // This is the most reliable flow — it cannot be blocked by popup blockers.
+      window.location.assign(url);
     } catch (err: any) {
       alert(err?.message ?? 'Failed to create Stripe onboarding link.');
     } finally {
@@ -343,22 +541,21 @@ export class StoreOnboardingPageComponent implements OnInit {
     }
   }
 
-  async onManageDashboard(store: any): Promise<void> {
-    const api = resolveApiBase();
+  async onManageDashboard(store: StoreRow): Promise<void> {
+    // First try: pre-warmed anchor (link is already rendered, click cannot be blocked).
+    if (store._dashboardUrl) {
+      // Anchor already works via href — nothing to do (native click follows href).
+      return;
+    }
+    // Not ready yet: fetch in-background, then open current-tab fallback (popup-proof).
     this.processingStoreId.set(store.id);
     try {
-      const res = await firstValueFrom(
-        this.http.post<any>(`${api}/connect/login-link`, {
-          storeId: store.id,
-        })
-      );
-      if (res?.url) {
-        window.open(res.url, '_blank', 'noopener');
-      } else {
-        throw new Error(res?.message ?? 'Stripe did not return a dashboard URL.');
-      }
+      const url = await this.ensureDashboardLink(store);
+      if (!url) throw new Error('Stripe did not return a dashboard URL.');
+      // Force-open in current tab (cannot be blocked) as a fallback — user will return via back.
+      window.location.assign(url);
     } catch (err: any) {
-      alert(err?.message ?? 'Failed to create Stripe dashboard link.');
+      alert(err?.message ?? 'Failed to open Stripe dashboard.');
     } finally {
       this.processingStoreId.set(null);
     }

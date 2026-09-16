@@ -1,13 +1,37 @@
-import { Component, OnInit, signal, computed, inject, ChangeDetectorRef, SecurityContext } from '@angular/core';
+import { Component, OnInit, signal, computed, inject, ChangeDetectorRef, SecurityContext, OnDestroy } from '@angular/core';
 import { CommonModule, DatePipe } from '@angular/common';
 import { FormsModule, ReactiveFormsModule, FormBuilder, FormGroup, Validators } from '@angular/forms';
-import { RouterLink } from '@angular/router';
+import { Router, RouterLink } from '@angular/router';
 import { HttpClient } from '@angular/common/http';
 import { DomSanitizer, SafeUrl } from '@angular/platform-browser';
 import { firstValueFrom } from 'rxjs';
 import { AuthService, AuthUser } from '../../services/auth.service';
 
 type TabKey = 'stores' | 'users' | 'transactions';
+
+interface SseEventShape {
+  eventId?: string | null;
+  type: 'RESERVED' | 'READY' | 'UNAVAILABLE' | 'PAID' | 'PICKED_UP' | 'CANCELLED' | 'EXPIRED' | string;
+  createdAt?: string | null;
+  transactionId?: string | null;
+  storeId?: string | null;
+  fulfillingStoreId?: string | null;
+  originatingStoreId?: string | null;
+  variantId?: string | null;
+  productId?: string | null;
+  productTitle?: string | null;
+  productImageUrl?: string | null;
+  sku?: string | null;
+  retailPrice?: number | null;
+  currency?: string | null;
+  expiresAt?: string | null;
+  countdownSeconds?: number | null;
+  qrFallbackCode?: string | null;
+  runnerId?: string | null;
+  status?: string | null;
+  message?: string | null;
+  _read?: boolean;
+}
 
 @Component({
   selector: 'app-admin-dashboard-page',
@@ -593,8 +617,226 @@ type TabKey = 'stores' | 'users' | 'transactions';
       font-size: 12px; background: #f3f4f6; padding: 3px 7px; border-radius: 6px;
       font-weight: 500;
     }
+
+    /* ============ NOTIFICATION BELL / DROPDOWN / TOASTS ============ */
+    .bell-wrap {
+      position: relative;
+      display: inline-flex;
+    }
+    .bell-btn {
+      position: relative;
+      width: 44px; height: 44px;
+      border-radius: 999px;
+      border: 1px solid #e5e7eb;
+      background: #fff;
+      color: #374151;
+      display: inline-flex; align-items: center; justify-content: center;
+      font-size: 20px;
+      cursor: pointer;
+      transition: background .15s ease, box-shadow .15s ease, transform .15s ease;
+      box-shadow: 0 1px 2px rgba(0,0,0,0.04);
+    }
+    .bell-btn:hover { background: #f9fafb; transform: translateY(-1px); box-shadow: 0 6px 14px -8px rgba(0,0,0,0.22); }
+    .bell-btn.pulse { animation: bellPulse 1.2s ease; }
+    @keyframes bellPulse {
+      0%   { box-shadow: 0 0 0 0 rgba(109,40,217, 0.35); }
+      70%  { box-shadow: 0 0 0 14px rgba(109,40,217, 0); }
+      100% { box-shadow: 0 0 0 0 rgba(109,40,217, 0); }
+    }
+    .bell-badge {
+      position: absolute;
+      top: -3px; right: -3px;
+      min-width: 20px; height: 20px;
+      padding: 0 6px;
+      border-radius: 999px;
+      background: #ef4444;
+      color: #fff;
+      font-size: 11px; font-weight: 800;
+      display: inline-flex; align-items: center; justify-content: center;
+      border: 2px solid #fff;
+      box-shadow: 0 1px 2px rgba(0,0,0,0.2);
+    }
+    .bell-panel {
+      position: absolute;
+      right: 0; top: calc(100% + 10px);
+      width: min(420px, calc(100vw - 40px));
+      max-height: 60vh;
+      background: #fff;
+      border: 1px solid #e5e7eb;
+      border-radius: 16px;
+      box-shadow: 0 20px 50px -20px rgba(0,0,0,0.25);
+      overflow: hidden;
+      z-index: 60;
+      display: grid;
+      grid-template-rows: auto 1fr auto;
+    }
+    .bell-panel-head {
+      padding: 14px 18px;
+      display: flex; align-items: center; justify-content: space-between;
+      border-bottom: 1px solid #f3f4f6;
+      background: #fafbff;
+    }
+    .bell-panel-head h3 { margin: 0; font-size: 15px; font-weight: 700; color: #111827; display: inline-flex; align-items: center; gap: 8px; }
+    .bell-clear {
+      background: none; border: none; padding: 4px 10px;
+      font-size: 12px; font-weight: 600; color: #6d28d9; cursor: pointer; border-radius: 999px;
+    }
+    .bell-clear:hover { background: #ede9fe; }
+    .bell-list {
+      overflow-y: auto;
+      padding: 8px 0;
+    }
+    .bell-item {
+      padding: 12px 18px;
+      display: grid;
+      grid-template-columns: 44px 1fr auto;
+      gap: 12px;
+      align-items: flex-start;
+      cursor: pointer;
+      border: none; background: none; text-align: left; width: 100%;
+      border-bottom: 1px solid #f9fafb;
+      transition: background .12s ease;
+    }
+    .bell-item:last-child { border-bottom: none; }
+    .bell-item:hover { background: #fafbff; }
+    .bell-item.unread { background: #faf5ff; }
+    .bell-thumb {
+      width: 44px; height: 44px; border-radius: 10px;
+      background: #f3f4f6;
+      overflow: hidden;
+      display: inline-flex; align-items: center; justify-content: center;
+      font-size: 20px; flex-shrink: 0;
+    }
+    .bell-thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
+    .bell-body { display: grid; gap: 4px; min-width: 0; }
+    .bell-title {
+      font-size: 13px; font-weight: 700; color: #111827;
+      display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+    }
+    .bell-title .ev {
+      font-size: 10px; font-weight: 800; padding: 2px 7px; border-radius: 999px;
+      text-transform: uppercase; letter-spacing: 0.03em;
+    }
+    .ev.RESERVED     { background: #ede9fe; color: #6d28d9; }
+    .ev.READY        { background: #dcfce7; color: #166534; }
+    .ev.UNAVAILABLE  { background: #fee2e2; color: #991b1b; }
+    .ev.PAID         { background: #dbeafe; color: #1e40af; }
+    .ev.PICKED_UP    { background: #d1fae5; color: #065f46; }
+    .ev.CANCELLED    { background: #f3f4f6; color: #4b5563; }
+    .ev.EXPIRED      { background: #fef3c7; color: #92400e; }
+    .bell-sub { font-size: 12px; color: #6b7280; line-height: 1.4; }
+    .bell-time {
+      font-size: 11px; font-weight: 600; color: #9ca3af; white-space: nowrap;
+    }
+    .bell-empty {
+      padding: 30px 20px;
+      text-align: center; color: #9ca3af; font-size: 13px;
+      display: grid; gap: 6px; justify-items: center;
+    }
+    .bell-empty .ico { font-size: 26px; }
+    .bell-foot {
+      padding: 10px 18px;
+      border-top: 1px solid #f3f4f6;
+      background: #f9fafb;
+      font-size: 11px; color: #9ca3af; font-weight: 500;
+      display: flex; align-items: center; gap: 6px;
+    }
+    .dot-live {
+      width: 7px; height: 7px; border-radius: 50%;
+      background: #22c55e; box-shadow: 0 0 0 3px rgba(34,197,94,0.18);
+      animation: liveBlink 2s ease-in-out infinite;
+    }
+    @keyframes liveBlink {
+      0%,100% { opacity: 1; }
+      50%     { opacity: 0.5; }
+    }
+
+    /* Toast stack */
+    .toast-stack {
+      position: fixed;
+      top: 20px; right: 20px;
+      z-index: 100;
+      display: grid;
+      gap: 10px;
+      width: min(380px, calc(100vw - 40px));
+    }
+    .toast {
+      background: #fff;
+      border: 1px solid #e5e7eb;
+      border-left: 4px solid #6d28d9;
+      border-radius: 12px;
+      padding: 12px 14px;
+      box-shadow: 0 20px 40px -18px rgba(0,0,0,0.25);
+      display: grid;
+      grid-template-columns: 40px 1fr auto;
+      gap: 12px;
+      align-items: flex-start;
+      animation: toastIn .28s ease both;
+    }
+    .toast.RESERVED    { border-left-color: #6d28d9; }
+    .toast.READY       { border-left-color: #16a34a; }
+    .toast.UNAVAILABLE { border-left-color: #dc2626; }
+    .toast.PAID        { border-left-color: #2563eb; }
+    .toast.PICKED_UP   { border-left-color: #059669; }
+    .toast.CANCELLED   { border-left-color: #6b7280; }
+    .toast.EXPIRED     { border-left-color: #d97706; }
+    @keyframes toastIn {
+      from { transform: translateX(12px); opacity: 0; }
+      to   { transform: translateX(0); opacity: 1; }
+    }
+    .toast.leave { animation: toastOut .22s ease forwards; }
+    @keyframes toastOut {
+      to { transform: translateX(20px); opacity: 0; }
+    }
+    .toast-thumb {
+      width: 40px; height: 40px; border-radius: 10px;
+      background: #f3f4f6; overflow: hidden;
+      display: inline-flex; align-items: center; justify-content: center;
+      font-size: 18px;
+    }
+    .toast-thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
+    .toast-body { display: grid; gap: 3px; min-width: 0; }
+    .toast-title { font-size: 13px; font-weight: 700; color: #111827; }
+    .toast-sub   { font-size: 12px; color: #6b7280; line-height: 1.4; }
+    .toast-close {
+      background: none; border: none; color: #9ca3af; cursor: pointer;
+      width: 22px; height: 22px; border-radius: 6px; font-size: 14px;
+      display: inline-flex; align-items: center; justify-content: center;
+    }
+    .toast-close:hover { background: #f3f4f6; color: #374151; }
   `],
   template: `
+    <!-- SSE Toast stack -->
+    <div class="toast-stack">
+      @for (t of toasts(); track t.id) {
+        <div class="toast"
+             [class]="t.type"
+             [class.leave]="t.leaving"
+             (click)="dismissToast(t.id)"
+             role="status">
+          <div class="toast-thumb">
+            @if (t.productImageUrl) {
+              <img [src]="t.productImageUrl" alt="" onerror="this.style.display='none'" />
+            } @else {
+              {{ toastIcon(t.type) }}
+            }
+          </div>
+          <div class="toast-body">
+            <div class="toast-title">
+              {{ toastTitle(t) }}
+            </div>
+            <div class="toast-sub">
+              {{ t.productTitle || 'Transaction update' }}
+              @if (t.expiresAt) {
+                <span style="margin-left: 6px;">· Expires in {{ formatCountdown(t.expiresAt) }}</span>
+              }
+            </div>
+          </div>
+          <button class="toast-close" (click)="$event.stopPropagation(); dismissToast(t.id)" aria-label="Dismiss">✕</button>
+        </div>
+      }
+    </div>
+
     <div class="wrap">
       <a class="back" routerLink="/">← Back to home</a>
 
@@ -671,6 +913,70 @@ type TabKey = 'stores' | 'users' | 'transactions';
               </p>
             </div>
             <div class="hero-right">
+              <!-- SSE Notification Bell -->
+              <div class="bell-wrap">
+                <button class="bell-btn"
+                        [class.pulse]="bellPulse()"
+                        (click)="toggleBellPanel()"
+                        [attr.aria-label]="'Notifications · ' + unreadCount() + ' unread'">
+                  🔔
+                  @if (unreadCount() > 0) {
+                    <span class="bell-badge">{{ unreadCount() > 99 ? '99+' : unreadCount() }}</span>
+                  }
+                </button>
+                @if (bellPanelOpen()) {
+                  <div class="bell-panel" role="dialog" aria-label="Notifications">
+                    <div class="bell-panel-head">
+                      <h3>🔔 Notifications</h3>
+                      <button class="bell-clear" (click)="clearEvents()" [disabled]="events().length === 0">Clear all</button>
+                    </div>
+                    <div class="bell-list">
+                      @if (events().length === 0) {
+                        <div class="bell-empty">
+                          <div class="ico">📭</div>
+                          <div>No notifications yet</div>
+                          <div style="font-size: 11px;">New requests &amp; updates will appear here.</div>
+                        </div>
+                      } @else {
+                        @for (ev of events(); track ev.eventId || ev.transactionId + '_' + ev.createdAt) {
+                          <button type="button" class="bell-item"
+                                  [class.unread]="!ev._read"
+                                  (click)="onEventClick(ev)">
+                            <div class="bell-thumb">
+                              @if (ev.productImageUrl) {
+                                <img [src]="ev.productImageUrl" alt="" onerror="this.style.display='none'" />
+                              } @else {
+                                {{ toastIcon(ev.type) }}
+                              }
+                            </div>
+                            <div class="bell-body">
+                              <div class="bell-title">
+                                <span class="ev" [class]="ev.type">{{ ev.type }}</span>
+                                <span>{{ toastTitle(ev) }}</span>
+                              </div>
+                              <div class="bell-sub">
+                                @if (ev.productTitle) { {{ ev.productTitle }} }
+                                @if (ev.sku) { <span class="mono" style="margin-left:6px;">{{ ev.sku }}</span> }
+                                @if (ev.expiresAt && (ev.type === 'RESERVED' || ev.type === 'READY')) {
+                                  <div style="margin-top:4px;">⏱ Expires in <b>{{ formatCountdown(ev.expiresAt) }}</b></div>
+                                }
+                                @if (ev.message) { <div style="margin-top:2px;opacity:.85;">{{ ev.message }}</div> }
+                              </div>
+                            </div>
+                            <div class="bell-time">{{ formatRelativeTime(ev.createdAt) }}</div>
+                          </button>
+                        }
+                      }
+                    </div>
+                    <div class="bell-foot">
+                      <span class="dot-live"></span>
+                      @if (sseConnected()) { Live · real-time updates }
+                      @else { Connecting… (will auto-reconnect) }
+                    </div>
+                  </div>
+                }
+              </div>
+
               <div class="user-chip">
                 <div class="avatar" [class.purple]="isGlobalAdmin()" [class.cyan]="!isGlobalAdmin()">
                   {{ avatarInitials(currentUser()) }}
@@ -891,11 +1197,22 @@ type TabKey = 'stores' | 'users' | 'transactions';
                                 <span class="ico">🏬</span> Store Admin
                               </button>
                               @if (store.onboarded) {
-                                <button class="btn btn-secondary"
-                                        [disabled]="loginLinking[store.id]"
-                                        (click)="loginLinkStore(store)">
-                                  <span class="ico">↗</span> Stripe
-                                </button>
+                                @if (store._dashboardSafeUrl) {
+                                  <a class="btn btn-secondary"
+                                     [href]="store._dashboardSafeUrl"
+                                     target="_blank"
+                                     rel="noopener noreferrer"
+                                     (click)="loginLinkStore(store)">
+                                    <span class="ico">↗</span> Stripe
+                                  </a>
+                                } @else {
+                                  <button class="btn btn-secondary"
+                                          [disabled]="loginLinking[store.id]"
+                                          (click)="loginLinkStore(store)">
+                                    <span class="ico">↗</span>
+                                    @if (store._dashboardLoading || loginLinking[store.id]) { Loading… } @else { Stripe }
+                                  </button>
+                                }
                               }
                               <button class="btn btn-danger"
                                       [disabled]="deleting[store.id]"
@@ -998,11 +1315,22 @@ type TabKey = 'stores' | 'users' | 'transactions';
                                       [disabled]="onboarding['me']" (click)="onboardMyStore()">
                                 🔄 Re-open Stripe Onboarding
                               </button>
-                              <button class="btn btn-secondary"
-                                      style="background:#047857;color:#fff;border-color:#047857;"
-                                      [disabled]="loginLinking['me']" (click)="loginLinkMyStore()">
-                                ↗ Open Stripe Dashboard
-                              </button>
+                              @if (myStore()?._dashboardSafeUrl) {
+                                <a class="btn btn-secondary"
+                                   style="background:#047857;color:#fff;border-color:#047857;"
+                                   [href]="myStore()!._dashboardSafeUrl"
+                                   target="_blank"
+                                   rel="noopener noreferrer"
+                                   (click)="loginLinkMyStore()">
+                                  ↗ Open Stripe Dashboard
+                                </a>
+                              } @else {
+                                <button class="btn btn-secondary"
+                                        style="background:#047857;color:#fff;border-color:#047857;"
+                                        [disabled]="loginLinking['me']" (click)="loginLinkMyStore()">
+                                  ↗ Open Stripe Dashboard
+                                </button>
+                              }
                             </div>
                           </div>
                         </div>
@@ -1025,11 +1353,21 @@ type TabKey = 'stores' | 'users' | 'transactions';
                                       [disabled]="onboarding['me']" (click)="onboardMyStore()">
                                 💳 Complete Stripe Onboarding →
                               </button>
-                              @if (myStore()!.onboarded) {
-                                <button class="btn btn-secondary"
-                                        [disabled]="loginLinking['me']" (click)="loginLinkMyStore()">
-                                  ↗ Open Stripe Dashboard
-                                </button>
+                              @if (myStore()?.onboarded) {
+                                @if (myStore()?._dashboardSafeUrl) {
+                                  <a class="btn btn-secondary"
+                                     [href]="myStore()!._dashboardSafeUrl"
+                                     target="_blank"
+                                     rel="noopener noreferrer"
+                                     (click)="loginLinkMyStore()">
+                                    ↗ Open Stripe Dashboard
+                                  </a>
+                                } @else {
+                                  <button class="btn btn-secondary"
+                                          [disabled]="loginLinking['me']" (click)="loginLinkMyStore()">
+                                    ↗ Open Stripe Dashboard
+                                  </button>
+                                }
                               }
                             </div>
                           </div>
@@ -1451,10 +1789,11 @@ type TabKey = 'stores' | 'users' | 'transactions';
     </div>
   `,
 })
-export class AdminDashboardPageComponent implements OnInit {
+export class AdminDashboardPageComponent implements OnInit, OnDestroy {
   readonly fb = inject(FormBuilder);
   readonly http = inject(HttpClient);
   readonly authService = inject(AuthService);
+  readonly router = inject(Router);
 
   readonly activeTab = signal<TabKey>('stores');
   readonly currentUser = signal<AuthUser | null>(null);
@@ -1464,7 +1803,6 @@ export class AdminDashboardPageComponent implements OnInit {
   readonly storesError = signal<string | null>(null);
   readonly storesSuccess = signal<string | null>(null);
   readonly myStore = signal<any | null>(null);
-
   readonly users = signal<any[]>([]);
   readonly usersLoading = signal(false);
   readonly userError = signal<string | null>(null);
@@ -1646,8 +1984,16 @@ export class AdminDashboardPageComponent implements OnInit {
 
   ngOnInit(): void {
     if (!this.isAdminish()) return;
+    // 1s ticker to update countdown timers in UI (bell panel + toasts)
+    this.sseTick = setInterval(() => {
+      if (this.events().some(e => e.expiresAt) || this.toasts().some(t => t.expiresAt)) {
+        this.cdr.markForCheck();
+      }
+    }, 1000);
     void this.refreshMe().then(() => {
-      void this.loadStores();
+      void this.loadStores().finally(() => {
+        void this.startSse();
+      });
       void this.loadUsers();
       void this.loadTransactions();
     });
@@ -1676,25 +2022,106 @@ export class AdminDashboardPageComponent implements OnInit {
     this.storesError.set(null);
     try {
       const api = this.api();
+      let arr: any[] = [];
+      let mine: any | null = null;
       if (this.isGlobalAdmin()) {
         const res = await firstValueFrom(this.http.get<any>(`${api}/admin/stores`));
-        const arr = Array.isArray(res) ? res : (res?.stores ?? res?.data ?? []);
-        this.stores.set(arr);
+        arr = Array.isArray(res) ? res : (res?.stores ?? res?.data ?? []);
       } else {
         try {
-          const me = await firstValueFrom(this.http.get<any>(`${api}/admin/stores/me`));
-          this.stores.set([me]);
-          this.myStore.set(me);
+          mine = await firstValueFrom(this.http.get<any>(`${api}/admin/stores/me`));
+          arr = [mine];
+          this.myStore.set(this.decorateStripeFields(mine));
         } catch (err: any) {
           this.myStore.set(null);
-          this.stores.set([]);
+          arr = [];
           this.storesError.set(err?.error?.message ?? err?.message ?? 'Could not load your store.');
         }
       }
+      arr = arr.map(s => this.decorateStripeFields(s));
+      this.stores.set(arr);
+      // Pre-warm dashboard login links in background so the UI can render them as <a target=_blank> — never popup-blocked.
+      for (const s of arr) if (s.onboarded) void this.ensureDashboardLink(s);
+      if (mine && mine.onboarded) void this.ensureDashboardLink(this.myStore()!);
     } catch (err: any) {
       this.storesError.set(err?.error?.message ?? err?.message ?? 'Failed to load stores.');
     } finally {
       this.storesLoading.set(false);
+    }
+  }
+
+  private decorateStripeFields(s: any): any {
+    if (!s) return s;
+    return {
+      ...s,
+      _onboardingUrl: null,
+      _onboardingLoading: false,
+      _dashboardUrl: null,
+      _dashboardSafeUrl: null,
+      _dashboardLoading: false,
+    };
+  }
+
+  private async ensureOnboardingLink(store: any, opts: { me?: boolean } = {}): Promise<string | null> {
+    if (store._onboardingUrl) return store._onboardingUrl;
+    if (store._onboardingLoading) {
+      return await new Promise<string | null>(resolve => {
+        const start = Date.now();
+        const iv = window.setInterval(() => {
+          if (store._onboardingUrl || !store._onboardingLoading || Date.now() - start > 20000) {
+            window.clearInterval(iv);
+            resolve(store._onboardingUrl ?? null);
+          }
+        }, 80);
+      });
+    }
+    store._onboardingLoading = true;
+    const api = this.api();
+    const body = {
+      returnUrl: `${window.location.origin}/admin`,
+      refreshUrl: `${window.location.origin}/admin`,
+    };
+    try {
+      const urlTail = opts.me
+        ? `/admin/stores/me/connect/onboarding-link`
+        : `/admin/stores/${encodeURIComponent(store.id)}/connect/onboarding-link`;
+      const res: any = await firstValueFrom(this.http.post(`${api}${urlTail}`, body));
+      const u = res?.url ?? null;
+      store._onboardingUrl = u;
+      return u;
+    } finally {
+      store._onboardingLoading = false;
+      this.touch();
+    }
+  }
+
+  private async ensureDashboardLink(store: any, opts: { me?: boolean } = {}): Promise<string | null> {
+    if (store._dashboardUrl) return store._dashboardUrl;
+    if (store._dashboardLoading) {
+      return await new Promise<string | null>(resolve => {
+        const start = Date.now();
+        const iv = window.setInterval(() => {
+          if (store._dashboardUrl || !store._dashboardLoading || Date.now() - start > 20000) {
+            window.clearInterval(iv);
+            resolve(store._dashboardUrl ?? null);
+          }
+        }, 80);
+      });
+    }
+    store._dashboardLoading = true;
+    const api = this.api();
+    try {
+      const urlTail = opts.me
+        ? `/admin/stores/me/connect/login-link`
+        : `/admin/stores/${encodeURIComponent(store.id)}/connect/login-link`;
+      const res: any = await firstValueFrom(this.http.post(`${api}${urlTail}`, {}));
+      const u = res?.url ?? null;
+      store._dashboardUrl = u;
+      if (u) store._dashboardSafeUrl = this.sanitizer.bypassSecurityTrustUrl(u);
+      return u;
+    } finally {
+      store._dashboardLoading = false;
+      this.touch();
     }
   }
 
@@ -1861,30 +2288,6 @@ export class AdminDashboardPageComponent implements OnInit {
 
   // ---- Stripe onboarding / login link ----
 
-  private openExternalPopup(url: string, label: string): boolean {
-    const popup = window.open('', '_blank', 'noopener,noreferrer');
-    if (popup) {
-      try { popup.location.href = url; } catch { popup.close(); return false; }
-      return true;
-    }
-    const safe = this.sanitizer.sanitize(SecurityContext.URL, url);
-    if (safe) {
-      this.stripeFallback.set({
-        url: this.sanitizer.bypassSecurityTrustUrl(safe),
-        label,
-      });
-      setTimeout(() => this.stripeFallback.set(null), 60000);
-    }
-    return false;
-  }
-
-  private redirectPreOpenedPopup(popup: Window | null, url: string, label: string): boolean {
-    if (popup) {
-      try { popup.location.href = url; return true; } catch { popup.close(); }
-    }
-    return this.openExternalPopup(url, label);
-  }
-
   async onboardStore(store: any): Promise<void> {
     const id = store.id;
     if (!id) {
@@ -1896,29 +2299,16 @@ export class AdminDashboardPageComponent implements OnInit {
     this.onboarding[id] = true;
     this.touch();
     this.storesError.set(null);
-    const popup = window.open('', '_blank', 'noopener,noreferrer');
     try {
-      const api = this.api();
-      const body = {
-        returnUrl: `${window.location.origin}/admin`,
-        refreshUrl: `${window.location.origin}/admin`,
-      };
-      const res: any = await firstValueFrom(
-        this.http.post(`${api}/admin/stores/${encodeURIComponent(id)}/connect/onboarding-link`, body)
-      );
-      if (res?.url) {
-        this.storesSuccess.set(res.message ? `Notice: ${res.message}` : 'Opening Stripe onboarding…');
-        this.clearStoreMessagesSoon();
-        await this.loadStores();
-        if (!this.redirectPreOpenedPopup(popup, res.url, 'Open Stripe Onboarding')) {
-          this.storesError.set('Your browser blocked the popup — click the link below to open Stripe.');
-        }
-      } else {
-        if (popup) popup.close();
-        this.storesError.set(res?.message || 'No URL returned from Stripe.');
-      }
+      const url = await this.ensureOnboardingLink(store);
+      if (!url) throw new Error('No URL returned from Stripe.');
+      this.storesSuccess.set('Opening Stripe onboarding…');
+      this.clearStoreMessagesSoon();
+      await this.loadStores();
+      // Current-tab redirect. Stripe explicitly returns users here via returnUrl/refreshUrl, so this is the correct flow.
+      // This CANNOT be blocked by a popup blocker — unlike window.open().
+      window.location.assign(url);
     } catch (err: any) {
-      if (popup) popup.close();
       this.storesError.set(err?.error?.message ?? err?.message ?? 'Failed to generate Stripe onboarding link.');
     } finally {
       this.onboarding[id] = false;
@@ -1936,28 +2326,22 @@ export class AdminDashboardPageComponent implements OnInit {
     this.stripeFallback.set(null);
     this.loginLinking[id] = true;
     this.touch();
-    const popup = window.open('', '_blank', 'noopener,noreferrer');
     try {
-      const api = this.api();
-      const res: any = await firstValueFrom(
-        this.http.post(`${api}/admin/stores/${encodeURIComponent(id)}/connect/login-link`, {})
-      );
-      if (res?.url) {
-        if (res.chargesEnabled === false || res.payoutsEnabled === false) {
+      const url = await this.ensureDashboardLink(store);
+      if (!url) throw new Error('Could not generate Stripe dashboard link.');
+      if (store._dashboardSafeUrl) {
+        // Pre-warmed anchor in template is already rendered with href + target=_blank. User followed it; nothing more.
+        if (store.chargesEnabled === false || store.payoutsEnabled === false) {
           this.storesSuccess.set(
-            `Stripe account not fully ready: chargesEnabled=${res.chargesEnabled}, payoutsEnabled=${res.payoutsEnabled}. Dashboard opens in new tab.`
+            `Stripe account not fully ready: chargesEnabled=${store.chargesEnabled}, payoutsEnabled=${store.payoutsEnabled}.`
           );
           this.clearStoreMessagesSoon();
         }
-        if (!this.redirectPreOpenedPopup(popup, res.url, 'Open Stripe Dashboard')) {
-          if (!this.storesSuccess()) this.storesError.set('Popup blocked — click the link below to open Stripe Dashboard.');
-        }
-      } else {
-        if (popup) popup.close();
-        this.storesError.set(res?.message || 'Could not generate Stripe dashboard link.');
+        return;
       }
+      // Not yet pre-warmed → fallback to current-tab redirect (impossible to block).
+      window.location.assign(url);
     } catch (err: any) {
-      if (popup) popup.close();
       this.storesError.set(err?.error?.message ?? err?.message ?? 'Failed to open Stripe dashboard.');
     } finally {
       this.loginLinking[id] = false;
@@ -1966,35 +2350,23 @@ export class AdminDashboardPageComponent implements OnInit {
   }
 
   async onboardMyStore(): Promise<void> {
+    const store = this.myStore();
+    if (!store) {
+      this.storesError.set('No store information loaded — refresh and try again.');
+      this.clearStoreMessagesSoon();
+      return;
+    }
     this.stripeFallback.set(null);
     this.onboarding['me'] = true;
     this.touch();
     this.storesError.set(null);
-    const popup = window.open('', '_blank', 'noopener,noreferrer');
     try {
-      const api = this.api();
-      const body = {
-        returnUrl: `${window.location.origin}/admin`,
-        refreshUrl: `${window.location.origin}/admin`,
-      };
-      const res: any = await firstValueFrom(
-        this.http.post(`${api}/admin/stores/me/connect/onboarding-link`, body)
-      );
-      if (res?.url) {
-        if (res.message) {
-          this.storesSuccess.set(res.message);
-          this.clearStoreMessagesSoon();
-        }
-        await this.loadStores();
-        if (!this.redirectPreOpenedPopup(popup, res.url, 'Open Stripe Onboarding')) {
-          if (!this.storesSuccess()) this.storesError.set('Popup blocked — use the Stripe link below.');
-        }
-      } else {
-        if (popup) popup.close();
-        this.storesError.set(res?.message || 'No URL returned.');
-      }
+      const url = await this.ensureOnboardingLink(store, { me: true });
+      if (!url) throw new Error('No URL returned.');
+      await this.loadStores();
+      // Current-tab redirect (popup-blocker proof).
+      window.location.assign(url);
     } catch (err: any) {
-      if (popup) popup.close();
       this.storesError.set(err?.error?.message ?? err?.message ?? 'Failed to generate onboarding link.');
     } finally {
       this.onboarding['me'] = false;
@@ -2003,31 +2375,27 @@ export class AdminDashboardPageComponent implements OnInit {
   }
 
   async loginLinkMyStore(): Promise<void> {
+    const store = this.myStore();
+    if (!store) {
+      this.storesError.set('No store information loaded — refresh and try again.');
+      this.clearStoreMessagesSoon();
+      return;
+    }
     this.stripeFallback.set(null);
     this.loginLinking['me'] = true;
     this.touch();
-    const popup = window.open('', '_blank', 'noopener,noreferrer');
     try {
-      const api = this.api();
-      const res: any = await firstValueFrom(
-        this.http.post(`${api}/admin/stores/me/connect/login-link`, {})
-      );
-      if (res?.url) {
-        if (res.chargesEnabled === false || res.payoutsEnabled === false) {
-          this.storesSuccess.set(
-            `Account not fully ready: chargesEnabled=${res.chargesEnabled}, payoutsEnabled=${res.payoutsEnabled}.`
-          );
-          this.clearStoreMessagesSoon();
-        }
-        if (!this.redirectPreOpenedPopup(popup, res.url, 'Open Stripe Dashboard')) {
-          if (!this.storesSuccess()) this.storesError.set('Popup blocked — use the Stripe link below.');
-        }
-      } else {
-        if (popup) popup.close();
-        this.storesError.set(res?.message || 'Could not generate Stripe dashboard link.');
+      const url = await this.ensureDashboardLink(store, { me: true });
+      if (!url) throw new Error('Could not generate Stripe dashboard link.');
+      if (store.chargesEnabled === false || store.payoutsEnabled === false) {
+        this.storesSuccess.set(
+          `Account not fully ready: chargesEnabled=${store.chargesEnabled}, payoutsEnabled=${store.payoutsEnabled}.`
+        );
+        this.clearStoreMessagesSoon();
       }
+      // Fallback (if anchor somehow wasn't rendered yet): current-tab redirect. Unreachable normally.
+      if (!store._dashboardSafeUrl) window.location.assign(url);
     } catch (err: any) {
-      if (popup) popup.close();
       this.storesError.set(err?.error?.message ?? err?.message ?? 'Failed to open Stripe dashboard.');
     } finally {
       this.loginLinking['me'] = false;
@@ -2201,5 +2569,203 @@ export class AdminDashboardPageComponent implements OnInit {
     const c = currency || 'USD';
     const n = Number(cents) / 100;
     return new Intl.NumberFormat('en-US', { style: 'currency', currency: c }).format(n);
+  }
+
+  // ============ SSE NOTIFICATIONS ============
+  private sseSource: EventSource | null = null;
+  private sseTick: any = null;
+  private sseDismissTimers: Record<string, any> = {};
+
+  readonly events = signal<SseEventShape[]>([]);
+  readonly toasts = signal<Array<SseEventShape & { id: string; leaving?: boolean }>>([]);
+  readonly bellPanelOpen = signal(false);
+  readonly bellPulse = signal(false);
+  readonly sseConnected = signal(false);
+
+  readonly unreadCount = computed(() =>
+    this.events().filter(e => !e._read && (e.type === 'RESERVED' || e.type === 'READY' || e.type === 'UNAVAILABLE' || e.type === 'PAID' || e.type === 'PICKED_UP' || e.type === 'CANCELLED' || e.type === 'EXPIRED')).length
+  );
+
+  private documentClickListener = (e: MouseEvent) => {
+    if (!this.bellPanelOpen()) return;
+    const target = e.target as HTMLElement | null;
+    if (!target) return;
+    if (!target.closest('.bell-wrap')) this.bellPanelOpen.set(false);
+  };
+
+  toggleBellPanel(): void {
+    this.bellPanelOpen.set(!this.bellPanelOpen());
+    if (this.bellPanelOpen()) {
+      setTimeout(() => document.addEventListener('click', this.documentClickListener, { once: true } as any), 0);
+    }
+  }
+
+  clearEvents(): void {
+    this.events.set([]);
+  }
+
+  private pushEvent(ev: SseEventShape): void {
+    ev._read = false;
+    this.events.update(list => {
+      const dedup = list.filter(x => !(x.transactionId && ev.transactionId && x.transactionId === ev.transactionId && x.type === ev.type));
+      return [ev, ...dedup].slice(0, 200);
+    });
+    // Badge pulse
+    this.bellPulse.set(true);
+    setTimeout(() => this.bellPulse.set(false), 1200);
+    // Toast for important events
+    if (['RESERVED', 'READY', 'UNAVAILABLE', 'PAID', 'PICKED_UP', 'CANCELLED', 'EXPIRED'].includes(ev.type)) {
+      const toastId = 't_' + (ev.eventId || (Date.now() + '_' + Math.random().toString(36).slice(2, 7)));
+      const t = { ...ev, id: toastId, leaving: false };
+      this.toasts.update(list => [t, ...list].slice(0, 4));
+      this.scheduleToastDismiss(toastId, 8000);
+    }
+  }
+
+  private scheduleToastDismiss(id: string, ms: number): void {
+    if (this.sseDismissTimers[id]) clearTimeout(this.sseDismissTimers[id]);
+    this.sseDismissTimers[id] = setTimeout(() => this.dismissToast(id), ms);
+  }
+
+  dismissToast(id: string): void {
+    this.toasts.update(list => list.map(t => t.id === id ? { ...t, leaving: true } : t));
+    setTimeout(() => {
+      this.toasts.update(list => list.filter(t => t.id !== id));
+      if (this.sseDismissTimers[id]) { clearTimeout(this.sseDismissTimers[id]); delete this.sseDismissTimers[id]; }
+    }, 260);
+  }
+
+  toastIcon(type: string): string {
+    switch (type) {
+      case 'RESERVED':    return '⏳';
+      case 'READY':       return '✅';
+      case 'UNAVAILABLE': return '🚫';
+      case 'PAID':        return '💳';
+      case 'PICKED_UP':   return '📦';
+      case 'CANCELLED':   return '🗙';
+      case 'EXPIRED':     return '⏰';
+      default:            return '🔔';
+    }
+  }
+
+  toastTitle(ev: SseEventShape): string {
+    switch (ev.type) {
+      case 'RESERVED':    return 'New customer request';
+      case 'READY':       return 'Item marked ready';
+      case 'UNAVAILABLE': return 'Item marked unavailable';
+      case 'PAID':        return 'Payment received';
+      case 'PICKED_UP':   return 'Order picked up';
+      case 'CANCELLED':   return 'Reservation cancelled';
+      case 'EXPIRED':     return 'Reservation expired';
+      default:            return ev.status ? `Status: ${ev.status}` : 'Update';
+    }
+  }
+
+  formatCountdown(iso: string | null | undefined): string {
+    if (!iso) return '—';
+    const ms = new Date(iso).getTime() - Date.now();
+    if (ms <= 0) return '00:00';
+    const s = Math.floor(ms / 1000);
+    const m = Math.floor(s / 60);
+    const sec = s % 60;
+    return (m < 10 ? '0' : '') + m + ':' + (sec < 10 ? '0' : '') + sec;
+  }
+
+  formatRelativeTime(iso: string | null | undefined): string {
+    if (!iso) return '';
+    const ms = Date.now() - new Date(iso).getTime();
+    const s = Math.max(0, Math.floor(ms / 1000));
+    if (s < 60) return s + 's ago';
+    const m = Math.floor(s / 60);
+    if (m < 60) return m + 'm ago';
+    const h = Math.floor(m / 60);
+    if (h < 24) return h + 'h ago';
+    const d = Math.floor(h / 24);
+    return d + 'd ago';
+  }
+
+  onEventClick(ev: SseEventShape): void {
+    ev._read = true;
+    this.events.update(list => list.slice());
+    const storeId = ev.fulfillingStoreId || ev.storeId;
+    if (storeId && ev.transactionId) {
+      void this.router.navigate(['/admin', 'stores', storeId, 'transactions'], {
+        fragment: 'tx-' + ev.transactionId,
+      });
+      this.bellPanelOpen.set(false);
+    }
+  }
+
+  private async startSse(): Promise<void> {
+    const api = this.api();
+    const token = this.authService.getToken();
+    if (!token) return;
+    let url = this.isGlobalAdmin()
+      ? `${api}/admin/sse/events`
+      : `${api}/stores/${encodeURIComponent(this.currentStoreIdForSse() || 'me')}/sse/events`;
+    url += '?access_token=' + encodeURIComponent(token);
+
+    try {
+      const recentLimit = 100;
+      const recentUrl = this.isGlobalAdmin()
+        ? `${api}/admin/sse/events/recent?limit=${recentLimit}`
+        : `${api}/stores/${encodeURIComponent(this.currentStoreIdForSse() || 'me')}/sse/events/recent?limit=${recentLimit}`;
+      const headers: Record<string, string> = { Authorization: 'Bearer ' + token };
+      const recent = await firstValueFrom(this.http.get<any[]>(recentUrl, { headers })).catch(() => [] as any[]);
+      if (Array.isArray(recent)) {
+        for (let i = recent.length - 1; i >= 0; i--) {
+          const r = recent[i];
+          if (r && typeof r === 'object') this.pushEvent(r as SseEventShape);
+        }
+      }
+    } catch { /* ignore */ }
+
+    if (typeof EventSource === 'undefined') return;
+    try {
+      this.sseSource = new EventSource(url, { withCredentials: false });
+      this.sseSource.onopen = () => { this.sseConnected.set(true); this.touch(); };
+      this.sseSource.onerror = () => { this.sseConnected.set(false); this.touch(); };
+      this.sseSource.onmessage = (e: MessageEvent) => {
+        try {
+          const data = JSON.parse(e.data);
+          if (data && typeof data === 'object') this.pushEvent(data as SseEventShape);
+        } catch { /* ignore */ }
+      };
+      const types = ['RESERVED', 'READY', 'UNAVAILABLE', 'PAID', 'PICKED_UP', 'CANCELLED', 'EXPIRED'];
+      for (const t of types) {
+        this.sseSource.addEventListener(t, (e: any) => {
+          try {
+            const data = JSON.parse(e.data || 'null');
+            if (data && typeof data === 'object') {
+              if (!data.type) data.type = t;
+              this.pushEvent(data as SseEventShape);
+            }
+          } catch { /* ignore */ }
+        });
+      }
+    } catch { /* ignore */ }
+  }
+
+  private currentStoreIdForSse(): string | null {
+    if (this.isGlobalAdmin()) return null;
+    const mine = this.myStore();
+    if (mine?.id) return mine.id;
+    const arr = this.stores();
+    if (arr.length === 1 && arr[0]?.id) return arr[0].id;
+    return null;
+  }
+
+  stopSse(): void {
+    if (this.sseTick) { clearInterval(this.sseTick); this.sseTick = null; }
+    if (this.sseSource) { try { this.sseSource.close(); } catch { /* ignore */ } this.sseSource = null; }
+    this.sseConnected.set(false);
+    Object.keys(this.sseDismissTimers).forEach(k => {
+      clearTimeout(this.sseDismissTimers[k]); delete this.sseDismissTimers[k];
+    });
+  }
+
+  ngOnDestroy(): void {
+    this.stopSse();
+    document.removeEventListener('click', this.documentClickListener);
   }
 }

@@ -262,6 +262,9 @@ interface InventoryVariant {
                         <a class="btn btn-secondary" [routerLink]="['./', v.variantId]">
                           <span class="ico">✎</span> Edit
                         </a>
+                        <a class="btn btn-secondary" [routerLink]="['/p', v.productId ?? v.variantId, 'qr']" target="_blank" rel="noopener">
+                          <span class="ico">📱</span> QR
+                        </a>
                       </div>
                     </td>
                   </tr>

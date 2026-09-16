@@ -1,10 +1,10 @@
 import { Component, computed, ElementRef, OnInit, signal, ViewChild } from '@angular/core';
-import { Router, RouterLink } from '@angular/router';
+import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { QRCodeModule } from 'angularx-qrcode';
 import { ProductService } from '../../services/product.service';
 
 @Component({
-  selector: 'app-home-page',
+  selector: 'app-product-qr-share-page',
   standalone: true,
   imports: [QRCodeModule, RouterLink],
   styles: [`
@@ -256,14 +256,14 @@ import { ProductService } from '../../services/product.service';
 
       <main>
         @if (loading()) {
-          <div class="qr-label">Loading today's featured product…</div>
+          <div class="qr-label">Loading…</div>
         } @else {
           <div class="card">
             <div class="qr-wrapper">
               <div class="qr-container">
                 <qrcode
                   #qrEl
-                  [qrdata]="qrUrl()"
+                  [qrdata]="productPdpUrl()"
                   [width]="320"
                   [errorCorrectionLevel]="'M'"
                   [elementType]="'img'"
@@ -304,41 +304,37 @@ import { ProductService } from '../../services/product.service';
     </div>
   `,
 })
-export class HomePageComponent implements OnInit {
-  private readonly featuredId = signal<string>('');
+export class ProductQrSharePageComponent implements OnInit {
+  readonly productId = signal<string>('');
   readonly loading = signal<boolean>(true);
-  readonly qrUrl = computed(() =>
-    this.featuredId() ? this.products.buildQrUrlFor(this.featuredId()) : window.location.origin
+
+  readonly productPdpUrl = computed(() =>
+    this.productId() ? this.products.buildQrUrlFor(this.productId()) : window.location.origin
   );
 
   @ViewChild('ctaBtn', { static: false })
   private readonly ctaBtnRef?: ElementRef<HTMLButtonElement>;
 
   constructor(
-    private readonly products: ProductService,
+    private readonly route: ActivatedRoute,
     private readonly router: Router,
+    private readonly products: ProductService,
   ) {}
 
   async ngOnInit(): Promise<void> {
-    let id: string | null = null;
-    try {
-      const allProducts = await this.products.getAllProducts();
-      if (Array.isArray(allProducts) && allProducts.length > 0) {
-        const idx = Math.floor(Math.random() * allProducts.length);
-        id = allProducts[idx]?.id ?? null;
-      }
-    } catch {
-      id = null;
-    }
-    if (!id) id = this.products.getFeaturedProductId();
-    this.featuredId.set(id);
+    const id = this.route.snapshot.paramMap.get('productId') || '';
+    this.productId.set(id);
     this.loading.set(false);
   }
 
   onExplore(event?: MouseEvent): void {
     this.spawnRipple(event);
-    const id = this.featuredId() || this.products.getFeaturedProductId();
-    this.router.navigate(['/p', id]);
+    const id = this.productId();
+    if (id) {
+      this.router.navigate(['/p', id]);
+    } else {
+      this.router.navigate(['/']);
+    }
   }
 
   private spawnRipple(event?: MouseEvent): void {

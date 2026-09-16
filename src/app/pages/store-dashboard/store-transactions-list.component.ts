@@ -1,4 +1,4 @@
-import { Component, OnInit, signal, inject, ChangeDetectorRef } from '@angular/core';
+import { Component, OnInit, signal, inject, ChangeDetectorRef, OnDestroy } from '@angular/core';
 import { CommonModule, DatePipe } from '@angular/common';
 import { ActivatedRoute } from '@angular/router';
 import { HttpClient } from '@angular/common/http';
@@ -12,9 +12,14 @@ interface Transaction {
   fulfillingStoreId: string | null;
   status: string | null;
   totalAmountCents: number | null;
+  totalRetailCents?: number | null;
   itemsCount?: number | null;
   lineItems?: Array<any> | null;
   role?: 'HOST' | 'FULFILL' | 'BOTH' | string | null;
+  expiresAt?: string | null;
+  variantId?: string | null;
+  productTitle?: string | null;
+  sku?: string | null;
 }
 
 @Component({
@@ -109,7 +114,44 @@ interface Transaction {
     .chip.purple { background: #f3e8ff; color: #6b21a8; }
     .chip.info   { background: #eff6ff; color: #1d4ed8; }
 
+    .countdown {
+      display: inline-flex; align-items: center; gap: 5px;
+      padding: 5px 10px; border-radius: 999px;
+      background: #fffbeb; color: #92400e;
+      font-size: 12px; font-weight: 700;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+    }
+    .countdown.soon { background: #fef2f2; color: #991b1b; animation: cdPulse 1.2s ease-in-out infinite; }
+    .countdown.done { background: #f3f4f6; color: #6b7280; animation: none; }
+    @keyframes cdPulse {
+      0%,100% { transform: scale(1); }
+      50%     { transform: scale(1.05); }
+    }
+
     .price { font-weight: 700; color: #111827; }
+
+    .btn {
+      display: inline-flex; align-items: center; gap: 6px;
+      padding: 7px 12px;
+      border-radius: 999px;
+      font-size: 12px; font-weight: 700;
+      cursor: pointer;
+      border: 1px solid transparent;
+      transition: filter .15s ease, transform .15s ease;
+    }
+    .btn[disabled] { opacity: .55; cursor: not-allowed; }
+    .btn:not([disabled]):hover { filter: brightness(0.97); transform: translateY(-1px); }
+    .btn.ready { background: #16a34a; color: #fff; border-color: #15803d; }
+    .btn.unavail { background: #dc2626; color: #fff; border-color: #b91c1c; }
+
+    .row-actions-cell {
+      display: flex; gap: 8px; align-items: center; flex-wrap: wrap;
+    }
+    .row-hl { animation: rowFlash 1.6s ease both; }
+    @keyframes rowFlash {
+      from { background: #fef9c3; }
+      to   { background: transparent; }
+    }
 
     .loading, .empty {
       padding: 48px 24px; text-align: center; color: #6b7280; font-size: 14px;
@@ -147,13 +189,15 @@ interface Transaction {
                   <th>ID</th>
                   <th>Role</th>
                   <th>Status</th>
+                  <th>Hold expires</th>
                   <th>Items</th>
                   <th>Total</th>
+                  <th>Actions</th>
                 </tr>
               </thead>
               <tbody>
                 @for (tx of transactions(); track tx.id) {
-                  <tr>
+                  <tr [id]="'tx-' + tx.id" [class.row-hl]="justUpdated()[tx.id]">
                     <td>
                       @if (tx.createdAt) {
                         {{ tx.createdAt | date:'MMM d, yyyy HH:mm' }}
@@ -180,10 +224,38 @@ interface Transaction {
                         {{ tx.status || 'PENDING' }}
                       </span>
                     </td>
+                    <td>
+                      @if (tx.expiresAt && (tx.status === 'RESERVED' || tx.status === 'PENDING_RESERVATION' || tx.status === 'READY')) {
+                        <span class="countdown"
+                              [class.soon]="countdownSecondsLeft(tx.expiresAt) < 180 && countdownSecondsLeft(tx.expiresAt) > 0"
+                              [class.done]="countdownSecondsLeft(tx.expiresAt) <= 0">
+                          ⏱ {{ formatCountdown(tx.expiresAt) }}
+                        </span>
+                      } @else { — }
+                    </td>
                     <td><strong style="font-weight:700;">{{ itemsCount(tx) }}</strong></td>
                     <td class="price">
                       @if (tx.totalAmountCents != null) { {{ '$' + (tx.totalAmountCents / 100).toFixed(2) }} }
+                      @else if (tx.totalRetailCents != null) { {{ '$' + (tx.totalRetailCents / 100).toFixed(2) }} }
                       @else { — }
+                    </td>
+                    <td>
+                      <div class="row-actions-cell">
+                        @if (tx.status === 'RESERVED' || tx.status === 'PENDING_RESERVATION') {
+                          <button class="btn ready"
+                                  [disabled]="!!markingReady()[tx.id]"
+                                  (click)="markReady(tx)">
+                            @if (markingReady()[tx.id]) { … } @else { ✓ } Mark Ready
+                          </button>
+                          <button class="btn unavail"
+                                  [disabled]="!!markingUnavail()[tx.id]"
+                                  (click)="markUnavailable(tx)">
+                            @if (markingUnavail()[tx.id]) { … } @else { ✗ } Not Available
+                          </button>
+                        } @else if (tx.status === 'READY') {
+                          <span class="chip ok">✓ Confirmed ready</span>
+                        }
+                      </div>
                     </td>
                   </tr>
                 }
@@ -201,7 +273,7 @@ interface Transaction {
     </section>
   `,
 })
-export class StoreTransactionsListComponent implements OnInit {
+export class StoreTransactionsListComponent implements OnInit, OnDestroy {
   private readonly http = inject(HttpClient);
   private readonly authService = inject(AuthService);
   private readonly cdr = inject(ChangeDetectorRef);
@@ -209,11 +281,24 @@ export class StoreTransactionsListComponent implements OnInit {
 
   readonly transactions = signal<Transaction[]>([]);
   readonly loading = signal(true);
-
+  readonly markingReady = signal<Record<string, boolean>>({});
+  readonly markingUnavail = signal<Record<string, boolean>>({});
+  readonly justUpdated = signal<Record<string, boolean>>({});
   private currentStoreId: string | null = null;
+  private tickerHandle: any = null;
+  private sseSource: EventSource | null = null;
 
   ngOnInit(): void {
     this.loadTransactions();
+    this.tickerHandle = setInterval(() => {
+      const any = this.transactions().some(t => t.expiresAt && (t.status === 'RESERVED' || t.status === 'PENDING_RESERVATION' || t.status === 'READY'));
+      if (any) this.cdr.markForCheck();
+    }, 1000);
+  }
+
+  ngOnDestroy(): void {
+    if (this.tickerHandle) clearInterval(this.tickerHandle);
+    if (this.sseSource) { try { this.sseSource.close(); } catch {} }
   }
 
   private getStoreIdParam(): { storeId: string; isMe: boolean } {
@@ -277,10 +362,86 @@ export class StoreTransactionsListComponent implements OnInit {
 
   statusClass(status: string | null): 'ok' | 'warn' | 'err' | 'info' {
     const s = (status || 'PENDING').toUpperCase();
-    if (['COMPLETED', 'PAID', 'FULFILLED', 'SUCCESS', 'CAPTURED'].includes(s)) return 'ok';
-    if (['PENDING', 'CREATED', 'PROCESSING', 'AUTHORIZED', 'SHIPPED'].includes(s)) return 'info';
+    if (['COMPLETED', 'PAID', 'FULFILLED', 'SUCCESS', 'CAPTURED', 'READY', 'PICKED_UP'].includes(s)) return 'ok';
+    if (['PENDING', 'CREATED', 'PROCESSING', 'AUTHORIZED', 'SHIPPED', 'RESERVED', 'PENDING_RESERVATION'].includes(s)) return 'warn';
     if (['REFUNDED', 'PARTIALLY_REFUNDED'].includes(s)) return 'warn';
-    if (['CANCELED', 'CANCELLED', 'FAILED', 'DECLINED', 'EXPIRED'].includes(s)) return 'err';
+    if (['CANCELED', 'CANCELLED', 'FAILED', 'DECLINED', 'EXPIRED', 'UNAVAILABLE'].includes(s)) return 'err';
     return 'info';
+  }
+
+  countdownSecondsLeft(iso: string | null | undefined): number {
+    if (!iso) return 0;
+    return Math.floor((new Date(iso).getTime() - Date.now()) / 1000);
+  }
+
+  formatCountdown(iso: string | null | undefined): string {
+    const s = this.countdownSecondsLeft(iso);
+    if (s <= 0) return '00:00';
+    const m = Math.floor(s / 60);
+    const sec = s % 60;
+    return (m < 10 ? '0' : '') + m + ':' + (sec < 10 ? '0' : '') + sec;
+  }
+
+  private pulseRow(txId: string): void {
+    this.justUpdated.update(r => ({ ...r, [txId]: true }));
+    setTimeout(() => {
+      this.justUpdated.update(r => { const nr = { ...r }; delete nr[txId]; return nr; });
+    }, 1700);
+  }
+
+  private mergeIncomingTx(update: Partial<Transaction> & { id: string }): void {
+    this.transactions.update(list => {
+      const idx = list.findIndex(t => t.id === update.id);
+      if (idx >= 0) {
+        const arr = list.slice();
+        arr[idx] = { ...arr[idx], ...update };
+        return arr;
+      }
+      return list;
+    });
+  }
+
+  async markReady(tx: Transaction): Promise<void> {
+    if (this.markingReady()[tx.id]) return;
+    this.markingReady.update(r => ({ ...r, [tx.id]: true }));
+    try {
+      const api = this.authService.resolveApiBasePublic();
+      const { isMe } = this.getStoreIdParam();
+      const pathPart = isMe ? 'me' : encodeURIComponent(this.currentStoreId || 'me');
+      const url = `${api}/admin/stores/${pathPart}/transactions/${encodeURIComponent(tx.id)}/mark-ready`;
+      const res = await firstValueFrom(this.http.post<any>(url, {}));
+      if (res?.transactionId) {
+        this.mergeIncomingTx({ id: tx.id, status: res.status || 'READY' });
+        this.pulseRow(tx.id);
+      } else {
+        await this.loadTransactions();
+      }
+    } catch (e: any) {
+      alert(e?.error?.message || e?.message || 'Failed to mark ready');
+    } finally {
+      this.markingReady.update(r => { const nr = { ...r }; delete nr[tx.id]; return nr; });
+    }
+  }
+
+  async markUnavailable(tx: Transaction): Promise<void> {
+    if (this.markingUnavail()[tx.id]) return;
+    this.markingUnavail.update(r => ({ ...r, [tx.id]: true }));
+    try {
+      const api = this.authService.resolveApiBasePublic();
+      const { isMe } = this.getStoreIdParam();
+      const pathPart = isMe ? 'me' : encodeURIComponent(this.currentStoreId || 'me');
+      const url = `${api}/admin/stores/${pathPart}/transactions/${encodeURIComponent(tx.id)}/mark-unavailable`;
+      const res = await firstValueFrom(this.http.post<any>(url, {}));
+      if (res?.transactionId) {
+        this.mergeIncomingTx({ id: tx.id, status: res.status || 'CANCELED' });
+        this.pulseRow(tx.id);
+      } else {
+        await this.loadTransactions();
+      }
+    } catch (e: any) {
+      alert(e?.error?.message || e?.message || 'Failed to mark unavailable');
+    } finally {
+      this.markingUnavail.update(r => { const nr = { ...r }; delete nr[tx.id]; return nr; });
+    }
   }
 }

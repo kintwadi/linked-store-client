@@ -276,6 +276,11 @@ export class ProductService {
     return `${origin}/p/${encodeURIComponent(productId)}`;
   }
 
+  buildQrSharePageUrlFor(productId: string): string {
+    const origin = resolvePublicOrigin();
+    return `${origin}/p/${encodeURIComponent(productId)}/qr`;
+  }
+
   async getSimilar(productId: string, limit = 4): Promise<Product[]> {
     const all = await firstValueFrom(this.list());
     const seed = all.find((p) => p.id === productId);
