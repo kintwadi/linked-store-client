@@ -88,6 +88,9 @@ export class AuthService {
     longitude: number;
     logoUrl?: string;
     isStoreAdmin: boolean;
+    countryCode?: string;
+    currencyCode?: string;
+    inviteToken?: string;
   }): Promise<TokenPair> {
     const api = this.resolveApiBase();
     const res = await firstValueFrom(

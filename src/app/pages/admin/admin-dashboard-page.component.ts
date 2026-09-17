@@ -6,6 +6,7 @@ import { HttpClient } from '@angular/common/http';
 import { DomSanitizer, SafeUrl } from '@angular/platform-browser';
 import { firstValueFrom } from 'rxjs';
 import { AuthService, AuthUser } from '../../services/auth.service';
+import { CanPipe } from '../../pipes/can.pipe';
 
 type TabKey = 'stores' | 'users' | 'transactions';
 
@@ -36,7 +37,7 @@ interface SseEventShape {
 @Component({
   selector: 'app-admin-dashboard-page',
   standalone: true,
-  imports: [CommonModule, FormsModule, RouterLink, ReactiveFormsModule, DatePipe],
+  imports: [CommonModule, FormsModule, RouterLink, ReactiveFormsModule, DatePipe, CanPipe],
   styles: [`
     :host { display: block; }
     .wrap {
@@ -414,6 +415,33 @@ interface SseEventShape {
     .info-item { display: grid; gap: 3px; }
     .info-item .k { font-size: 12px; color: #6b7280; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; }
     .info-item .v { font-size: 14px; color: #111827; font-weight: 500; }
+
+    .store-token-row { display: inline-flex; align-items: center; gap: 6px; }
+    .token-digits {
+      font-size: 15px;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      color: #4f46e5;
+      background: #eef2ff;
+      padding: 3px 10px;
+      border-radius: 8px;
+    }
+    .copy-btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      padding: 2px 6px;
+      font-size: 13px;
+      line-height: 1;
+      border: 1px solid #e5e7eb;
+      background: #ffffff;
+      color: #374151;
+      border-radius: 6px;
+      cursor: pointer;
+      transition: background 0.15s, border-color 0.15s, transform 0.1s;
+    }
+    .copy-btn:hover { background: #f9fafb; border-color: #d1d5db; }
+    .copy-btn:active { transform: translateY(1px); }
 
     .banner {
       padding: 16px 18px;
@@ -1146,7 +1174,18 @@ interface SseEventShape {
                               <div class="avatar purple">🏪</div>
                               <div class="cell-text">
                                 <span class="cell-title">{{ store.businessName || '—' }}</span>
-                                <span class="cell-meta mono">{{ store.id?.slice(0, 14) }}…</span>
+                                <span class="cell-meta mono">
+                                  {{ store.id?.slice(0, 14) }}…
+                                  @if (store.gatewayCode) {
+                                    <span style="margin-left:10px;color:#4f46e5;font-weight:700;letter-spacing:0.03em;">
+                                      Token {{ store.gatewayCode }}
+                                    </span>
+                                    <button class="copy-btn" type="button"
+                                            style="margin-left:4px;"
+                                            (click)="copyToClipboard(store.gatewayCode, 'Store token copied.')"
+                                            title="Copy store token">📋</button>
+                                  }
+                                </span>
                               </div>
                             </div>
                           </td>
@@ -1187,16 +1226,18 @@ interface SseEventShape {
                                 </span>
                                 @if (store.subscriptionStatus === 'SUSPENDED' || store.subscriptionStatus === 'CANCELED') { Activate } @else { Suspend }
                               </button>
-                              <button class="btn btn-primary-stripe"
-                                      [disabled]="onboarding[store.id]"
-                                      (click)="onboardStore(store)">
-                                <span class="ico">💳</span>
-                                @if (store.onboarded) { Re-onboard } @else { Setup Stripe }
-                              </button>
+                              @if (store.id | can:'payouts') {
+                                <button class="btn btn-primary-stripe"
+                                        [disabled]="onboarding[store.id]"
+                                        (click)="onboardStore(store)">
+                                  <span class="ico">💳</span>
+                                  @if (store.onboarded) { Re-onboard } @else { Setup Stripe }
+                                </button>
+                              }
                               <button class="btn btn-secondary" [routerLink]="['/admin', 'stores', store.id]">
                                 <span class="ico">🏬</span> Store Admin
                               </button>
-                              @if (store.onboarded) {
+                              @if (store.onboarded && (store.id | can:'payouts')) {
                                 @if (store._dashboardSafeUrl) {
                                   <a class="btn btn-secondary"
                                      [href]="store._dashboardSafeUrl"
@@ -1256,6 +1297,17 @@ interface SseEventShape {
                               {{ myStore()!.subscriptionStatus || '—' }}
                             </span>
                             <span>ID: <span style="font-family:ui-monospace;opacity:.95;">{{ myStore()!.id?.slice(0,12) }}…</span></span>
+                            @if (myStore()!.gatewayCode) {
+                              <span style="margin-left:14px;">
+                                Token:
+                                <span style="font-family:ui-monospace;font-weight:700;color:#4f46e5;letter-spacing:0.03em;">
+                                  {{ myStore()!.gatewayCode }}
+                                </span>
+                                <button class="copy-btn" type="button" style="margin-left:4px;transform:translateY(1px);"
+                                        (click)="copyToClipboard(myStore()!.gatewayCode, 'Store token copied.')"
+                                        title="Copy store token">📋</button>
+                              </span>
+                            }
                           </div>
                         </div>
                       </div>
@@ -1289,7 +1341,21 @@ interface SseEventShape {
                     <div class="info-section">
                       <h3 style="font-size:15px;font-weight:700;margin:0;">Store details</h3>
                       <div class="info-row-grid">
-                        <div class="info-item"><span class="k">Store ID</span><span class="v"><span class="mono">{{ myStore()!.id }}</span></span></div>
+                        <div class="info-item">
+                          <span class="k">Store ID</span>
+                          <span class="v"><span class="mono">{{ myStore()!.id }}</span></span>
+                        </div>
+                        <div class="info-item">
+                          <span class="k">Store token</span>
+                          <span class="v store-token-row">
+                            <span class="mono token-digits">{{ myStore()!.gatewayCode || '—' }}</span>
+                            @if (myStore()!.gatewayCode) {
+                              <button class="copy-btn" type="button"
+                                      (click)="copyToClipboard(myStore()!.gatewayCode, 'Store token copied.')"
+                                      title="Copy store token">📋</button>
+                            }
+                          </span>
+                        </div>
                         <div class="info-item"><span class="k">Business name</span><span class="v">{{ myStore()!.businessName || '—' }}</span></div>
                         <div class="info-item"><span class="k">Latitude</span><span class="v">{{ myStore()!.latitude }}</span></div>
                         <div class="info-item"><span class="k">Longitude</span><span class="v">{{ myStore()!.longitude }}</span></div>
@@ -1311,25 +1377,27 @@ interface SseEventShape {
                                  style="background:var(--color-primary);border-color:var(--color-primary);color:#fff;box-shadow:var(--shadow-sm);">
                                 🛍 Manage Products &amp; Inventory
                               </a>
-                              <button class="btn btn-ghost" style="background:#fff;color:#047857;border:1px solid #a7f3d0;"
-                                      [disabled]="onboarding['me']" (click)="onboardMyStore()">
-                                🔄 Re-open Stripe Onboarding
-                              </button>
-                              @if (myStore()?._dashboardSafeUrl) {
-                                <a class="btn btn-secondary"
-                                   style="background:#047857;color:#fff;border-color:#047857;"
-                                   [href]="myStore()!._dashboardSafeUrl"
-                                   target="_blank"
-                                   rel="noopener noreferrer"
-                                   (click)="loginLinkMyStore()">
-                                  ↗ Open Stripe Dashboard
-                                </a>
-                              } @else {
-                                <button class="btn btn-secondary"
-                                        style="background:#047857;color:#fff;border-color:#047857;"
-                                        [disabled]="loginLinking['me']" (click)="loginLinkMyStore()">
-                                  ↗ Open Stripe Dashboard
+                              @if (myStore()!.id | can:'payouts') {
+                                <button class="btn btn-ghost" style="background:#fff;color:#047857;border:1px solid #a7f3d0;"
+                                        [disabled]="onboarding['me']" (click)="onboardMyStore()">
+                                  🔄 Re-open Stripe Onboarding
                                 </button>
+                                @if (myStore()?._dashboardSafeUrl) {
+                                  <a class="btn btn-secondary"
+                                     style="background:#047857;color:#fff;border-color:#047857;"
+                                     [href]="myStore()!._dashboardSafeUrl"
+                                     target="_blank"
+                                     rel="noopener noreferrer"
+                                     (click)="loginLinkMyStore()">
+                                    ↗ Open Stripe Dashboard
+                                  </a>
+                                } @else {
+                                  <button class="btn btn-secondary"
+                                          style="background:#047857;color:#fff;border-color:#047857;"
+                                          [disabled]="loginLinking['me']" (click)="loginLinkMyStore()">
+                                    ↗ Open Stripe Dashboard
+                                  </button>
+                                }
                               }
                             </div>
                           </div>
@@ -1348,25 +1416,27 @@ interface SseEventShape {
                                  style="background:var(--color-primary);border-color:var(--color-primary);color:#fff;box-shadow:var(--shadow-sm);">
                                 🛍 Manage Products &amp; Inventory
                               </a>
-                              <button class="btn btn-primary"
-                                      style="background:#b45309;border-color:#b45309;"
-                                      [disabled]="onboarding['me']" (click)="onboardMyStore()">
-                                💳 Complete Stripe Onboarding →
-                              </button>
-                              @if (myStore()?.onboarded) {
-                                @if (myStore()?._dashboardSafeUrl) {
-                                  <a class="btn btn-secondary"
-                                     [href]="myStore()!._dashboardSafeUrl"
-                                     target="_blank"
-                                     rel="noopener noreferrer"
-                                     (click)="loginLinkMyStore()">
-                                    ↗ Open Stripe Dashboard
-                                  </a>
-                                } @else {
-                                  <button class="btn btn-secondary"
-                                          [disabled]="loginLinking['me']" (click)="loginLinkMyStore()">
-                                    ↗ Open Stripe Dashboard
-                                  </button>
+                              @if (myStore()!.id | can:'payouts') {
+                                <button class="btn btn-primary"
+                                        style="background:#b45309;border-color:#b45309;"
+                                        [disabled]="onboarding['me']" (click)="onboardMyStore()">
+                                  💳 Complete Stripe Onboarding →
+                                </button>
+                                @if (myStore()?.onboarded) {
+                                  @if (myStore()?._dashboardSafeUrl) {
+                                    <a class="btn btn-secondary"
+                                       [href]="myStore()!._dashboardSafeUrl"
+                                       target="_blank"
+                                       rel="noopener noreferrer"
+                                       (click)="loginLinkMyStore()">
+                                      ↗ Open Stripe Dashboard
+                                    </a>
+                                  } @else {
+                                    <button class="btn btn-secondary"
+                                            [disabled]="loginLinking['me']" (click)="loginLinkMyStore()">
+                                      ↗ Open Stripe Dashboard
+                                    </button>
+                                  }
                                 }
                               }
                             </div>
@@ -1405,9 +1475,11 @@ interface SseEventShape {
                   @else { Manage your in-store team and their permissions. }
                 </span>
               </div>
-              <button class="btn btn-primary" (click)="showAddUser.set(!showAddUser())" [disabled]="addingUser()">
-                @if (showAddUser()) { <span class="ico">✕</span> Cancel } @else { <span class="ico">＋</span> Add operator }
-              </button>
+              @if ((myStore()?.id ?? '') | can:'users') {
+                <button class="btn btn-primary" (click)="showAddUser.set(!showAddUser())" [disabled]="addingUser()">
+                  @if (showAddUser()) { <span class="ico">✕</span> Cancel } @else { <span class="ico">＋</span> Add operator }
+                </button>
+              }
             </div>
 
             @if (showAddUser()) {
@@ -2559,9 +2631,9 @@ export class AdminDashboardPageComponent implements OnInit, OnDestroy {
     this.loggingOut.set(true);
     try {
       await this.authService.logout();
-      window.location.href = '/';
+      this.router.navigate(['/login'], { replaceUrl: true }).catch(() => { window.location.href = '/login'; });
     } catch {
-      window.location.href = '/';
+      this.router.navigate(['/login'], { replaceUrl: true }).catch(() => { window.location.href = '/login'; });
     } finally {
       this.loggingOut.set(false);
     }
@@ -2705,6 +2777,38 @@ export class AdminDashboardPageComponent implements OnInit, OnDestroy {
         fragment: 'tx-' + ev.transactionId,
       });
       this.bellPanelOpen.set(false);
+    }
+  }
+
+  copyToClipboard(text: string, successMsg = 'Copied to clipboard.'): void {
+    if (!text) return;
+    const done = () => {
+      this.userSuccess.set(successMsg);
+      setTimeout(() => {
+        if (this.userSuccess() === successMsg) this.userSuccess.set(null);
+      }, 2000);
+    };
+    if (typeof navigator !== 'undefined' && navigator.clipboard && navigator.clipboard.writeText) {
+      void navigator.clipboard.writeText(text).then(done, () => this.fallbackCopy(text, done));
+    } else {
+      this.fallbackCopy(text, done);
+    }
+  }
+
+  private fallbackCopy(text: string, done: () => void): void {
+    try {
+      const ta = document.createElement('textarea');
+      ta.value = text;
+      ta.style.position = 'fixed';
+      ta.style.left = '-9999px';
+      document.body.appendChild(ta);
+      ta.focus();
+      ta.select();
+      document.execCommand('copy');
+      document.body.removeChild(ta);
+      done();
+    } catch {
+      // no-op
     }
   }
 

@@ -4,6 +4,7 @@ import { RouterLink, ActivatedRoute } from '@angular/router';
 import { HttpClient } from '@angular/common/http';
 import { firstValueFrom } from 'rxjs';
 import { AuthService } from '../../services/auth.service';
+import { CanPipe } from '../../pipes/can.pipe';
 
 interface InventoryVariant {
   variantId: string;
@@ -25,7 +26,7 @@ interface InventoryVariant {
 @Component({
   selector: 'app-store-products-list',
   standalone: true,
-  imports: [CommonModule, RouterLink],
+  imports: [CommonModule, RouterLink, CanPipe],
   styles: [`
     :host { display: block; }
 
@@ -182,9 +183,11 @@ interface InventoryVariant {
           <h2><span class="ico">📦</span> Products & Inventory</h2>
           <span class="muted">Manage your catalog, pricing, and stock levels.</span>
         </div>
-        <a class="btn btn-primary" routerLink="./new">
-          <span class="ico">＋</span> Add product
-        </a>
+        @if (storeId() | can:'create') {
+          <a class="btn btn-primary" routerLink="./new">
+            <span class="ico">＋</span> Add product
+          </a>
+        }
       </div>
 
       <div class="panel-body">
@@ -259,12 +262,21 @@ interface InventoryVariant {
                     </td>
                     <td>
                       <div class="row-actions">
-                        <a class="btn btn-secondary" [routerLink]="['./', v.variantId]">
-                          <span class="ico">✎</span> Edit
-                        </a>
-                        <a class="btn btn-secondary" [routerLink]="['/p', v.productId ?? v.variantId, 'qr']" target="_blank" rel="noopener">
-                          <span class="ico">📱</span> QR
-                        </a>
+                        @if (v | can:'edit':storeId()) {
+                          <a class="btn btn-secondary" [routerLink]="['./', v.variantId]">
+                            <span class="ico">✎</span> Edit
+                          </a>
+                        }
+                        @if (v | can:'qr':storeId()) {
+                          <a class="btn btn-secondary" [routerLink]="['/p', v.productId ?? v.variantId, 'qr']" target="_blank" rel="noopener">
+                            <span class="ico">📱</span> QR
+                          </a>
+                        }
+                        @if (v | can:'delete':storeId()) {
+                          <button class="btn btn-secondary" style="background:#fef2f2;color:#b91c1c;border:1px solid #fecaca;" (click)="onDeleteProduct(v)">
+                            <span class="ico">🗑</span> Delete
+                          </button>
+                        }
                       </div>
                     </td>
                   </tr>
@@ -291,8 +303,13 @@ export class StoreProductsListComponent implements OnInit {
 
   readonly products = signal<InventoryVariant[]>([]);
   readonly loading = signal(true);
+  readonly storeId = signal<string>('');
 
   ngOnInit(): void {
+    const storeIdParam = this.route.snapshot.parent?.paramMap.get('storeId');
+    const isMe = storeIdParam === 'me';
+    const pathPart = isMe ? 'me' : (storeIdParam ?? '');
+    this.storeId.set(pathPart);
     this.loadInventory();
   }
 
@@ -300,6 +317,28 @@ export class StoreProductsListComponent implements OnInit {
     const variantUrls = v.variantGalleryImageUrls ?? [];
     const productUrls = v.productGalleryImageUrls ?? [];
     return new Set([...variantUrls, ...productUrls]).size;
+  }
+
+  onDeleteProduct(v: InventoryVariant): void {
+    if (confirm(`Delete product "${v.productTitle || 'Untitled'}"? This cannot be undone.`)) {
+      void this.deleteProduct(v);
+    }
+  }
+
+  private async deleteProduct(v: InventoryVariant): Promise<void> {
+    try {
+      const api = this.authService.resolveApiBasePublic();
+      const pathPart = this.storeId() === 'me' ? 'me' : encodeURIComponent(this.storeId());
+      await firstValueFrom(
+        this.http.delete<void>(
+          `${api}/admin/stores/${pathPart}/inventory/${encodeURIComponent(v.variantId)}`
+        )
+      );
+      this.products.update(list => list.filter(p => p.variantId !== v.variantId));
+    } catch (err) {
+      console.error('Failed to delete product', err);
+      alert('Failed to delete product. Please try again.');
+    }
   }
 
   private async loadInventory(): Promise<void> {
