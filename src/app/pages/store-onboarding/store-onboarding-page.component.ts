@@ -452,7 +452,6 @@ export class StoreOnboardingPageComponent implements OnInit {
         _dashboardLoading: false,
       }));
       this.stores.set(arr);
-      for (const s of arr) if (s.onboarded) void this.ensureDashboardLink(s);
     } catch (err: any) {
       const msg = err?.message ?? 'Failed to load stores.';
       this.error.set(msg);
@@ -490,37 +489,47 @@ export class StoreOnboardingPageComponent implements OnInit {
           defaultCurrency,
         })
       );
-      const u = res?.url ?? null;
+      if (!res || res.status === 'error' || !res.url) {
+        const msg = res?.message ?? 'Stripe did not return an onboarding URL.';
+        throw new Error(msg);
+      }
+      const u: string = res.url;
       store._onboardingUrl = u;
       return u;
+    } catch (err: any) {
+      const message = err?.error?.message
+        ?? err?.message
+        ?? 'Failed to create Stripe onboarding link.';
+      throw new Error(message);
     } finally {
       store._onboardingLoading = false;
     }
   }
 
   private async ensureDashboardLink(store: StoreRow): Promise<string | null> {
-    if (store._dashboardUrl) return store._dashboardUrl;
-    if (store._dashboardLoading) {
-      return await new Promise(resolve => {
-        const start = Date.now();
-        const iv = window.setInterval(() => {
-          if (store._dashboardUrl || !store._dashboardLoading || Date.now() - start > 15000) {
-            window.clearInterval(iv);
-            resolve(store._dashboardUrl ?? null);
-          }
-        }, 80);
-      });
-    }
+    // Do NOT cache LoginLinks: they expire in minutes and fail the next day with a Stripe 404.
+    // Always request a fresh one. Also skip the Loading poll loop (we don't cache anymore).
     store._dashboardLoading = true;
+    store._dashboardUrl = null;
+    store._dashboardSafeUrl = null;
     const api = resolveApiBase();
     try {
       const res = await firstValueFrom(
         this.http.post<any>(`${api}/connect/login-link`, { storeId: store.id })
       );
-      const u = res?.url ?? null;
+      if (!res || res.status === 'error' || !res.url) {
+        const msg = res?.message ?? 'Stripe did not return a dashboard URL.';
+        throw new Error(msg);
+      }
+      const u: string = res.url;
       store._dashboardUrl = u;
-      if (u) store._dashboardSafeUrl = this.sanitizer.bypassSecurityTrustUrl(u);
+      store._dashboardSafeUrl = this.sanitizer.bypassSecurityTrustUrl(u);
       return u;
+    } catch (err: any) {
+      const message = err?.error?.message
+        ?? err?.message
+        ?? 'Stripe Express dashboard session could not be created.';
+      throw new Error(message);
     } finally {
       store._dashboardLoading = false;
     }

@@ -2040,9 +2040,6 @@ export class AdminDashboardPageComponent implements OnInit, OnDestroy {
       }
       arr = arr.map(s => this.decorateStripeFields(s));
       this.stores.set(arr);
-      // Pre-warm dashboard login links in background so the UI can render them as <a target=_blank> — never popup-blocked.
-      for (const s of arr) if (s.onboarded) void this.ensureDashboardLink(s);
-      if (mine && mine.onboarded) void this.ensureDashboardLink(this.myStore()!);
     } catch (err: any) {
       this.storesError.set(err?.error?.message ?? err?.message ?? 'Failed to load stores.');
     } finally {
@@ -2063,7 +2060,10 @@ export class AdminDashboardPageComponent implements OnInit, OnDestroy {
   }
 
   private async ensureOnboardingLink(store: any, opts: { me?: boolean } = {}): Promise<string | null> {
-    if (store._onboardingUrl) return store._onboardingUrl;
+    // Do NOT cache onboarding URLs: if backend returns status==='error' we MUST surface the error alert
+    // to the user (and re-request when they retry). If we cached a null after a 503, the next click would
+    // short-circuit before re-requesting.
+    store._onboardingUrl = null;
     if (store._onboardingLoading) {
       return await new Promise<string | null>(resolve => {
         const start = Date.now();
@@ -2086,7 +2086,11 @@ export class AdminDashboardPageComponent implements OnInit, OnDestroy {
         ? `/admin/stores/me/connect/onboarding-link`
         : `/admin/stores/${encodeURIComponent(store.id)}/connect/onboarding-link`;
       const res: any = await firstValueFrom(this.http.post(`${api}${urlTail}`, body));
-      const u = res?.url ?? null;
+      if (!res || res.status === 'error' || !res.url) {
+        const msg = res?.message ?? 'Stripe did not return an onboarding URL.';
+        throw new Error(msg);
+      }
+      const u: string = res.url;
       store._onboardingUrl = u;
       return u;
     } finally {
@@ -2096,7 +2100,11 @@ export class AdminDashboardPageComponent implements OnInit, OnDestroy {
   }
 
   private async ensureDashboardLink(store: any, opts: { me?: boolean } = {}): Promise<string | null> {
-    if (store._dashboardUrl) return store._dashboardUrl;
+    // LoginLinks are short-lived (minutes). Never use cached values or the user can end up on a
+    // Stripe 404 a day later. Also: backend now returns 503 status==='error' with a message when
+    // no real URL could be generated; we must show that, not navigate to a null/empty URL.
+    store._dashboardUrl = null;
+    store._dashboardSafeUrl = null;
     if (store._dashboardLoading) {
       return await new Promise<string | null>(resolve => {
         const start = Date.now();
@@ -2115,9 +2123,13 @@ export class AdminDashboardPageComponent implements OnInit, OnDestroy {
         ? `/admin/stores/me/connect/login-link`
         : `/admin/stores/${encodeURIComponent(store.id)}/connect/login-link`;
       const res: any = await firstValueFrom(this.http.post(`${api}${urlTail}`, {}));
-      const u = res?.url ?? null;
+      if (!res || res.status === 'error' || !res.url) {
+        const msg = res?.message ?? 'Stripe did not return a dashboard URL.';
+        throw new Error(msg);
+      }
+      const u: string = res.url;
       store._dashboardUrl = u;
-      if (u) store._dashboardSafeUrl = this.sanitizer.bypassSecurityTrustUrl(u);
+      store._dashboardSafeUrl = this.sanitizer.bypassSecurityTrustUrl(u);
       return u;
     } finally {
       store._dashboardLoading = false;
