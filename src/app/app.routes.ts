@@ -7,6 +7,7 @@ import { CheckoutSuccessPageComponent } from './pages/checkout/checkout-success-
 import { CheckoutCancelPageComponent } from './pages/checkout/checkout-cancel-page.component';
 import { StoreOnboardingPageComponent } from './pages/store-onboarding/store-onboarding-page.component';
 import { MerchantPickupPageComponent } from './pages/merchant-pickup/merchant-pickup-page.component';
+import { RunnerPickupPageComponent } from './pages/runner/runner-pickup-page.component';
 import { SignupPageComponent } from './pages/signup/signup-page.component';
 import { LoginPageComponent } from './pages/login/login-page.component';
 import { AdminDashboardPageComponent } from './pages/admin/admin-dashboard-page.component';
@@ -29,6 +30,7 @@ export const routes: Routes = [
   { path: 'merchant/pickup',         component: MerchantPickupPageComponent,     title: 'Merchant Pickup | Linked-Store' },
   { path: 'signup',                  component: SignupPageComponent,             title: 'Sign up' },
   { path: 'login',                   component: LoginPageComponent,              title: 'Log in' },
+  { path: 'runner/pickup',           component: RunnerPickupPageComponent,       title: 'Runner Pickup Queue | Linked-Store', canActivate: [authGuard] },
   { path: 'admin',                   component: AdminDashboardPageComponent,     title: 'Admin | Linked-Store', canActivate: [authGuard], data: { requireStoreAdmin: true } },
   { path: 'admin/notifications',     component: AdminNotificationsPageComponent, title: 'All Notifications | Linked-Store', canActivate: [authGuard], data: { requireStoreAdmin: true } },
   { path: 'admin/requests/:transactionId', component: AdminRequestDetailPageComponent, title: 'Request Detail | Linked-Store', canActivate: [authGuard], data: { requireStoreAdmin: true } },

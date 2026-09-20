@@ -483,6 +483,53 @@ export class ProductService {
     );
   }
 
+  getRunnerPickupList(options?: {
+    status?: string;
+    page?: number;
+    pageSize?: number;
+  }): Promise<{
+    items: Array<{
+      id: string;
+      status: string;
+      totalRetailCents: number;
+      wholesalePayoutCents: number;
+      arbitrageMarginCents: number;
+      currency: string;
+      productId?: string;
+      productTitle?: string;
+      productImageUrl?: string;
+      variantId?: string;
+      sku?: string;
+      variantAttributesJson?: string;
+      qrSecureToken?: string;
+      qrFallbackCode?: string;
+      originatingStoreId?: string;
+      fulfillingStoreId?: string;
+      stripePaymentIntentId?: string;
+      createdAt?: string;
+      updatedAt?: string;
+      originatingStoreName?: string;
+      fulfillingStoreName?: string;
+    }>;
+    page: number;
+    pageSize: number;
+    totalCount: number;
+    totalElements: number;
+    totalPages: number;
+    hasNext: boolean;
+    hasPrevious: boolean;
+  }> {
+    const api = resolveApiBase();
+    const status = options?.status ?? 'PAID';
+    const page = Math.max(0, options?.page ?? 0);
+    const pageSize = Math.max(1, Math.min(200, options?.pageSize ?? 50));
+    return firstValueFrom(
+      this.http.get<any>(
+        `${api}/admin/transactions/me/runner?status=${encodeURIComponent(status)}&page=${page}&pageSize=${pageSize}`
+      )
+    );
+  }
+
   /**
    * Hook for the "Request Now" flow.
    * 1) POST /api/inventory/check-availability — 15-min stock lock on variant
