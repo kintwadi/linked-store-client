@@ -10,6 +10,8 @@ import { MerchantPickupPageComponent } from './pages/merchant-pickup/merchant-pi
 import { SignupPageComponent } from './pages/signup/signup-page.component';
 import { LoginPageComponent } from './pages/login/login-page.component';
 import { AdminDashboardPageComponent } from './pages/admin/admin-dashboard-page.component';
+import { AdminNotificationsPageComponent } from './pages/admin/admin-notifications-page.component';
+import { AdminRequestDetailPageComponent } from './pages/admin/admin-request-detail-page.component';
 import { authGuard } from './guards/auth.guard';
 import { StoreDashboardShellComponent } from './pages/store-dashboard/store-dashboard-shell.component';
 import { StoreProductsListComponent } from './pages/store-dashboard/store-products-list.component';
@@ -28,6 +30,9 @@ export const routes: Routes = [
   { path: 'signup',                  component: SignupPageComponent,             title: 'Sign up' },
   { path: 'login',                   component: LoginPageComponent,              title: 'Log in' },
   { path: 'admin',                   component: AdminDashboardPageComponent,     title: 'Admin | Linked-Store', canActivate: [authGuard], data: { requireStoreAdmin: true } },
+  { path: 'admin/notifications',     component: AdminNotificationsPageComponent, title: 'All Notifications | Linked-Store', canActivate: [authGuard], data: { requireStoreAdmin: true } },
+  { path: 'admin/requests/:transactionId', component: AdminRequestDetailPageComponent, title: 'Request Detail | Linked-Store', canActivate: [authGuard], data: { requireStoreAdmin: true } },
+  { path: 'admin/products-all',      component: StoreProductsListComponent,      title: 'All Products | Linked-Store', canActivate: [authGuard], data: { requireStoreAdmin: true, unifiedView: true } },
   { path: 'admin/stores/:storeId',   component: StoreDashboardShellComponent,    canActivate: [authGuard], data: { requireStoreAdmin: true }, children: [
     { path: '', redirectTo: 'products', pathMatch: 'full' },
     { path: 'products', component: StoreProductsListComponent },

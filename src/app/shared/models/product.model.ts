@@ -1,3 +1,14 @@
+export interface ProductVariant {
+  id: string;
+  sku: string;
+  retailPriceCents: number;
+  wholesalePriceCents?: number;
+  imageUrl?: string;
+  stockQuantity: number;
+  storeId: string;
+  variantAttributes?: Record<string, any> | null;
+}
+
 export interface Product {
   id: string;
   title: string;
@@ -13,6 +24,8 @@ export interface Product {
   inStock: boolean;
   variantId?: string;
   storeId?: string;
+  sku?: string;
+  variants?: ProductVariant[];
 }
 
 export interface SimilarProductsResult {

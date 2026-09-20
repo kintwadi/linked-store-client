@@ -23,8 +23,11 @@ export const authGuard: CanActivateFn = (route): boolean | UrlTree => {
     const isAdmin =
       user?.isGlobalAdmin ||
       user?.role === 'GLOBAL_ADMIN' ||
+      user?.role === 'OWNER' ||
       user?.role === 'STORE_ADMIN' ||
-      user?.role === 'OWNER';
+      user?.role === 'STORE_REPRESENTATIVE' ||
+      user?.role === 'CLERK' ||
+      user?.role === 'RUNNER';
     if (!isAdmin) {
       return router.createUrlTree(['/']);
     }

@@ -3,7 +3,7 @@ import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { CommonModule } from '@angular/common';
 import { HttpClient } from '@angular/common/http';
 import { firstValueFrom } from 'rxjs';
-import { Product, SimilarProductsResult } from '../../shared/models/product.model';
+import { Product, ProductVariant, SimilarProductsResult } from '../../shared/models/product.model';
 import { ProductService } from '../../services/product.service';
 import { AuthService } from '../../services/auth.service';
 
@@ -293,6 +293,11 @@ type ReservationStatus = 'idle' | 'pending' | 'accepted' | 'denied' | 'expired';
       box-shadow: 0 10px 28px -14px rgba(109,40,217,0.55);
       border: 1px solid rgba(255,255,255,0.08);
     }
+    .held-banner.ready {
+      background: linear-gradient(135deg, #047857 0%, #065f46 100%);
+      box-shadow: 0 12px 28px -14px rgba(6,95,70,0.55);
+      border-color: rgba(255,255,255,0.12);
+    }
     .held-head {
       display: flex; align-items: flex-start; justify-content: space-between;
       gap: 12px; flex-wrap: wrap;
@@ -301,11 +306,19 @@ type ReservationStatus = 'idle' | 'pending' | 'accepted' | 'denied' | 'expired';
       display: inline-flex; align-items: center; gap: 10px;
       font-size: 17px; font-weight: 800; letter-spacing: -0.01em;
     }
+    .held-title.ready-label {
+      font-size: 18px;
+    }
     .held-title .dot {
       width: 9px; height: 9px; border-radius: 50%;
       background: #22c55e;
       box-shadow: 0 0 0 4px rgba(34,197,94,0.25);
       animation: liveBlink 2s ease-in-out infinite;
+    }
+    .held-title .dot.ready {
+      background: #fff;
+      box-shadow: 0 0 0 4px rgba(255,255,255,0.3);
+      animation: none;
     }
     @keyframes liveBlink {
       0%,100% { opacity: 1; }
@@ -376,6 +389,11 @@ type ReservationStatus = 'idle' | 'pending' | 'accepted' | 'denied' | 'expired';
       transition: transform .15s ease, box-shadow .15s ease;
       box-shadow: 0 10px 20px -14px rgba(0,0,0,0.35);
     }
+    .btn-primary-checkout.success {
+      background: linear-gradient(135deg, #fde68a 0%, #fbbf24 100%);
+      color: #7c2d12;
+      border-color: #fff;
+    }
     .btn-primary-checkout:hover { transform: translateY(-1px); box-shadow: 0 14px 24px -14px rgba(0,0,0,0.45); }
     .btn-primary-checkout[disabled] { opacity: .55; cursor: not-allowed; }
     .cancel-btn-danger {
@@ -388,6 +406,95 @@ type ReservationStatus = 'idle' | 'pending' | 'accepted' | 'denied' | 'expired';
     }
     .cancel-btn-danger:hover { background: rgba(254,202,202,0.1); color: #fff; border-color: rgba(254,202,202,0.55); }
     .cancel-btn-danger[disabled] { opacity: .55; cursor: not-allowed; }
+
+    .store-scan-banner {
+      display: flex;
+      align-items: flex-start;
+      gap: 12px;
+      padding: 12px 14px;
+      border-radius: 14px;
+      background: linear-gradient(135deg, rgba(79,110,247,0.10), rgba(129,140,248,0.05));
+      border: 1px solid rgba(99,102,241,0.25);
+      margin-bottom: 18px;
+    }
+    .store-scan-ico { font-size: 20px; line-height: 1.2; }
+    .store-scan-text { flex: 1; display: grid; gap: 2px; }
+    .store-scan-title { font-size: 14px; font-weight: 700; color: #1e1b4b; }
+    .store-scan-sub { font-size: 12.5px; color: #4b5563; line-height: 1.5; }
+    .store-scan-sub .mono { font-family: ui-monospace, Menlo, monospace; font-weight: 700; color: #4338ca; }
+
+    .swatches-wrap { display:grid; gap:10px; }
+    .swatch-row { display:flex; flex-wrap:wrap; gap:10px; }
+    .swatch {
+      display: inline-flex;
+      flex-direction: column;
+      align-items: flex-start;
+      gap: 4px;
+      padding: 10px 14px;
+      border-radius: 12px;
+      background: #fff;
+      border: 2px solid var(--color-border);
+      color: #111827;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: border-color .15s ease, transform .1s ease, box-shadow .15s ease;
+      min-width: 110px;
+      text-align: left;
+    }
+    .swatch:hover:not([disabled]):not(.selected) {
+      border-color: #c7d2fe;
+      transform: translateY(-1px);
+    }
+    .swatch.selected {
+      border-color: var(--color-primary);
+      box-shadow: 0 0 0 3px rgba(79,70,229,.12);
+    }
+    .swatch[disabled] {
+      opacity: .55;
+      cursor: not-allowed;
+      background: #f9fafb;
+    }
+    .swatch .sw-label {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 13px;
+      font-weight: 700;
+    }
+    .swatch .sw-check {
+      display: inline-block;
+      width: 14px;
+      height: 14px;
+      border-radius: 50%;
+      background: var(--color-primary);
+      color: #fff;
+      font-size: 10px;
+      line-height: 14px;
+      text-align: center;
+    }
+    .swatch .sw-price {
+      font-size: 12px;
+      color: var(--color-muted);
+      font-weight: 600;
+    }
+    .swatch .sw-stock {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      font-size: 11px;
+      font-weight: 600;
+      padding: 2px 8px;
+      border-radius: 999px;
+    }
+    .swatch .sw-stock.in {
+      background: #d1fae5;
+      color: #065f46;
+    }
+    .swatch .sw-stock.out {
+      background: #f3f4f6;
+      color: #6b7280;
+    }
   `],
   template: `
     <a routerLink="/" class="back-link">← Back to home</a>
@@ -457,6 +564,23 @@ type ReservationStatus = 'idle' | 'pending' | 'accepted' | 'denied' | 'expired';
         </div>
 
         <div class="info">
+          @if (scannedStoreId() || scannedStoreGateway()) {
+            <div class="store-scan-banner" *ngIf="!loading()">
+              <div class="store-scan-ico">🏬</div>
+              <div class="store-scan-text">
+                @if (scannedStoreName()) {
+                  <div class="store-scan-title">Shopping from {{ scannedStoreName() }}</div>
+                } @else if (scannedStoreGateway()) {
+                  <div class="store-scan-title">Store token {{ scannedStoreGateway() }}</div>
+                }
+                <div class="store-scan-sub">
+                  Your request will notify this store's team.
+                  @if (scannedStoreGateway()) { Token: <span class="mono">{{ scannedStoreGateway() }}</span> }
+                </div>
+              </div>
+            </div>
+          }
+
           <div>
             <span class="category">{{ product()!.category || 'Featured' }}</span>
             <h1 style="margin-top: 8px; margin-bottom: 6px;">{{ product()!.title }}</h1>
@@ -465,20 +589,74 @@ type ReservationStatus = 'idle' | 'pending' | 'accepted' | 'denied' | 'expired';
 
           <div class="price-row">
             <span class="price">{{ formattedPrice() }}</span>
-            <span class="badge badge-in-stock" *ngIf="product()!.inStock">In stock</span>
-            <span class="badge badge-out-stock" *ngIf="!product()!.inStock">Low stock</span>
+            @if (hasVariants()) {
+              @if (chosenVariantStock() > 0) {
+                <span class="badge badge-in-stock">In stock ({{ chosenVariantStock() }})</span>
+              } @else if (chosenVariantStock() === 0) {
+                <span class="badge badge-out-stock">Sold out</span>
+              } @else {
+                @if (hasAnyVariantInStock()) {
+                  <span class="badge badge-in-stock">In stock</span>
+                } @else {
+                  <span class="badge badge-out-stock">NOT AVAILABLE</span>
+                }
+              }
+            } @else {
+              <span class="badge badge-in-stock" *ngIf="product()!.inStock">In stock</span>
+              <span class="badge badge-out-stock" *ngIf="!product()!.inStock">Low stock</span>
+            }
           </div>
 
+          @if (hasVariants()) {
+            <div class="swatches-wrap">
+              <div style="font-size: 13px; font-weight: 600; color: var(--color-muted);">
+                Select size / variant
+              </div>
+              <div class="swatch-row" role="radiogroup" aria-label="Product variants">
+                @for (v of product()!.variants; track v.id) {
+                  <button
+                    type="button"
+                    role="radio"
+                    class="swatch"
+                    [class.selected]="v.id === selectedVariantId()"
+                    [attr.aria-checked]="v.id === selectedVariantId()"
+                    [disabled]="variantSoldOut(v)"
+                    (click)="selectedVariantId.set(v.id)">
+                    <span class="sw-label">
+                      @if (v.id === selectedVariantId()) {
+                        <span class="sw-check">✓</span>
+                      }
+                      @if (v.variantAttributes && v.variantAttributes['size']) {
+                        Size {{ v.variantAttributes['size'] }}
+                      } @else if (v.variantAttributes && v.variantAttributes['color']) {
+                        {{ v.variantAttributes['color'] }}
+                      } @else {
+                        {{ v.sku.length > 10 ? v.sku.slice(v.sku.length - 8) : v.sku }}
+                      }
+                    </span>
+                    <span class="sw-price">
+                      {{ products.formatPrice(v.retailPriceCents, product()!.currency) }}
+                    </span>
+                    @if (variantHasStock(v)) {
+                      <span class="sw-stock in">In stock ({{ v.stockQuantity }})</span>
+                    } @else {
+                      <span class="sw-stock out">Sold out</span>
+                    }
+                  </button>
+                }
+              </div>
+            </div>
+          }
+
           <div class="card request-card">
-            @if (reservationStatus() !== 'idle') {
-              <div class="countdown" [class.accepted]="reservationStatus() === 'accepted'"
+            @if (reservationStatus() === 'pending' || reservationStatus() === 'denied' || reservationStatus() === 'expired') {
+              <div class="countdown" [class.accepted]="false"
                                    [class.denied]="reservationStatus() === 'denied'"
                                    [class.expired]="reservationStatus() === 'expired'">
                 <div>
                   <div class="label">
                     @switch (reservationStatus()) {
                       @case ('pending')  { Please wait }
-                      @case ('accepted') { Reserved }
                       @case ('denied')   { Not available }
                       @case ('expired')  { Request expired }
                     }
@@ -486,7 +664,6 @@ type ReservationStatus = 'idle' | 'pending' | 'accepted' | 'denied' | 'expired';
                   <div class="sub">
                     @switch (reservationStatus()) {
                       @case ('pending')  { Confirming availability for you. }
-                      @case ('accepted') { Ready for pickup. }
                       @case ('denied')   { Please try again later. }
                       @case ('expired')  { Please try again later. }
                     }
@@ -499,23 +676,32 @@ type ReservationStatus = 'idle' | 'pending' | 'accepted' | 'denied' | 'expired';
               </div>
             }
 
+            @if (chosenVariantStock() === 0 && reservationStatus() === 'idle' && !requestResult()) {
+              <div class="request-result error">
+                This size is currently sold out; please pick another above.
+              </div>
+            }
+
             @if (requestResult() && reservationStatus() === 'idle') {
               <div class="request-result" [class.error]="!requestResult()!.ok">
-                {{ requestResult()!.message }}
+                @if (chosenVariantStock() === 0 && !requestResult()!.ok) {
+                  This size is currently sold out; please pick another above.
+                } @else {
+                  {{ requestResult()!.message }}
+                }
               </div>
             }
 
             @if (reservationStatus() === 'accepted' && reservation()) {
-              <div class="held-banner" role="status" aria-live="polite">
+              <div class="held-banner ready" role="status" aria-live="polite">
                 <div class="held-head">
                   <div style="display: grid; gap: 6px;">
-                    <div class="held-title">
-                      <span class="dot"></span>
-                      Held · Waiting for store confirmation
+                    <div class="held-title ready-label">
+                      <span class="dot ready"></span>
+                      Ready for checkout
                     </div>
                     <p class="held-sub">
-                      We've reserved this item for 15 minutes. The store is confirming they have it ready — once they mark it
-                      available you can complete checkout. If you change your mind you can release the hold below.
+                      🎉 The store confirmed this item is available. Please complete checkout within the hold time to secure it for pickup.
                     </p>
                   </div>
                 </div>
@@ -534,7 +720,7 @@ type ReservationStatus = 'idle' | 'pending' | 'accepted' | 'denied' | 'expired';
                 </div>
 
                 <div class="held-actions">
-                  <button class="btn-primary-checkout"
+                  <button class="btn-primary-checkout success"
                           type="button"
                           (click)="goToCheckout()"
                           [disabled]="requesting()">
@@ -549,16 +735,18 @@ type ReservationStatus = 'idle' | 'pending' | 'accepted' | 'denied' | 'expired';
                   </button>
                 </div>
               </div>
-            } @else {
+            } @else if (reservationStatus() !== 'accepted' || !reservation()) {
               <button
                 class="btn btn-primary btn-block"
                 (click)="onRequestNow()"
-                [disabled]="requesting() || reservationStatus() === 'pending'">
+                [disabled]="requesting() || reservationStatus() === 'pending' || chosenVariantStock() === 0">
                 @if (reservationStatus() === 'pending')  { Waiting… }
                 @if (reservationStatus() === 'accepted') { Reserved ✓ }
                 @if (reservationStatus() === 'denied' || reservationStatus() === 'expired') { Try again }
                 @if (reservationStatus() === 'idle') {
-                  {{ requesting() ? 'Reserving…' : 'Request Now' }}
+                  @if (chosenVariantStock() === 0) { Sold out — pick another size }
+                  @else if (requesting()) { Reserving… }
+                  @else { Request Now }
                 }
               </button>
             }
@@ -621,12 +809,44 @@ export class ProductDetailPageComponent implements OnInit, OnDestroy {
   readonly deadlineMs = signal<number>(0);
   readonly reservation = signal<any>(null);
   private readonly tick = signal(0);
+  readonly selectedVariantId = signal<string | null>(null);
+
+  readonly scannedStoreId = signal<string | null>(null);
+  readonly scannedStoreName = signal<string | null>(null);
+  readonly scannedStoreGateway = signal<string | null>(null);
+  private storeResolvedPromise: Promise<string | null> | null = null;
 
   private countdownTimer: number | null = null;
+  private reservationPollTimer: number | null = null;
+  private static readonly RESERVATION_POLL_MS = 1200;
+  private static readonly RESERVATION_POLL_MAX_SECONDS = 25;
+
+  readonly currentVariant = computed<ProductVariant | null>(() => {
+    const p = this.product();
+    const svid = this.selectedVariantId();
+    if (!p || !p.variants || !svid) return null;
+    return p.variants.find((v) => v.id === svid) ?? null;
+  });
+
+  readonly hasAnyVariantInStock = computed(() => {
+    const p = this.product();
+    return !!p?.variants?.some((v) => Number(v.stockQuantity) > 0);
+  });
+
+  readonly chosenPriceCents = computed(() => {
+    const v = this.currentVariant();
+    if (v) return v.retailPriceCents;
+    return this.product()?.retailPriceCents ?? 0;
+  });
+
+  readonly chosenVariantStock = computed(() => {
+    const v = this.currentVariant();
+    return v ? Number(v.stockQuantity) : -1;
+  });
 
   readonly formattedPrice = computed(() => {
     const p = this.product();
-    return p ? this.products.formatPrice(p.retailPriceCents, p.currency) : '';
+    return p ? this.products.formatPrice(this.chosenPriceCents(), p.currency) : '';
   });
 
   readonly galleryImages = computed<string[]>(() => {
@@ -663,6 +883,23 @@ export class ProductDetailPageComponent implements OnInit, OnDestroy {
     return this.currentSecondsRemaining();
   }
 
+  hasVariants(): boolean {
+    const p = this.product();
+    const arr = p ? p['variants'] : undefined;
+    return Array.isArray(arr) && arr.length > 0;
+  }
+
+  variantStockNum(v: unknown): number {
+    const vAny = v as Record<string, unknown>;
+    const sq = vAny?.['stockQuantity'];
+    if (typeof sq === 'number') return sq;
+    if (typeof sq === 'string') { const n = Number(sq); return isNaN(n) ? -1 : n; }
+    return -1;
+  }
+
+  variantSoldOut(v: unknown): boolean { return this.variantStockNum(v) === 0; }
+  variantHasStock(v: unknown): boolean { return this.variantStockNum(v) > 0; }
+
   countdownMinutesLeft(): number {
     return Math.floor(this.currentSecondsRemaining() / 60);
   }
@@ -683,11 +920,73 @@ export class ProductDetailPageComponent implements OnInit, OnDestroy {
       this.errorMsg.set('No product was selected.');
       return;
     }
-    this.loadProduct(id);
+    this.storeResolvedPromise = this.resolveScannedStoreFromUrl();
+    void this.storeResolvedPromise.then(() => {
+      this.loadProduct(id);
+    });
+  }
+
+  private async resolveScannedStoreFromUrl(): Promise<string | null> {
+    const qp = this.route.snapshot.queryParamMap;
+    const gateway = qp.get('gateway') ?? qp.get('gatewayCode') ?? qp.get('token');
+    const storeId = qp.get('storeId') ?? qp.get('store');
+    const apiBase = this.auth.resolveApiBasePublic();
+
+    if (gateway && /^\d{8}$/.test(gateway.trim())) {
+      const code = gateway.trim();
+      try {
+        const s: any = await firstValueFrom(
+          this.http.get(`${apiBase}/stores/gateway/${encodeURIComponent(code)}`),
+        );
+        if (s && s.id) {
+          this.scannedStoreId.set(String(s.id));
+          this.scannedStoreName.set(String(s.businessName || 'Store'));
+          if (s.gatewayCode) this.scannedStoreGateway.set(String(s.gatewayCode));
+          return String(s.id);
+        }
+      } catch {
+        this.scannedStoreGateway.set(code);
+      }
+    }
+
+    if (storeId && /^[0-9a-fA-F-]{20,}$/.test(storeId.trim())) {
+      const sid = storeId.trim();
+      try {
+        const s: any = await firstValueFrom(
+          this.http.get(`${apiBase}/stores/${encodeURIComponent(sid)}`),
+        );
+        if (s && s.id) {
+          this.scannedStoreId.set(String(s.id));
+          this.scannedStoreName.set(String(s.businessName || 'Store'));
+          if (s.gatewayCode) this.scannedStoreGateway.set(String(s.gatewayCode));
+          return String(s.id);
+        }
+      } catch {
+        // ignore; fall through to no scan
+      }
+    }
+
+    return null;
+  }
+
+  private async resolveOriginatingStoreId(product: Product): Promise<string> {
+    const explicit = this.scannedStoreId();
+    if (explicit) return explicit;
+    if (product?.storeId) return product.storeId;
+    const apiBase = this.auth.resolveApiBasePublic();
+    try {
+      const list: any[] = await firstValueFrom(this.http.get<any[]>(`${apiBase}/stores`));
+      if (Array.isArray(list) && list.length > 0 && list[0]?.id) return String(list[0].id);
+    } catch {
+      // ignore
+    }
+    const fallback = 'd7e59214-5adf-4788-beb0-ffccf4ab18f9';
+    return fallback;
   }
 
   ngOnDestroy(): void {
     this.clearCountdown();
+    this.clearReservationPolling();
   }
 
   @HostListener('document:keydown.arrowleft', ['$event'])
@@ -725,11 +1024,13 @@ export class ProductDetailPageComponent implements OnInit, OnDestroy {
     this.loading.set(true);
     this.activeSlide.set(0);
     this.clearCountdown();
+    this.clearReservationPolling();
     this.reservationStatus.set('idle');
     try {
       const { product, similar }: SimilarProductsResult =
         await this.products.getWithSimilar(productId);
       this.product.set(product);
+      this.selectedVariantId.set(product.variantId ?? product.id ?? null);
       this.similarProducts.set(similar);
     } catch (err) {
       this.errorMsg.set('This product could not be loaded.');
@@ -753,10 +1054,11 @@ export class ProductDetailPageComponent implements OnInit, OnDestroy {
     this.requesting.set(true);
     this.requestResult.set(null);
     try {
+      const originatingStoreId = await this.resolveOriginatingStoreId(p);
       const result = await this.products.createReservation({
         productId: p.id,
-        variantId: p.variantId ?? null,
-        originatingStoreId: p.storeId ?? '3c4e5dad-7cf2-4f5b-a617-ff0adaa04d44',
+        variantId: this.selectedVariantId() ?? p.variantId ?? null,
+        originatingStoreId,
         radiusKm: 5,
         countdownSeconds: 900,
       });
@@ -812,13 +1114,7 @@ export class ProductDetailPageComponent implements OnInit, OnDestroy {
     }
     this.deadlineMs.set(deadline);
     this.reservationStatus.set('pending');
-
-    window.setTimeout(() => {
-      if (this.reservationStatus() === 'pending') {
-        this.reservationStatus.set('accepted');
-        this.tick.update((t) => t + 1);
-      }
-    }, 1500);
+    this.startReservationPolling();
 
     this.countdownTimer = window.setInterval(() => {
       this.tick.update((t) => t + 1);
@@ -828,14 +1124,100 @@ export class ProductDetailPageComponent implements OnInit, OnDestroy {
           this.reservationStatus.set('expired');
         }
         this.clearCountdown();
+        this.clearReservationPolling();
       }
     }, 250);
+  }
+
+  private startReservationPolling(): void {
+    this.clearReservationPolling();
+    const txId: string | undefined = this.reservation()?.transactionId;
+    if (!txId) return;
+
+    const api = this.auth.resolveApiBasePublic();
+    const url = `${api}/transactions/${encodeURIComponent(txId)}`;
+    const startedAt = Date.now();
+    const maxMs = ProductDetailPageComponent.RESERVATION_POLL_MAX_SECONDS * 1000;
+
+    let consecutiveErrors = 0;
+
+    const tick = async (): Promise<void> => {
+      if (this.reservationPollTimer === null) return;
+      const status = this.reservationStatus();
+      if (status !== 'pending') return;
+      if (Date.now() - startedAt > maxMs) {
+        this.reservationStatus.set('accepted');
+        this.tick.update((t) => t + 1);
+        return;
+      }
+      try {
+        const res: any = await firstValueFrom(this.http.get(url)).catch((e: any) => {
+          throw e;
+        });
+        consecutiveErrors = 0;
+        const txStatus: string | undefined = res?.status ?? res?.transactionStatus;
+        if (!txStatus) {
+          this.scheduleNextPoll(tick);
+          return;
+        }
+        switch (txStatus) {
+          case 'READY':
+          case 'PAID':
+          case 'PICKED_UP':
+            this.reservationStatus.set('accepted');
+            this.tick.update((t) => t + 1);
+            this.clearReservationPolling();
+            return;
+          case 'CANCELED':
+          case 'EXPIRED':
+          case 'CANCELLED':
+            this.reservationStatus.set('denied');
+            this.clearCountdown();
+            this.clearReservationPolling();
+            this.deadlineMs.set(Date.now() - 1000);
+            this.requestResult.set({
+              ok: false,
+              message: 'The store could not fulfill this item right now. Please try again later.',
+            });
+            return;
+          default:
+            this.scheduleNextPoll(tick);
+            return;
+        }
+      } catch {
+        consecutiveErrors += 1;
+        if (consecutiveErrors >= 5) {
+          this.reservationStatus.set('accepted');
+          this.tick.update((t) => t + 1);
+          this.clearReservationPolling();
+          return;
+        }
+        this.scheduleNextPoll(tick);
+        return;
+      }
+    };
+
+    this.scheduleNextPoll(tick);
+  }
+
+  private scheduleNextPoll(next: () => Promise<void>): void {
+    this.reservationPollTimer = window.setTimeout(() => {
+      void next();
+    }, ProductDetailPageComponent.RESERVATION_POLL_MS);
+  }
+
+  private clearReservationPolling(): void {
+    if (this.reservationPollTimer !== null) {
+      clearTimeout(this.reservationPollTimer);
+      this.reservationPollTimer = null;
+    }
   }
 
   goToCheckout(): void {
     const reservationResult = this.reservation();
     if (!reservationResult) return;
     this.clearCountdown();
+    this.clearReservationPolling();
     const state = {
       transactionId: reservationResult.transactionId,
       qrSecureToken: reservationResult.qrSecureToken,
@@ -858,6 +1240,7 @@ export class ProductDetailPageComponent implements OnInit, OnDestroy {
       const url = `${api}/reservations/${encodeURIComponent(txId)}/cancel`;
       const res: any = await firstValueFrom(this.http.post(url, {})).catch((e: any) => e?.error ?? null);
       this.clearCountdown();
+      this.clearReservationPolling();
       this.deadlineMs.set(Date.now() - 1000);
       this.reservationStatus.set('idle');
       this.reservation.set(null);
@@ -887,6 +1270,7 @@ export class ProductDetailPageComponent implements OnInit, OnDestroy {
     this.requestResult.set(null);
     this.reservationStatus.set('idle');
     this.clearCountdown();
+    this.clearReservationPolling();
     this.router.navigate(['/p', id]).then(() => {
       window.scrollTo({ top: 0, behavior: 'smooth' });
     });

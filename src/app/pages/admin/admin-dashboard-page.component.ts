@@ -31,7 +31,12 @@ interface SseEventShape {
   runnerId?: string | null;
   status?: string | null;
   message?: string | null;
+  variantAttributes?: Record<string, string | number | boolean | null> | null;
   _read?: boolean;
+  _stockQuantity?: number | null;
+  _stockLoading?: boolean;
+  _stockError?: boolean;
+  _actionPending?: 'accept' | 'deny' | null;
 }
 
 @Component({
@@ -62,7 +67,7 @@ interface SseEventShape {
       color: #111827;
       box-shadow: 0 1px 3px rgba(0,0,0,0.06);
       position: relative;
-      overflow: hidden;
+      overflow: visible;
       border: 1px solid #f3f4f6;
     }
     .hero::before { display: none; }
@@ -688,6 +693,7 @@ interface SseEventShape {
       position: absolute;
       right: 0; top: calc(100% + 10px);
       width: min(420px, calc(100vw - 40px));
+      min-height: 220px;
       max-height: 60vh;
       background: #fff;
       border: 1px solid #e5e7eb;
@@ -832,6 +838,109 @@ interface SseEventShape {
       display: inline-flex; align-items: center; justify-content: center;
     }
     .toast-close:hover { background: #f3f4f6; color: #374151; }
+
+    .bell-stock {
+      font-size: 12px;
+      font-weight: 600;
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      margin-top: 6px;
+    }
+    .bell-stock.ok { color: #059669; }
+    .bell-stock.zero { color: #dc2626; }
+    .bell-stock.err { color: #b45309; }
+    .bell-stock .spinner {
+      display: inline-block;
+      width: 12px;
+      height: 12px;
+      border: 2px solid #e5e7eb;
+      border-top-color: #4f46e5;
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    .bell-action-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-top: 10px;
+    }
+    .bell-action-btn {
+      padding: 6px 12px;
+      font-size: 12px;
+      font-weight: 700;
+      border-radius: 8px;
+      border: 1px solid transparent;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      transition: background .15s ease, transform .1s ease;
+    }
+    .bell-action-btn:active { transform: translateY(1px); }
+    .bell-action-btn:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+    .bell-action-btn.btn-primary {
+      background: var(--color-primary, #4f46e5);
+      color: #fff;
+      box-shadow: 0 1px 2px rgba(0,0,0,0.08);
+    }
+    .bell-action-btn.btn-primary:hover:not(:disabled) { background: var(--color-primary-600, #4338ca); }
+    .bell-action-btn.btn-secondary-warn {
+      background: #fff7ed;
+      color: #9a3412;
+      border: 1px solid #fed7aa;
+    }
+    .bell-action-btn.btn-secondary-warn:hover:not(:disabled) { background: #ffedd5; }
+    .bell-open-link {
+      margin-left: auto;
+      padding: 6px 10px;
+      font-size: 12px;
+      font-weight: 700;
+      color: #6d28d9;
+      text-decoration: none;
+      border-radius: 8px;
+      background: #f5f3ff;
+      border: 1px solid #ddd6fe;
+      cursor: pointer;
+      transition: background .15s ease;
+    }
+    .bell-open-link:hover { background: #ede9fe; }
+
+    .bell-foot {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      align-items: stretch;
+    }
+    .bell-foot .bell-view-all {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      padding: 8px 12px;
+      border-radius: 10px;
+      background: #fff;
+      border: 1px solid #e5e7eb;
+      color: #4f46e5;
+      font-size: 12px;
+      font-weight: 700;
+      text-decoration: none;
+      cursor: pointer;
+      transition: background .15s ease, border-color .15s ease;
+    }
+    .bell-foot .bell-view-all:hover {
+      background: #ede9fe;
+      border-color: #ddd6fe;
+    }
+    .bell-foot .bell-live-row {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 11px;
+      color: #9ca3af;
+      font-weight: 500;
+    }
   `],
   template: `
     <!-- SSE Toast stack -->
@@ -956,17 +1065,17 @@ interface SseEventShape {
                   <div class="bell-panel" role="dialog" aria-label="Notifications">
                     <div class="bell-panel-head">
                       <h3>🔔 Notifications</h3>
-                      <button class="bell-clear" (click)="clearEvents()" [disabled]="events().length === 0">Clear all</button>
+                      <button class="bell-clear" (click)="clearResolvedEvents()" [disabled]="visibleBellEvents().length === 0">Clear all</button>
                     </div>
                     <div class="bell-list">
-                      @if (events().length === 0) {
+                      @if (visibleBellEvents().length === 0) {
                         <div class="bell-empty">
                           <div class="ico">📭</div>
                           <div>No notifications yet</div>
                           <div style="font-size: 11px;">New requests &amp; updates will appear here.</div>
                         </div>
                       } @else {
-                        @for (ev of events(); track ev.eventId || ev.transactionId + '_' + ev.createdAt) {
+                        @for (ev of visibleBellEvents(); track ev.eventId || ev.transactionId + '_' + ev.createdAt) {
                           <button type="button" class="bell-item"
                                   [class.unread]="!ev._read"
                                   (click)="onEventClick(ev)">
@@ -989,6 +1098,45 @@ interface SseEventShape {
                                   <div style="margin-top:4px;">⏱ Expires in <b>{{ formatCountdown(ev.expiresAt) }}</b></div>
                                 }
                                 @if (ev.message) { <div style="margin-top:2px;opacity:.85;">{{ ev.message }}</div> }
+                                @if (ev.variantId) {
+                                  <div class="bell-stock"
+                                       [class.ok]="evStockAvail(ev)"
+                                       [class.zero]="evStockZero(ev)"
+                                       [class.err]="evStockErr(ev)">
+                                    @if (evStockLoading(ev)) {
+                                      <span class="spinner"></span>
+                                      <span>Checking stock…</span>
+                                    } @else if (evStockErr(ev)) {
+                                      <span>⚠ Unable to load stock</span>
+                                    } @else if (evStockLoaded(ev)) {
+                                      <span>✓ {{ evStockQty(ev) }} item{{ evStockQty(ev) === 1 ? '' : 's' }} still available</span>
+                                    }
+                                  </div>
+                                }
+                                @if (ev.type === 'RESERVED' || ev.type === 'READY') {
+                                  <div class="bell-action-row" (click)="$event.stopPropagation()">
+                                    <button type="button"
+                                            class="bell-action-btn btn-primary"
+                                            [disabled]="evAcceptDisabled(ev)"
+                                            (click)="acceptEvent(ev, $event)">
+                                      @if (evAcceptPending(ev)) { ⟳ } @else { ✓ }
+                                      Accept
+                                    </button>
+                                    <button type="button"
+                                            class="bell-action-btn btn-secondary-warn"
+                                            [disabled]="evActionPending(ev)"
+                                            (click)="denyEvent(ev, $event)">
+                                      @if (evDenyPending(ev)) { ⟳ } @else { ✕ }
+                                      Deny
+                                    </button>
+                                    <a type="button"
+                                       class="bell-open-link"
+                                       (click)="$event.stopPropagation(); openRequestDetail(ev, $event)"
+                                       href="javascript:void(0)">
+                                      Open →
+                                    </a>
+                                  </div>
+                                }
                               </div>
                             </div>
                             <div class="bell-time">{{ formatRelativeTime(ev.createdAt) }}</div>
@@ -997,9 +1145,14 @@ interface SseEventShape {
                       }
                     </div>
                     <div class="bell-foot">
-                      <span class="dot-live"></span>
-                      @if (sseConnected()) { Live · real-time updates }
-                      @else { Connecting… (will auto-reconnect) }
+                      <button type="button" class="bell-view-all" (click)="gotoNotificationsPage($event)">
+                        View all notifications →
+                      </button>
+                      <div class="bell-live-row">
+                        <span class="dot-live"></span>
+                        @if (sseConnected()) { Live · real-time updates }
+                        @else { Connecting… (will auto-reconnect) }
+                      </div>
                     </div>
                   </div>
                 }
@@ -1338,6 +1491,23 @@ interface SseEventShape {
                       </div>
                     </div>
 
+                    <div class="banner info" style="background:#eef2ff;border:1px solid #c7d2fe;">
+                      <div class="banner-ico">🌐</div>
+                      <div class="banner-text">
+                        <div class="banner-title" style="color:#3730a3;">Unified Network Catalog</div>
+                        <div class="banner-msg" style="color:#3730a3;opacity:.9;">
+                          Browse every product across every store in the network in one unified list. Generate QR share
+                          codes for any product.
+                        </div>
+                        <div class="banner-actions">
+                          <a class="btn btn-primary" routerLink="/admin/products-all"
+                             style="background:#4338ca;border-color:#4338ca;color:#fff;box-shadow:var(--shadow-sm);">
+                            🌐 View All Products
+                          </a>
+                        </div>
+                      </div>
+                    </div>
+
                     <div class="info-section">
                       <h3 style="font-size:15px;font-weight:700;margin:0;">Store details</h3>
                       <div class="info-row-grid">
@@ -1660,6 +1830,7 @@ interface SseEventShape {
                         <th>Status</th>
                         <th>Total</th>
                         <th>Created</th>
+                        <th>Actions</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -1689,6 +1860,29 @@ interface SseEventShape {
                           </td>
                           <td><strong style="font-weight:700;">{{ formatMoney(tx.totalRetailCents ?? tx.totalCents ?? tx.amountCents, tx.currency) }}</strong></td>
                           <td>{{ tx.createdAt | date:'short' }}</td>
+                          <td>
+                            <div class="row-actions">
+                              @if (tx.status === 'RESERVED' || tx.status === 'PENDING_RESERVATION' || tx.status === 'READY') {
+                                <button type="button" class="btn btn-primary"
+                                        [disabled]="txAcceptLoading(tx)"
+                                        (click)="acceptTx(tx)">
+                                  @if (txAcceptLoading(tx)) { ⟳ } @else { ✓ }
+                                  Accept
+                                </button>
+                                <button type="button" class="btn btn-secondary-warn"
+                                        [disabled]="txDenyLoading(tx)"
+                                        (click)="denyTx(tx)">
+                                  @if (txDenyLoading(tx)) { ⟳ } @else { ✕ }
+                                  Deny
+                                </button>
+                              }
+                              @if (tx.id) {
+                                <button type="button" class="btn btn-secondary" (click)="openRequestDetail(tx)">
+                                  Open
+                                </button>
+                              }
+                            </div>
+                          </td>
                         </tr>
                       }
                     </tbody>
@@ -1919,6 +2113,8 @@ export class AdminDashboardPageComponent implements OnInit, OnDestroy {
   readonly deleting: Record<string, boolean> = {};
   readonly togglingUserStatus: Record<string, boolean> = {};
   readonly deletingUser: Record<string, boolean> = {};
+  readonly acceptingTx: Record<string, boolean> = {};
+  readonly denyingTx: Record<string, boolean> = {};
 
   readonly stripeFallback = signal<{ url: SafeUrl; label: string } | null>(null);
 
@@ -2062,9 +2258,15 @@ export class AdminDashboardPageComponent implements OnInit, OnDestroy {
         this.cdr.markForCheck();
       }
     }, 1000);
+    // 60s GC ticker: prune stale-terminal events from bell list (keeps the list short)
+    this.notifCleanupTick = setInterval(() => {
+      this.runNotificationGcPass();
+    }, 60 * 1000);
     void this.refreshMe().then(() => {
       void this.loadStores().finally(() => {
-        void this.startSse();
+        void this.startSse().finally(() => {
+          void this.hydrateEventStock();
+        });
       });
       void this.loadUsers();
       void this.loadTransactions();
@@ -2659,6 +2861,13 @@ export class AdminDashboardPageComponent implements OnInit, OnDestroy {
   private sseSource: EventSource | null = null;
   private sseTick: any = null;
   private sseDismissTimers: Record<string, any> = {};
+  private notifCleanupTick: any = null;
+
+  // Grace window before a terminal-stale event is auto-pruned from the bell list.
+  private readonly TERMINAL_EVENT_GRACE_MS = 5 * 60 * 1000;
+  // PAID/PICKED_UP are informational success events: keep in list for a longer tail
+  // but still eventually drop them.
+  private readonly SUCCESS_EVENT_RETENTION_MS = 24 * 60 * 60 * 1000;
 
   readonly events = signal<SseEventShape[]>([]);
   readonly toasts = signal<Array<SseEventShape & { id: string; leaving?: boolean }>>([]);
@@ -2666,9 +2875,61 @@ export class AdminDashboardPageComponent implements OnInit, OnDestroy {
   readonly bellPulse = signal(false);
   readonly sseConnected = signal(false);
 
-  readonly unreadCount = computed(() =>
-    this.events().filter(e => !e._read && (e.type === 'RESERVED' || e.type === 'READY' || e.type === 'UNAVAILABLE' || e.type === 'PAID' || e.type === 'PICKED_UP' || e.type === 'CANCELLED' || e.type === 'EXPIRED')).length
-  );
+  private isTerminalType(type: string): boolean {
+    return type === 'EXPIRED' || type === 'CANCELLED' || type === 'UNAVAILABLE';
+  }
+
+  private isSuccessType(type: string): boolean {
+    return type === 'PAID' || type === 'PICKED_UP';
+  }
+
+  private ageMs(ev: SseEventShape, nowMs: number): number {
+    if (!ev.createdAt) return 0;
+    try {
+      const t = new Date(ev.createdAt).getTime();
+      if (!isFinite(t)) return 0;
+      return Math.max(0, nowMs - t);
+    } catch { return 0; }
+  }
+
+  private isEventStaleForBell(ev: SseEventShape, nowMs: number): boolean {
+    const t = ev.type;
+    if (t === 'RESERVED' || t === 'READY') {
+      // Actionable items: hide only if their countdown has expired (optimistic EXPIRED
+      // until the backend sweep broadcasts the real EXPIRED event).
+      if (ev.expiresAt) {
+        try {
+          if (new Date(ev.expiresAt).getTime() <= nowMs) return true;
+        } catch { /* ignore */ }
+      }
+      return false;
+    }
+    if (this.isTerminalType(t)) {
+      // EXPIRED / CANCELED / UNAVAILABLE keep for a short GRACE (5 min) then remove.
+      return this.ageMs(ev, nowMs) >= this.TERMINAL_EVENT_GRACE_MS;
+    }
+    if (this.isSuccessType(t)) {
+      // PAID / PICKED_UP keep for 24h then auto remove.
+      return this.ageMs(ev, nowMs) >= this.SUCCESS_EVENT_RETENTION_MS;
+    }
+    return false;
+  }
+
+  /** Count only unread events that still contribute to the bell badge. */
+  readonly unreadCount = computed(() => {
+    const now = Date.now();
+    return this.events().filter(e => {
+      if (e._read) return false;
+      if (this.isEventStaleForBell(e, now)) return false;
+      return true;
+    }).length;
+  });
+
+  /** Bell-list view: sorted newest-first with stale-terminal entries filtered out. */
+  readonly visibleBellEvents = computed(() => {
+    const now = Date.now();
+    return this.events().filter(e => !this.isEventStaleForBell(e, now));
+  });
 
   private documentClickListener = (e: MouseEvent) => {
     if (!this.bellPanelOpen()) return;
@@ -2681,11 +2942,55 @@ export class AdminDashboardPageComponent implements OnInit, OnDestroy {
     this.bellPanelOpen.set(!this.bellPanelOpen());
     if (this.bellPanelOpen()) {
       setTimeout(() => document.addEventListener('click', this.documentClickListener, { once: true } as any), 0);
+      this.hydrateEventStockIfPanelOpen();
     }
   }
 
-  clearEvents(): void {
+  /** Smart clear-all: remove terminal-stale (already un-actionable) events.
+   *  Keeps RESERVED/READY actionables so the user does not accidentally lose pending work.
+   */
+  clearResolvedEvents(): void {
+    const now = Date.now();
+    this.events.update(list =>
+      list.filter(ev => {
+        if (this.isTerminalType(ev.type)) return false;
+        if (this.isSuccessType(ev.type) && this.ageMs(ev, now) >= this.TERMINAL_EVENT_GRACE_MS) return false;
+        return true;
+      })
+    );
+  }
+
+  /** Nuclear clear-all (available via context / explicit). Wipes list regardless of status. */
+  clearAllEvents(): void {
     this.events.set([]);
+  }
+
+  /** Run every minute: optimistic expiry cleanup.
+   *  (a) Drop events that are terminal-stale past their grace window.
+   *  (b) Optimistically relabel RESERVED / READY events whose expiresAt has passed as EXPIRED
+   *      before the backend 30-second sweep catches up.
+   */
+  private runNotificationGcPass(): void {
+    const now = Date.now();
+    let touched = false;
+    this.events.update(list => {
+      const out: SseEventShape[] = [];
+      for (const ev of list) {
+        if (this.isEventStaleForBell(ev, now)) { touched = true; continue; }
+        if ((ev.type === 'RESERVED' || ev.type === 'READY') && ev.expiresAt) {
+          try {
+            if (new Date(ev.expiresAt).getTime() <= now) {
+              const copy: SseEventShape = { ...ev, type: 'EXPIRED', status: 'EXPIRED', _read: true };
+              out.push(copy);
+              touched = true;
+              continue;
+            }
+          } catch { /* ignore */ }
+        }
+        out.push(ev);
+      }
+      return touched ? out : list;
+    });
   }
 
   private pushEvent(ev: SseEventShape): void {
@@ -2704,6 +3009,12 @@ export class AdminDashboardPageComponent implements OnInit, OnDestroy {
       this.toasts.update(list => [t, ...list].slice(0, 4));
       this.scheduleToastDismiss(toastId, 8000);
     }
+    setTimeout(() => {
+      void this.hydrateEventStock();
+    }, 20);
+    // New terminal events immediately trigger one GC pass so if a replacement EXPIRED
+    // event just landed it supersedes any prior RESERVED of same tx in the dedup.
+    setTimeout(() => this.runNotificationGcPass(), 100);
   }
 
   private scheduleToastDismiss(id: string, ms: number): void {
@@ -2768,16 +3079,208 @@ export class AdminDashboardPageComponent implements OnInit, OnDestroy {
     return d + 'd ago';
   }
 
+  evStockLoaded(ev: SseEventShape): boolean { return typeof ev['_stockQuantity'] === 'number'; }
+  evStockAvail(ev: SseEventShape): boolean { return typeof ev['_stockQuantity'] === 'number' && (ev['_stockQuantity'] as number) > 0; }
+  evStockZero(ev: SseEventShape): boolean { return typeof ev['_stockQuantity'] === 'number' && (ev['_stockQuantity'] as number) <= 0; }
+  evStockErr(ev: SseEventShape): boolean { return !!ev['_stockError']; }
+  evStockLoading(ev: SseEventShape): boolean { return !!ev['_stockLoading']; }
+  evStockQty(ev: SseEventShape): number { return typeof ev['_stockQuantity'] === 'number' ? (ev['_stockQuantity'] as number) : 0; }
+  evAcceptPending(ev: SseEventShape): boolean { return ev['_actionPending'] === 'accept'; }
+  evDenyPending(ev: SseEventShape): boolean { return ev['_actionPending'] === 'deny'; }
+  evActionPending(ev: SseEventShape): boolean { return !!ev['_actionPending']; }
+  evAcceptDisabled(ev: SseEventShape): boolean { return this.evActionPending(ev) || this.evStockZero(ev); }
+  txAcceptLoading(tx: any): boolean { return !!this.acceptingTx[this.txId(tx)]; }
+  txDenyLoading(tx: any): boolean { return !!this.denyingTx[this.txId(tx)]; }
+  txId(tx: any): string { return String(tx?.id ?? ''); }
+
+  async hydrateEventStock(): Promise<void> {
+    const api = this.api();
+    const evs = this.events();
+    const work: Array<SseEventShape> = [];
+    for (const ev of evs) {
+      if (
+        ev.variantId &&
+        ev.productId &&
+        typeof ev['_stockQuantity'] !== 'number' &&
+        !ev['_stockLoading']
+      ) {
+        work.push(ev);
+      }
+    }
+    if (work.length === 0) return;
+    for (const ev of work) {
+      ev['_stockLoading'] = true;
+      ev['_stockError'] = false;
+    }
+    this.events.update(list => list.slice());
+    this.touch();
+    for (const ev of work) {
+      try {
+        const res = await firstValueFrom(
+          this.http.get<any>(`${api}/products/variants/${encodeURIComponent(ev.variantId!)}`)
+        ).catch(() => null);
+        const variant = res?.variant ?? res;
+        const stock = variant?.stockQuantity;
+        if (typeof stock === 'number') {
+          ev['_stockQuantity'] = stock;
+        } else {
+          ev['_stockError'] = true;
+        }
+      } catch {
+        ev['_stockError'] = true;
+      } finally {
+        ev['_stockLoading'] = false;
+      }
+    }
+    this.events.update(list => list.slice());
+    this.touch();
+  }
+
+  hydrateEventStockIfPanelOpen(): void {
+    if (this.bellPanelOpen() || this.events().some(e =>
+      (e.type === 'RESERVED' || e.type === 'READY') &&
+      typeof e['_stockQuantity'] !== 'number'
+    )) {
+      void this.hydrateEventStock();
+    }
+  }
+
+  async acceptEvent(ev: SseEventShape, evt?: MouseEvent): Promise<void> {
+    if (evt) evt.stopPropagation();
+    if (!ev.transactionId) return;
+    ev['_actionPending'] = 'accept';
+    ev._read = true;
+    this.events.update(list => list.slice());
+    this.touch();
+    const api = this.api();
+    const token = this.authService.getToken();
+    try {
+      const headers: Record<string, string> = token ? { Authorization: 'Bearer ' + token } : {};
+      await firstValueFrom(
+        this.http.post<any>(`${api}/admin/stores/me/transactions/${encodeURIComponent(ev.transactionId)}/mark-ready`, {}, { headers })
+      );
+      const readyEvent: SseEventShape = { ...ev, type: 'READY' };
+      ev.type = 'READY';
+      this.pushEvent(readyEvent);
+      this.userSuccess.set('Item marked ready.');
+      setTimeout(() => { if (this.userSuccess() === 'Item marked ready.') this.userSuccess.set(null); }, 3000);
+    } catch (err: any) {
+      this.userError.set(err?.error?.message ?? err?.message ?? 'Failed to mark ready.');
+      setTimeout(() => { if (this.userError()) this.userError.set(null); }, 4000);
+    } finally {
+      ev['_actionPending'] = null;
+      this.events.update(list => list.slice());
+      this.touch();
+    }
+  }
+
+  async denyEvent(ev: SseEventShape, evt?: MouseEvent): Promise<void> {
+    if (evt) evt.stopPropagation();
+    if (!ev.transactionId) return;
+    ev['_actionPending'] = 'deny';
+    ev._read = true;
+    this.events.update(list => list.slice());
+    this.touch();
+    const api = this.api();
+    const token = this.authService.getToken();
+    try {
+      const headers: Record<string, string> = token ? { Authorization: 'Bearer ' + token } : {};
+      await firstValueFrom(
+        this.http.post<any>(`${api}/admin/stores/me/transactions/${encodeURIComponent(ev.transactionId)}/mark-unavailable`, {}, { headers })
+      );
+      const unavailEvent: SseEventShape = { ...ev, type: 'UNAVAILABLE' };
+      ev.type = 'UNAVAILABLE';
+      this.pushEvent(unavailEvent);
+      this.userSuccess.set('Item marked unavailable.');
+      setTimeout(() => { if (this.userSuccess() === 'Item marked unavailable.') this.userSuccess.set(null); }, 3000);
+    } catch (err: any) {
+      this.userError.set(err?.error?.message ?? err?.message ?? 'Failed to mark unavailable.');
+      setTimeout(() => { if (this.userError()) this.userError.set(null); }, 4000);
+    } finally {
+      ev['_actionPending'] = null;
+      this.events.update(list => list.slice());
+      this.touch();
+    }
+  }
+
+  async acceptTx(tx: any): Promise<void> {
+    const id = tx?.id;
+    if (!id) return;
+    this.acceptingTx[id] = true;
+    this.touch();
+    const api = this.api();
+    const token = this.authService.getToken();
+    try {
+      const headers: Record<string, string> = token ? { Authorization: 'Bearer ' + token } : {};
+      const u = this.currentUser();
+      const storeId = tx.fulfillingStoreId || tx.storeId || u?.storeId;
+      let url: string;
+      if (this.isGlobalAdmin() && storeId) {
+        url = `${api}/admin/stores/${encodeURIComponent(storeId)}/transactions/${encodeURIComponent(id)}/mark-ready`;
+      } else {
+        url = `${api}/admin/stores/me/transactions/${encodeURIComponent(id)}/mark-ready`;
+      }
+      await firstValueFrom(this.http.post<any>(url, {}, { headers }));
+      this.userSuccess.set('Transaction marked ready.');
+      setTimeout(() => { if (this.userSuccess() === 'Transaction marked ready.') this.userSuccess.set(null); }, 3000);
+      await this.loadTransactions();
+    } catch (err: any) {
+      this.userError.set(err?.error?.message ?? err?.message ?? 'Failed to mark ready.');
+      setTimeout(() => { if (this.userError()) this.userError.set(null); }, 4000);
+    } finally {
+      this.acceptingTx[id] = false;
+      this.touch();
+    }
+  }
+
+  async denyTx(tx: any): Promise<void> {
+    const id = tx?.id;
+    if (!id) return;
+    this.denyingTx[id] = true;
+    this.touch();
+    const api = this.api();
+    const token = this.authService.getToken();
+    try {
+      const headers: Record<string, string> = token ? { Authorization: 'Bearer ' + token } : {};
+      const u = this.currentUser();
+      const storeId = tx.fulfillingStoreId || tx.storeId || u?.storeId;
+      let url: string;
+      if (this.isGlobalAdmin() && storeId) {
+        url = `${api}/admin/stores/${encodeURIComponent(storeId)}/transactions/${encodeURIComponent(id)}/mark-unavailable`;
+      } else {
+        url = `${api}/admin/stores/me/transactions/${encodeURIComponent(id)}/mark-unavailable`;
+      }
+      await firstValueFrom(this.http.post<any>(url, {}, { headers }));
+      this.userSuccess.set('Transaction marked unavailable.');
+      setTimeout(() => { if (this.userSuccess() === 'Transaction marked unavailable.') this.userSuccess.set(null); }, 3000);
+      await this.loadTransactions();
+    } catch (err: any) {
+      this.userError.set(err?.error?.message ?? err?.message ?? 'Failed to mark unavailable.');
+      setTimeout(() => { if (this.userError()) this.userError.set(null); }, 4000);
+    } finally {
+      this.denyingTx[id] = false;
+      this.touch();
+    }
+  }
+
+  gotoNotificationsPage(e: MouseEvent): void {
+    e.stopPropagation();
+    void this.router.navigate(['/admin/notifications']);
+  }
+
+  openRequestDetail(ev: SseEventShape | { id?: string | null; transactionId?: string | null }, e?: MouseEvent): void {
+    if (e) { e.stopPropagation(); e.preventDefault(); }
+    const txId = (ev as any).transactionId ?? (ev as any).id;
+    if (txId) {
+      void this.router.navigate(['/admin', 'requests', txId]);
+      this.bellPanelOpen.set(false);
+    }
+  }
+
   onEventClick(ev: SseEventShape): void {
     ev._read = true;
     this.events.update(list => list.slice());
-    const storeId = ev.fulfillingStoreId || ev.storeId;
-    if (storeId && ev.transactionId) {
-      void this.router.navigate(['/admin', 'stores', storeId, 'transactions'], {
-        fragment: 'tx-' + ev.transactionId,
-      });
-      this.bellPanelOpen.set(false);
-    }
+    this.openRequestDetail(ev);
   }
 
   copyToClipboard(text: string, successMsg = 'Copied to clipboard.'): void {
@@ -2816,16 +3319,16 @@ export class AdminDashboardPageComponent implements OnInit, OnDestroy {
     const api = this.api();
     const token = this.authService.getToken();
     if (!token) return;
-    let url = this.isGlobalAdmin()
-      ? `${api}/admin/sse/events`
-      : `${api}/stores/${encodeURIComponent(this.currentStoreIdForSse() || 'me')}/sse/events`;
-    url += '?access_token=' + encodeURIComponent(token);
+    const sseTail = this.isGlobalAdmin()
+      ? `/admin/sse/events`
+      : `/stores/me/sse/events`;
+    let url = `${api}${sseTail}?access_token=${encodeURIComponent(token)}`;
 
     try {
       const recentLimit = 100;
       const recentUrl = this.isGlobalAdmin()
         ? `${api}/admin/sse/events/recent?limit=${recentLimit}`
-        : `${api}/stores/${encodeURIComponent(this.currentStoreIdForSse() || 'me')}/sse/events/recent?limit=${recentLimit}`;
+        : `${api}/stores/me/sse/events/recent?limit=${recentLimit}`;
       const headers: Record<string, string> = { Authorization: 'Bearer ' + token };
       const recent = await firstValueFrom(this.http.get<any[]>(recentUrl, { headers })).catch(() => [] as any[]);
       if (Array.isArray(recent)) {
@@ -2873,6 +3376,7 @@ export class AdminDashboardPageComponent implements OnInit, OnDestroy {
 
   stopSse(): void {
     if (this.sseTick) { clearInterval(this.sseTick); this.sseTick = null; }
+    if (this.notifCleanupTick) { clearInterval(this.notifCleanupTick); this.notifCleanupTick = null; }
     if (this.sseSource) { try { this.sseSource.close(); } catch { /* ignore */ } this.sseSource = null; }
     this.sseConnected.set(false);
     Object.keys(this.sseDismissTimers).forEach(k => {

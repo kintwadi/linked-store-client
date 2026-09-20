@@ -1075,7 +1075,7 @@ export class SignupPageComponent implements OnInit {
         inviteToken: this.inviteToken() ?? undefined,
       };
       const result = await this.authService.register(payload);
-      if (result.user?.isGlobalAdmin || result.user?.role === 'GLOBAL_ADMIN' || result.user?.role === 'STORE_ADMIN' || result.user?.role === 'OWNER') {
+      if (result.user?.isGlobalAdmin || result.user?.role === 'GLOBAL_ADMIN' || result.user?.role === 'STORE_ADMIN' || result.user?.role === 'OWNER' || result.user?.role === 'STORE_REPRESENTATIVE' || result.user?.role === 'CLERK' || result.user?.role === 'RUNNER') {
         await this.router.navigate(['/admin']);
       } else {
         await this.router.navigate(['/']);

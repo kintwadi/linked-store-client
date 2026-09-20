@@ -16,6 +16,8 @@ const QR_ALLOWED_ANY: RoleName[] = [
   'OWNER',
   'STORE_ADMIN',
   'STORE_REPRESENTATIVE',
+  'CLERK',
+  'RUNNER',
 ];
 
 @Injectable({ providedIn: 'root' })
@@ -81,7 +83,9 @@ export class PermissionService {
     if (!u) return false;
     if (u.isGlobalAdmin || u.role === 'GLOBAL_ADMIN') return true;
     return ADMIN_PLUS_ROLES.includes(u.role as RoleName) ||
-      u.role === 'STORE_REPRESENTATIVE';
+      u.role === 'STORE_REPRESENTATIVE' ||
+      u.role === 'CLERK' ||
+      u.role === 'RUNNER';
   }
 
   canGenerateQrFor(target: any): boolean {
@@ -89,12 +93,6 @@ export class PermissionService {
     if (!u) return false;
     if (QR_ALLOWED_ANY.includes(u.role as RoleName) || u.isGlobalAdmin) {
       return true;
-    }
-    if (u.role === 'CLERK' || u.role === 'RUNNER') {
-      const targetStoreId: string | undefined =
-        target?.storeId ?? target?.store?.id ?? target?.storeIdRef;
-      if (!targetStoreId) return false;
-      return this.isOwnStore(targetStoreId);
     }
     return false;
   }

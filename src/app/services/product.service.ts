@@ -222,6 +222,34 @@ export class ProductService {
     const gender = attrs.gender ?? undefined;
     const priceFromAttrs = attrs.price ? Number(attrs.price) : undefined;
     const primaryImage = response.primaryImageUrl || response.thumbnailUrl || '';
+
+    const variantsArr: any[] = Array.isArray(response.variants) ? response.variants : [];
+
+    const inStockVariants = variantsArr
+      .filter((v: any) => Number(v.stockQuantity) > 0)
+      .sort((a: any, b: any) => Number(a.retailPriceCents) - Number(b.retailPriceCents));
+
+    const chosenVariant: any = inStockVariants.length > 0 ? inStockVariants[0] : (variantsArr[0] ?? null);
+
+    const chosenVariantId = chosenVariant?.id ?? response.variants?.[0]?.id ?? response.id;
+    const chosenRetailPriceCents = chosenVariant?.retailPriceCents != null
+      ? Number(chosenVariant.retailPriceCents)
+      : (priceFromAttrs ?? response.retailPriceCents ?? 0);
+    const chosenStoreId = chosenVariant?.storeId ?? response.storeId;
+    const chosenSku = chosenVariant?.sku ?? response.sku;
+    const chosenInStock = chosenVariant ? Number(chosenVariant.stockQuantity) > 0 : true;
+
+    const mappedVariants = variantsArr.map((v: any) => ({
+      id: String(v.id ?? ''),
+      sku: String(v.sku ?? ''),
+      retailPriceCents: Number(v.retailPriceCents ?? 0),
+      wholesalePriceCents: v.wholesalePriceCents != null ? Number(v.wholesalePriceCents) : undefined,
+      imageUrl: v.imageUrl ?? undefined,
+      stockQuantity: Number(v.stockQuantity ?? 0),
+      storeId: String(v.storeId ?? ''),
+      variantAttributes: v.variantAttributes ?? v.attributes ?? null,
+    }));
+
     return {
       id: response.id,
       title: response.title,
@@ -229,15 +257,16 @@ export class ProductService {
       primaryImageUrl: primaryImage,
       thumbnailUrl: response.thumbnailUrl,
       galleryImages: [primaryImage, primaryImage, primaryImage],
-      retailPriceCents: priceFromAttrs ?? response.retailPriceCents ?? 0,
+      retailPriceCents: chosenRetailPriceCents,
       currency: 'USD',
       category,
       brand,
-      inStock: true,
-      variantId: response.variants?.[0]?.id ?? response.id,
-      storeId: response.storeId,
-      sku: response.sku,
-    } as Product;
+      inStock: chosenInStock,
+      variantId: chosenVariantId,
+      storeId: chosenStoreId,
+      sku: chosenSku,
+      variants: mappedVariants.length > 0 ? mappedVariants : undefined,
+    };
   }
 
   async getProduct(productId: string): Promise<Product> {
