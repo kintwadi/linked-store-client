@@ -462,17 +462,21 @@ export class LoginPageComponent {
       const v = this.loginForm.value as { email: string; password: string };
       const result = await this.authService.login(v.email, v.password);
       const user = result.user;
-      const isAdmin =
-        !!user && (
-          (user as any).isGlobalAdmin === true ||
-          (user as any).role === 'GLOBAL_ADMIN' ||
-          (user as any).role === 'OWNER' ||
-          (user as any).role === 'STORE_ADMIN' ||
-          (user as any).role === 'STORE_REPRESENTATIVE' ||
-          (user as any).role === 'CLERK' ||
-          (user as any).role === 'RUNNER'
+      const u = user as any;
+      const isRunner = !!u && u.role === 'RUNNER';
+      const isAllowedAdminish =
+        !!u && (
+          u.isGlobalAdmin === true ||
+          u.role === 'GLOBAL_ADMIN' ||
+          u.role === 'OWNER' ||
+          u.role === 'STORE_ADMIN' ||
+          u.role === 'STORE_REPRESENTATIVE' ||
+          u.role === 'CLERK' ||
+          u.role === 'RUNNER'
         );
-      if (isAdmin) {
+      if (isRunner) {
+        await this.router.navigate(['/runner', 'pickup']);
+      } else if (isAllowedAdminish) {
         await this.router.navigate(['/admin']);
       } else {
         await this.router.navigate(['/']);

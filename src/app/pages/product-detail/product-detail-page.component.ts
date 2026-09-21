@@ -777,6 +777,7 @@ type ReservationStatus = 'idle' | 'pending' | 'accepted' | 'denied' | 'expired';
               <a
                 class="card sp"
                 [routerLink]="['/p', sp.id]"
+                [queryParams]="hostQueryParams()"
                 (click)="$event.preventDefault(); navigateTo(sp.id)">
                 <div class="sp-img">
                   <img [src]="sp.primaryImageUrl" [alt]="sp.title" loading="lazy" />
@@ -814,6 +815,22 @@ export class ProductDetailPageComponent implements OnInit, OnDestroy {
   readonly scannedStoreId = signal<string | null>(null);
   readonly scannedStoreName = signal<string | null>(null);
   readonly scannedStoreGateway = signal<string | null>(null);
+  readonly hostQueryParams = computed(() => {
+    const params: Record<string, string> = {};
+    if (this.scannedStoreGateway() && /^\d{8}$/.test(this.scannedStoreGateway()!)) {
+      params['gateway'] = this.scannedStoreGateway()!;
+    } else if (this.scannedStoreId() && /^[0-9a-fA-F-]{20,}$/.test(this.scannedStoreId()!)) {
+      params['storeId'] = this.scannedStoreId()!;
+    } else {
+      const cachedHost = this.products.getBrowsingHostStore();
+      if (cachedHost?.gatewayCode && /^\d{8}$/.test(cachedHost.gatewayCode)) {
+        params['gateway'] = cachedHost.gatewayCode;
+      } else if (cachedHost?.storeId && /^[0-9a-fA-F-]{20,}$/.test(cachedHost.storeId)) {
+        params['storeId'] = cachedHost.storeId;
+      }
+    }
+    return Object.keys(params).length > 0 ? params : null;
+  });
   private storeResolvedPromise: Promise<string | null> | null = null;
 
   private countdownTimer: number | null = null;
@@ -920,6 +937,15 @@ export class ProductDetailPageComponent implements OnInit, OnDestroy {
       this.errorMsg.set('No product was selected.');
       return;
     }
+    // Re-hydrate browsing host store from localStorage BEFORE URL parsing, so
+    // navigating to similar products (which drops query params) still preserves
+    // the store context the customer scanned in via QR / gateway.
+    const cachedHost = this.products.getBrowsingHostStore();
+    if (cachedHost?.storeId) {
+      this.scannedStoreId.set(cachedHost.storeId);
+      if (cachedHost.businessName) this.scannedStoreName.set(cachedHost.businessName);
+      if (cachedHost.gatewayCode) this.scannedStoreGateway.set(cachedHost.gatewayCode);
+    }
     this.storeResolvedPromise = this.resolveScannedStoreFromUrl();
     void this.storeResolvedPromise.then(() => {
       this.loadProduct(id);
@@ -942,6 +968,11 @@ export class ProductDetailPageComponent implements OnInit, OnDestroy {
           this.scannedStoreId.set(String(s.id));
           this.scannedStoreName.set(String(s.businessName || 'Store'));
           if (s.gatewayCode) this.scannedStoreGateway.set(String(s.gatewayCode));
+          this.products.setBrowsingHostStore({
+            storeId: String(s.id),
+            businessName: String(s.businessName || 'Store'),
+            gatewayCode: s.gatewayCode ? String(s.gatewayCode) : null,
+          });
           return String(s.id);
         }
       } catch {
@@ -959,20 +990,31 @@ export class ProductDetailPageComponent implements OnInit, OnDestroy {
           this.scannedStoreId.set(String(s.id));
           this.scannedStoreName.set(String(s.businessName || 'Store'));
           if (s.gatewayCode) this.scannedStoreGateway.set(String(s.gatewayCode));
+          this.products.setBrowsingHostStore({
+            storeId: String(s.id),
+            businessName: String(s.businessName || 'Store'),
+            gatewayCode: s.gatewayCode ? String(s.gatewayCode) : null,
+          });
           return String(s.id);
         }
       } catch {
-        // ignore; fall through to no scan
+        // ignore; fall through to cache default
       }
     }
 
-    return null;
+    return this.scannedStoreId();
   }
 
-  private async resolveOriginatingStoreId(product: Product): Promise<string> {
+  private async resolveOriginatingStoreId(_product: Product): Promise<string> {
+    // PRIMARY RULE: originating store = RETAIL HOST — the store the customer is
+    // currently shopping inside (where they are physically located / where they
+    // scanned the QR). It is NEVER the variant's own product.storeId, because
+    // that is the WHOLESALE FULFILLER owner and would incorrectly collapse the
+    // split-ledger into a single-store self-fulfill transaction.
     const explicit = this.scannedStoreId();
     if (explicit) return explicit;
-    if (product?.storeId) return product.storeId;
+    const cachedHost = this.products.getBrowsingHostStore();
+    if (cachedHost?.storeId) return cachedHost.storeId;
     const apiBase = this.auth.resolveApiBasePublic();
     try {
       const list: any[] = await firstValueFrom(this.http.get<any[]>(`${apiBase}/stores`));
@@ -1271,7 +1313,23 @@ export class ProductDetailPageComponent implements OnInit, OnDestroy {
     this.reservationStatus.set('idle');
     this.clearCountdown();
     this.clearReservationPolling();
-    this.router.navigate(['/p', id]).then(() => {
+    const queryParams: Record<string, string> = {};
+    // Persist browsing host store across internal navigation so cross-store
+    // split-ledger attribution is preserved even after clicking similar products.
+    if (this.scannedStoreGateway() && /^\d{8}$/.test(this.scannedStoreGateway()!)) {
+      queryParams['gateway'] = this.scannedStoreGateway()!;
+    } else if (this.scannedStoreId() && /^[0-9a-fA-F-]{20,}$/.test(this.scannedStoreId()!)) {
+      queryParams['storeId'] = this.scannedStoreId()!;
+    } else {
+      const cachedHost = this.products.getBrowsingHostStore();
+      if (cachedHost?.gatewayCode && /^\d{8}$/.test(cachedHost.gatewayCode)) {
+        queryParams['gateway'] = cachedHost.gatewayCode;
+      } else if (cachedHost?.storeId && /^[0-9a-fA-F-]{20,}$/.test(cachedHost.storeId)) {
+        queryParams['storeId'] = cachedHost.storeId;
+      }
+    }
+    const extras = Object.keys(queryParams).length > 0 ? { queryParams, replaceUrl: false } : { replaceUrl: false };
+    this.router.navigate(['/p', id], extras).then(() => {
       window.scrollTo({ top: 0, behavior: 'smooth' });
     });
   }

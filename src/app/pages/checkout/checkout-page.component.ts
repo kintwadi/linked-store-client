@@ -1,7 +1,6 @@
 import { Component, computed, OnInit, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { Router, RouterLink } from '@angular/router';
-import { QRCodeModule } from 'angularx-qrcode';
 import { Product } from '../../shared/models/product.model';
 import { ProductService } from '../../services/product.service';
 
@@ -10,7 +9,7 @@ type CheckoutStatus = 'reserved' | 'loading' | 'confirmed' | 'error';
 @Component({
   selector: 'app-checkout-page',
   standalone: true,
-  imports: [CommonModule, RouterLink, QRCodeModule],
+  imports: [CommonModule, RouterLink],
   styles: [`
     :host { display: block; }
     .wrap {
@@ -139,109 +138,6 @@ type CheckoutStatus = 'reserved' | 'loading' | 'confirmed' | 'error';
     }
     .empty a { color: var(--color-primary); text-decoration: none; }
 
-    .token-card {
-      padding: 22px 20px;
-      background: linear-gradient(180deg, #fff 0%, #f8fafc 100%);
-      border: 1px solid var(--color-border);
-      border-radius: var(--radius-md);
-      display: grid;
-      gap: 18px;
-      justify-items: center;
-    }
-    .token-card .label {
-      justify-self: stretch;
-      text-align: left;
-      font-size: 12px;
-      color: var(--color-muted);
-      font-weight: 700;
-      text-transform: uppercase;
-      letter-spacing: 0.08em;
-    }
-    .qr-wrap {
-      background: #fff;
-      padding: 14px;
-      border: 1px solid var(--color-border);
-      border-radius: var(--radius-sm);
-      box-shadow: 0 4px 20px rgba(15, 23, 42, 0.04);
-    }
-    .qr-wrap ::ng-deep img,
-    .qr-wrap ::ng-deep canvas,
-    .qr-wrap ::ng-deep svg {
-      display: block;
-      width: 240px !important;
-      height: 240px !important;
-    }
-    .fallback-block {
-      width: 100%;
-      display: grid;
-      gap: 6px;
-      text-align: center;
-      background: #fff;
-      padding: 14px 16px;
-      border: 1px solid #e5e7eb;
-      border-radius: var(--radius-sm);
-    }
-    .fallback-block .sub {
-      font-size: 11px;
-      font-weight: 600;
-      letter-spacing: 0.12em;
-      color: var(--color-muted);
-      text-transform: uppercase;
-    }
-    .fallback-code {
-      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
-      font-size: 36px;
-      font-weight: 800;
-      letter-spacing: 0.32em;
-      color: var(--color-ink);
-      line-height: 1.1;
-      padding: 8px 4px 4px;
-    }
-    .fallback-code.grp {
-      letter-spacing: 0.24em;
-    }
-    .token-row {
-      width: 100%;
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: 10px;
-      padding-top: 4px;
-      border-top: 1px dashed var(--color-border);
-    }
-    .token-row .k {
-      font-size: 11px;
-      font-weight: 700;
-      letter-spacing: 0.06em;
-      color: var(--color-muted);
-      text-transform: uppercase;
-    }
-    .token-row .v {
-      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
-      font-size: 12px;
-      color: var(--color-ink);
-      word-break: break-all;
-    }
-    .copy-btn {
-      background: transparent;
-      border: 1px solid var(--color-border);
-      padding: 4px 10px;
-      border-radius: 6px;
-      font-size: 12px;
-      cursor: pointer;
-      color: var(--color-muted);
-      flex-shrink: 0;
-    }
-    .copy-btn:hover {
-      border-color: var(--color-primary);
-      color: var(--color-primary);
-    }
-    .copy-btn.copied {
-      border-color: #059669;
-      color: #059669;
-      background: #ecfdf5;
-    }
-
     .ledger h2 {
       margin: 0;
       font-size: 16px;
@@ -267,54 +163,6 @@ type CheckoutStatus = 'reserved' | 'loading' | 'confirmed' | 'error';
             <div style="margin-top: 4px; font-size: 14px;">Your order is confirmed.</div>
           </div>
         </div>
-
-        @if (transaction()?.qrSecureToken) {
-          <div class="token-card">
-            <div class="label">Runner pickup credentials</div>
-
-            <div class="qr-wrap">
-              <qrcode
-                [qrdata]="transaction()!.qrSecureToken!"
-                [width]="240"
-                [errorCorrectionLevel]="'M'"
-                [elementType]="'svg'"
-                [ariaLabel]="'Pickup QR code'">
-              </qrcode>
-            </div>
-
-            <div class="fallback-block">
-              <div class="sub">If scanning fails — enter 8-digit code at the store</div>
-              @if (formattedFallback()) {
-                <div class="fallback-code grp" title="Fallback pickup code">{{ formattedFallback() }}</div>
-              } @else {
-                <div class="fallback-code grp" style="font-size:22px; letter-spacing:0.2em;">—</div>
-              }
-              @if (transaction()?.qrFallbackCode) {
-                <button
-                  type="button"
-                  class="copy-btn"
-                  [class.copied]="copiedFallback()"
-                  (click)="copyFallback(transaction()!.qrFallbackCode!)">
-                  @if (copiedFallback()) { Copied ✓ } @else { Copy code }
-                </button>
-              }
-            </div>
-
-            <div class="token-row">
-              <div style="min-width:0; display:grid; gap:2px; flex:1;">
-                <span class="k">Secure token</span>
-                <span class="v">{{ truncateToken(transaction()!.qrSecureToken) }}</span>
-              </div>
-              <button
-                type="button"
-                class="copy-btn"
-                [class.copied]="copiedToken()"
-                (click)="copyToken(transaction()!.qrSecureToken)">
-                @if (copiedToken()) { Copied ✓ } @else { Copy }
-              </button>
-            </div>
-          </div>
-        }
 
         <section class="card">
           <h2>Items</h2>
@@ -391,19 +239,11 @@ export class CheckoutPageComponent implements OnInit {
   readonly loading = signal(true);
   readonly status  = signal<CheckoutStatus>('reserved');
   readonly errorMessage = signal<string | null>(null);
-  readonly copiedToken = signal(false);
-  readonly copiedFallback = signal(false);
 
   readonly cents = computed(() => this.product()?.retailPriceCents ?? 0);
   readonly formattedPrice = computed(() => this.formatPrice(this.cents()));
   readonly formattedTax   = computed(() => this.formatPrice(Math.round(this.cents() * 0.08)));
   readonly formattedTotal = computed(() => this.formatPrice(Math.round(this.cents() * 1.08)));
-  readonly formattedFallback = computed(() => {
-    const raw = this.transaction()?.qrFallbackCode as string | undefined;
-    if (!raw) return null;
-    const digits = raw.replace(/\D/g, '').padStart(8, '0').slice(0, 8);
-    return `${digits.slice(0, 4)} ${digits.slice(4, 8)}`;
-  });
 
   formatPrice(cents: number, currency = 'USD'): string {
     return new Intl.NumberFormat('en-US', {
@@ -411,51 +251,6 @@ export class CheckoutPageComponent implements OnInit {
       currency,
       maximumFractionDigits: 2,
     }).format(cents / 100);
-  }
-
-  truncateToken(token: string): string {
-    if (!token || token.length <= 12) return token;
-    return token.slice(0, 6) + '…' + token.slice(-4);
-  }
-
-  copyToken(token: string): void {
-    if (!token) return;
-    this.copiedToken.set(false);
-    this.doCopy(token).then(() => {
-      this.copiedToken.set(true);
-      window.setTimeout(() => this.copiedToken.set(false), 1500);
-    });
-  }
-
-  copyFallback(code: string): void {
-    if (!code) return;
-    this.copiedFallback.set(false);
-    this.doCopy(code.replace(/\D/g, '')).then(() => {
-      this.copiedFallback.set(true);
-      window.setTimeout(() => this.copiedFallback.set(false), 1500);
-    });
-  }
-
-  private doCopy(text: string): Promise<void> {
-    try {
-      if (navigator.clipboard && navigator.clipboard.writeText) {
-        return navigator.clipboard.writeText(text).catch(() => this.fallbackCopy(text));
-      }
-      return Promise.resolve(this.fallbackCopy(text));
-    } catch {
-      return Promise.resolve(this.fallbackCopy(text));
-    }
-  }
-
-  private fallbackCopy(text: string): void {
-    const ta = document.createElement('textarea');
-    ta.value = text;
-    ta.style.position = 'fixed';
-    ta.style.opacity = '0';
-    document.body.appendChild(ta);
-    ta.select();
-    try { document.execCommand('copy'); } catch { /* ignore */ }
-    document.body.removeChild(ta);
   }
 
   constructor(
@@ -474,9 +269,6 @@ export class CheckoutPageComponent implements OnInit {
       this.loading.set(true);
       try {
         const tx = await this.productService.getTransaction(txId);
-        if (!tx.qrFallbackCode && (history.state as any)?.qrFallbackCode) {
-          (tx as any).qrFallbackCode = (history.state as any).qrFallbackCode;
-        }
         this.transaction.set(tx);
         const virtualProduct: Product = {
           id: tx.productId ?? tx.id,

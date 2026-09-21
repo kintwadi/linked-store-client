@@ -1113,7 +1113,7 @@ interface SseEventShape {
                                     }
                                   </div>
                                 }
-                                @if (ev.type === 'RESERVED' || ev.type === 'READY') {
+                                @if ((ev.type === 'RESERVED' || ev.type === 'READY') && !isSupersededBellEvent(ev)) {
                                   <div class="bell-action-row" (click)="$event.stopPropagation()">
                                     <button type="button"
                                             class="bell-action-btn btn-primary"
@@ -1843,14 +1843,25 @@ interface SseEventShape {
                                 <div style="display:flex;align-items:center;gap:8px;">
                                   <span class="chip purple" style="font-size:11px;">HOST</span>
                                   <span>{{ tx.originatingStoreName }}</span>
+                                  @if (tx.perspectiveRole === 'RETAIL_HOST') {
+                                    <span class="chip info" style="font-size:10px;">You · Retail</span>
+                                  }
                                 </div>
                                 <div style="display:flex;align-items:center;gap:8px;">
                                   <span class="chip ok" style="font-size:11px;">FULFILL</span>
                                   <span>{{ tx.fulfillingStoreName }}</span>
+                                  @if (tx.perspectiveRole === 'WHOLESALE_SELLER') {
+                                    <span class="chip info" style="font-size:10px;">You · Wholesale</span>
+                                  }
                                 </div>
                               </div>
                             } @else {
                               <span class="mono">🏪 {{ tx.originatingStoreName || tx.fulfillingStoreName || tx.storeName || '—' }}</span>
+                              @if (tx.perspectiveRole === 'RETAIL_HOST' || tx.perspectiveRole === 'WHOLESALE_SELLER') {
+                                <span class="chip info" style="font-size:10px; margin-left:6px;">
+                                  {{ tx.perspectiveRole === 'RETAIL_HOST' ? 'You · Retail' : 'You · Wholesale' }}
+                                </span>
+                              }
                             }
                           </td>
                           <td>
@@ -1858,22 +1869,43 @@ interface SseEventShape {
                               {{ tx.status || '—' }}
                             </span>
                           </td>
-                          <td><strong style="font-weight:700;">{{ formatMoney(tx.totalRetailCents ?? tx.totalCents ?? tx.amountCents, tx.currency) }}</strong></td>
+                          <td>
+                            <div style="display: grid; gap: 2px;">
+                              <strong style="font-weight:700;">{{ formatMoney((tx.perspectivePriceCents ?? tx.totalRetailCents ?? tx.totalCents ?? tx.amountCents), tx.currency) }}</strong>
+                              @if (tx.perspectiveRole === 'WHOLESALE_SELLER') {
+                                <span class="chip" style="font-size:10px; padding: 1px 6px; justify-self: start;">Wholesale payout</span>
+                              } @else if (tx.perspectiveRole === 'RETAIL_HOST') {
+                                <span class="chip purple" style="font-size:10px; padding: 1px 6px; justify-self: start;">Retail revenue</span>
+                              } @else {
+                                <span class="chip" style="font-size:10px; padding: 1px 6px; justify-self: start;">Retail (network)</span>
+                              }
+                            </div>
+                          </td>
                           <td>{{ tx.createdAt | date:'short' }}</td>
                           <td>
                             <div class="row-actions">
-                              @if (tx.status === 'RESERVED' || tx.status === 'PENDING_RESERVATION' || tx.status === 'READY') {
+                              @if (txShowAcceptButton(tx)) {
                                 <button type="button" class="btn btn-primary"
                                         [disabled]="txAcceptLoading(tx)"
                                         (click)="acceptTx(tx)">
                                   @if (txAcceptLoading(tx)) { ⟳ } @else { ✓ }
                                   Accept
                                 </button>
+                              }
+                              @if (txShowDenyButton(tx)) {
                                 <button type="button" class="btn btn-secondary-warn"
                                         [disabled]="txDenyLoading(tx)"
                                         (click)="denyTx(tx)">
                                   @if (txDenyLoading(tx)) { ⟳ } @else { ✕ }
                                   Deny
+                                </button>
+                              }
+                              @if (txShowCancelReadyButton(tx)) {
+                                <button type="button" class="btn btn-secondary-warn"
+                                        [disabled]="txDenyLoading(tx)"
+                                        (click)="denyTx(tx)">
+                                  @if (txDenyLoading(tx)) { ⟳ } @else { ✕ }
+                                  Cancel request
                                 </button>
                               }
                               @if (tx.id) {
@@ -2133,9 +2165,15 @@ export class AdminDashboardPageComponent implements OnInit, OnDestroy {
       u?.isGlobalAdmin ||
       u?.role === 'GLOBAL_ADMIN' ||
       u?.role === 'STORE_ADMIN' ||
-      u?.role === 'OWNER'
+      u?.role === 'OWNER' ||
+      u?.role === 'STORE_REPRESENTATIVE' ||
+      u?.role === 'CLERK' ||
+      u?.role === 'RUNNER'
     );
   });
+
+  /** true if current user is RUNNER role: should redirect to pickup queue rather than stay on admin. */
+  readonly isRunnerRole = computed(() => this.currentUser()?.role === 'RUNNER');
 
   readonly pagedTransactions = computed(() => {
     const start = this.txPage() * this.txPageSize;
@@ -2191,10 +2229,10 @@ export class AdminDashboardPageComponent implements OnInit, OnDestroy {
     if (!list.length) return this.formatMoney(0, 'USD');
     let total = 0;
     for (const tx of list) {
-      total += Number(tx.totalRetailCents ?? tx.totalCents ?? tx.amountCents ?? 0);
+      total += Number((tx as any).perspectivePriceCents ?? (tx as any).totalRetailCents ?? (tx as any).totalCents ?? (tx as any).amountCents ?? 0);
     }
     const sample = list.find((t: any) => t.currency);
-    return this.formatMoney(total, sample?.currency ?? 'USD');
+    return this.formatMoney(total, (sample as any)?.currency ?? 'USD');
   });
 
   avatarInitials(u: any): string {
@@ -2251,6 +2289,12 @@ export class AdminDashboardPageComponent implements OnInit, OnDestroy {
   }
 
   ngOnInit(): void {
+    // Redirect runners immediately to their pickup-work queue page (runners do not need the
+    // admin dashboard with KPIs, invite forms, etc).
+    if (this.isRunnerRole()) {
+      void this.router.navigate(['/runner', 'pickup']);
+      return;
+    }
     if (!this.isAdminish()) return;
     // 1s ticker to update countdown timers in UI (bell panel + toasts)
     this.sseTick = setInterval(() => {
@@ -2865,9 +2909,13 @@ export class AdminDashboardPageComponent implements OnInit, OnDestroy {
 
   // Grace window before a terminal-stale event is auto-pruned from the bell list.
   private readonly TERMINAL_EVENT_GRACE_MS = 5 * 60 * 1000;
-  // PAID/PICKED_UP are informational success events: keep in list for a longer tail
-  // but still eventually drop them.
-  private readonly SUCCESS_EVENT_RETENTION_MS = 24 * 60 * 60 * 1000;
+  // PAID/PICKED_UP success events:
+  // - Bell badge & bell dropdown list: hidden instantly (customer has paid/picked; nothing
+  //   left for store clerks to act on). Clerk still sees a brief toast on arrival.
+  // - Standalone /admin/notifications page: retained for SHORT_GRACE_MS so there is a small
+  //   audit trail then auto-pruned.
+  private readonly SUCCESS_BELL_HIDE_INSTANT = true;
+  private readonly SUCCESS_EVENT_RETENTION_MS = 5 * 60 * 1000;
 
   readonly events = signal<SseEventShape[]>([]);
   readonly toasts = signal<Array<SseEventShape & { id: string; leaving?: boolean }>>([]);
@@ -2895,6 +2943,11 @@ export class AdminDashboardPageComponent implements OnInit, OnDestroy {
   private isEventStaleForBell(ev: SseEventShape, nowMs: number): boolean {
     const t = ev.type;
     if (t === 'RESERVED' || t === 'READY') {
+      // Safety net: if a *newer* PAID / PICKED_UP / EXPIRED / CANCELED / UNAVAILABLE event
+      // already exists in the same list for this transactionId, then this RESERVED/READY is
+      // stale now — regardless of its own countdown. Hides rows like "READY Item marked ready"
+      // alongside "PAID Payment received" for the same order.
+      if (this.hasNewerSupersedingEvent(ev, this.events())) return true;
       // Actionable items: hide only if their countdown has expired (optimistic EXPIRED
       // until the backend sweep broadcasts the real EXPIRED event).
       if (ev.expiresAt) {
@@ -2909,10 +2962,36 @@ export class AdminDashboardPageComponent implements OnInit, OnDestroy {
       return this.ageMs(ev, nowMs) >= this.TERMINAL_EVENT_GRACE_MS;
     }
     if (this.isSuccessType(t)) {
-      // PAID / PICKED_UP keep for 24h then auto remove.
+      // PAID / PICKED_UP: as soon as payment succeeds or customer picks up, hide from
+      // bell list INSTANTLY — these are not actionable anymore.
+      if (this.SUCCESS_BELL_HIDE_INSTANT) return true;
       return this.ageMs(ev, nowMs) >= this.SUCCESS_EVENT_RETENTION_MS;
     }
     return false;
+  }
+
+  /** Helper: true if the list already contains a newer event for the same transactionId
+   *  whose type supersedes this event (terminal/success outcome). If so, the older event
+   *  should be hidden immediately from bell/badge.
+   */
+  private hasNewerSupersedingEvent(ev: SseEventShape, list: SseEventShape[]): boolean {
+    const tx = ev.transactionId;
+    if (!tx) return false;
+    const evT = ev.createdAt ? new Date(ev.createdAt).getTime() : 0;
+    for (const other of list) {
+      if (other === ev) continue;
+      if (other.transactionId !== tx) continue;
+      const ot = other.type;
+      if (!this.isTerminalType(ot) && !this.isSuccessType(ot)) continue;
+      const otherT = other.createdAt ? new Date(other.createdAt).getTime() : 0;
+      if (otherT >= evT) return true;
+    }
+    return false;
+  }
+
+  /** Public helper used by bell template to hide Accept/Deny buttons for stale superseded rows. */
+  isSupersededBellEvent(ev: SseEventShape): boolean {
+    return this.hasNewerSupersedingEvent(ev, this.events());
   }
 
   /** Count only unread events that still contribute to the bell badge. */
@@ -2954,7 +3033,7 @@ export class AdminDashboardPageComponent implements OnInit, OnDestroy {
     this.events.update(list =>
       list.filter(ev => {
         if (this.isTerminalType(ev.type)) return false;
-        if (this.isSuccessType(ev.type) && this.ageMs(ev, now) >= this.TERMINAL_EVENT_GRACE_MS) return false;
+        if (this.isSuccessType(ev.type)) return false; // PAID/PICKED_UP are resolved; always wipe.
         return true;
       })
     );
@@ -2966,17 +3045,39 @@ export class AdminDashboardPageComponent implements OnInit, OnDestroy {
   }
 
   /** Run every minute: optimistic expiry cleanup.
-   *  (a) Drop events that are terminal-stale past their grace window.
+   *  (a) Drop events that are terminal-stale past their grace window, plus success events
+   *      (PAID/PICKED_UP) if past SUCCESS_EVENT_RETENTION_MS.
    *  (b) Optimistically relabel RESERVED / READY events whose expiresAt has passed as EXPIRED
    *      before the backend 30-second sweep catches up.
+   *  (c) Drop any stale duplicate events for the same transactionId (keep newest), in case
+   *      an older event (RESERVED) arrived out of order after a newer one (PAID).
    */
   private runNotificationGcPass(): void {
     const now = Date.now();
     let touched = false;
     this.events.update(list => {
-      const out: SseEventShape[] = [];
+      // (c) dedup per transactionId, keeping newest event per tx
+      const byTx = new Map<string, SseEventShape>();
+      const noTx: SseEventShape[] = [];
       for (const ev of list) {
+        const tx = ev.transactionId;
+        if (!tx) { noTx.push(ev); continue; }
+        const existing = byTx.get(tx);
+        if (!existing) { byTx.set(tx, ev); continue; }
+        const exT = existing.createdAt ? new Date(existing.createdAt).getTime() : 0;
+        const evT = ev.createdAt ? new Date(ev.createdAt).getTime() : 0;
+        if (evT >= exT) { byTx.set(tx, ev); touched = true; }
+      }
+      const deduped: SseEventShape[] = [];
+      byTx.forEach(v => deduped.push(v));
+      deduped.push(...noTx);
+      if (deduped.length !== list.length) touched = true;
+
+      const out: SseEventShape[] = [];
+      for (const ev of deduped) {
+        // (a) drop unconditionally if they're stale
         if (this.isEventStaleForBell(ev, now)) { touched = true; continue; }
+        // (b) optimistic relabel past-expires RESERVED/READY to EXPIRED read=true
         if ((ev.type === 'RESERVED' || ev.type === 'READY') && ev.expiresAt) {
           try {
             if (new Date(ev.expiresAt).getTime() <= now) {
@@ -2996,13 +3097,23 @@ export class AdminDashboardPageComponent implements OnInit, OnDestroy {
   private pushEvent(ev: SseEventShape): void {
     ev._read = false;
     this.events.update(list => {
-      const dedup = list.filter(x => !(x.transactionId && ev.transactionId && x.transactionId === ev.transactionId && x.type === ev.type));
+      // Drop any prior events for the SAME transactionId, regardless of type, because a
+      // newer event (e.g. READY, PAID) supersedes any older one (RESERVED, READY). Also
+      // remove exact (transactionId+type) duplicates. This way RESERVED→READY→PAID goes
+      // through cleanly (1 row live always = newest).
+      let dedup: SseEventShape[] = list;
+      if (ev.transactionId) {
+        dedup = dedup.filter(x => !(x.transactionId && x.transactionId === ev.transactionId));
+      } else {
+        dedup = dedup.filter(x => !(x.eventId && ev.eventId && x.eventId === ev.eventId));
+      }
       return [ev, ...dedup].slice(0, 200);
     });
     // Badge pulse
     this.bellPulse.set(true);
     setTimeout(() => this.bellPulse.set(false), 1200);
-    // Toast for important events
+    // Toast for important events (show the toast even if we hide from bell list instantly for
+    // PAID/PICKED_UP successes so clerk sees the green confirmation pop up briefly).
     if (['RESERVED', 'READY', 'UNAVAILABLE', 'PAID', 'PICKED_UP', 'CANCELLED', 'EXPIRED'].includes(ev.type)) {
       const toastId = 't_' + (ev.eventId || (Date.now() + '_' + Math.random().toString(36).slice(2, 7)));
       const t = { ...ev, id: toastId, leaving: false };
@@ -3012,8 +3123,8 @@ export class AdminDashboardPageComponent implements OnInit, OnDestroy {
     setTimeout(() => {
       void this.hydrateEventStock();
     }, 20);
-    // New terminal events immediately trigger one GC pass so if a replacement EXPIRED
-    // event just landed it supersedes any prior RESERVED of same tx in the dedup.
+    // New terminal/success events immediately trigger one GC pass so the dedup/supersede takes
+    // effect right away (e.g. incoming PAID replaces old RESERVED row instantly).
     setTimeout(() => this.runNotificationGcPass(), 100);
   }
 
@@ -3201,6 +3312,23 @@ export class AdminDashboardPageComponent implements OnInit, OnDestroy {
       this.events.update(list => list.slice());
       this.touch();
     }
+  }
+
+  /** Dashboard Transactions tab: show Accept button for RESERVED/PENDING_RESERVATION only. */
+  txShowAcceptButton(tx: { status?: string | null | undefined } | null | undefined): boolean {
+    const s = tx?.status;
+    return s === 'RESERVED' || s === 'PENDING_RESERVATION';
+  }
+
+  /** Dashboard Transactions tab: show Deny button for RESERVED/PENDING_RESERVATION only. */
+  txShowDenyButton(tx: { status?: string | null | undefined } | null | undefined): boolean {
+    const s = tx?.status;
+    return s === 'RESERVED' || s === 'PENDING_RESERVATION';
+  }
+
+  /** Dashboard Transactions tab: show Cancel (mark-unavailable) button for READY rows. */
+  txShowCancelReadyButton(tx: { status?: string | null | undefined } | null | undefined): boolean {
+    return tx?.status === 'READY';
   }
 
   async acceptTx(tx: any): Promise<void> {

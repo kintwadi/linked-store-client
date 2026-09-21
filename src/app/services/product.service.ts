@@ -300,9 +300,58 @@ export class ProductService {
     return resolvePublicOrigin();
   }
 
-  buildQrUrlFor(productId: string): string {
+  private static readonly LS_BROWSING_HOST_STORE = 'ls.browsing_host_store';
+  private static readonly LS_BROWSING_HOST_STORE_TTL_MS = 1000 * 60 * 60 * 6;
+
+  setBrowsingHostStore(payload: { storeId: string; businessName?: string | null; gatewayCode?: string | null }): void {
+    if (typeof window === 'undefined' || !payload?.storeId) return;
+    try {
+      const record = {
+        storeId: payload.storeId,
+        businessName: payload.businessName ?? null,
+        gatewayCode: payload.gatewayCode ?? null,
+        t: Date.now(),
+      };
+      window.localStorage.setItem(ProductService.LS_BROWSING_HOST_STORE, JSON.stringify(record));
+    } catch {
+      /* storage blocked */
+    }
+  }
+
+  getBrowsingHostStore(): { storeId: string; businessName?: string | null; gatewayCode?: string | null } | null {
+    if (typeof window === 'undefined') return null;
+    try {
+      const raw = window.localStorage.getItem(ProductService.LS_BROWSING_HOST_STORE);
+      if (!raw) return null;
+      const parsed = JSON.parse(raw) as any;
+      if (!parsed || typeof parsed !== 'object' || typeof parsed.storeId !== 'string') return null;
+      const createdTs = Number(parsed.t) || 0;
+      if (createdTs > 0 && Date.now() - createdTs > ProductService.LS_BROWSING_HOST_STORE_TTL_MS) {
+        window.localStorage.removeItem(ProductService.LS_BROWSING_HOST_STORE);
+        return null;
+      }
+      return {
+        storeId: parsed.storeId,
+        businessName: parsed.businessName ?? null,
+        gatewayCode: parsed.gatewayCode ?? null,
+      };
+    } catch {
+      return null;
+    }
+  }
+
+  clearBrowsingHostStore(): void {
+    if (typeof window === 'undefined') return;
+    try { window.localStorage.removeItem(ProductService.LS_BROWSING_HOST_STORE); } catch { /* ignore */ }
+  }
+
+  buildQrUrlFor(productId: string, options?: { gatewayCode?: string | null }): string {
     const origin = resolvePublicOrigin();
-    return `${origin}/p/${encodeURIComponent(productId)}`;
+    let base = `${origin}/p/${encodeURIComponent(productId)}`;
+    if (options?.gatewayCode && /^\d{8}$/.test(String(options.gatewayCode))) {
+      base += `?gateway=${encodeURIComponent(String(options.gatewayCode))}`;
+    }
+    return base;
   }
 
   buildQrSharePageUrlFor(productId: string): string {
@@ -491,6 +540,7 @@ export class ProductService {
     items: Array<{
       id: string;
       status: string;
+      runnerId?: string;
       totalRetailCents: number;
       wholesalePayoutCents: number;
       arbitrageMarginCents: number;
@@ -527,6 +577,21 @@ export class ProductService {
       this.http.get<any>(
         `${api}/admin/transactions/me/runner?status=${encodeURIComponent(status)}&page=${page}&pageSize=${pageSize}`
       )
+    );
+  }
+
+  /** Runner self-assign claim: POST /api/admin/transactions/me/runner/claim/{txId} */
+  claimRunnerPickup(txId: string): Promise<{
+    ok?: boolean;
+    runnerId?: string;
+    transactionId?: string;
+    status?: string;
+    message?: string;
+    error?: string;
+  }> {
+    const api = resolveApiBase();
+    return firstValueFrom(
+      this.http.post<any>(`${api}/admin/transactions/me/runner/claim/${encodeURIComponent(txId)}`, {})
     );
   }
 

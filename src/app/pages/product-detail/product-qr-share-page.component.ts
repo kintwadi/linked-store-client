@@ -307,10 +307,18 @@ import { ProductService } from '../../services/product.service';
 export class ProductQrSharePageComponent implements OnInit {
   readonly productId = signal<string>('');
   readonly loading = signal<boolean>(true);
+  readonly qrGatewayCode = signal<string | null>(null);
+  readonly qrStoreId = signal<string | null>(null);
 
-  readonly productPdpUrl = computed(() =>
-    this.productId() ? this.products.buildQrUrlFor(this.productId()) : window.location.origin
-  );
+  readonly productPdpUrl = computed(() => {
+    if (!this.productId()) return window.location.origin;
+    let gateway: string | null | undefined = this.qrGatewayCode() ?? undefined;
+    if (!gateway) {
+      const cachedHost = this.products.getBrowsingHostStore();
+      if (cachedHost?.gatewayCode) gateway = cachedHost.gatewayCode;
+    }
+    return this.products.buildQrUrlFor(this.productId(), { gatewayCode: gateway ?? null });
+  });
 
   @ViewChild('ctaBtn', { static: false })
   private readonly ctaBtnRef?: ElementRef<HTMLButtonElement>;
@@ -324,6 +332,19 @@ export class ProductQrSharePageComponent implements OnInit {
   async ngOnInit(): Promise<void> {
     const id = this.route.snapshot.paramMap.get('productId') || '';
     this.productId.set(id);
+    const qp = this.route.snapshot.queryParamMap;
+    const gateway = qp.get('gateway') ?? qp.get('gatewayCode') ?? qp.get('token');
+    const storeId = qp.get('storeId') ?? qp.get('store');
+    if (gateway && /^\d{8}$/.test(gateway.trim())) {
+      this.qrGatewayCode.set(gateway.trim());
+      this.products.setBrowsingHostStore({
+        storeId: this.qrStoreId() ?? '',
+        gatewayCode: gateway.trim(),
+      });
+    }
+    if (storeId && /^[0-9a-fA-F-]{20,}$/.test(storeId.trim())) {
+      this.qrStoreId.set(storeId.trim());
+    }
     this.loading.set(false);
   }
 
@@ -331,7 +352,12 @@ export class ProductQrSharePageComponent implements OnInit {
     this.spawnRipple(event);
     const id = this.productId();
     if (id) {
-      this.router.navigate(['/p', id]);
+      const queryParams: Record<string, string> = {};
+      if (this.qrGatewayCode()) queryParams['gateway'] = this.qrGatewayCode()!;
+      else if (this.qrStoreId()) queryParams['storeId'] = this.qrStoreId()!;
+      const extras = Object.keys(queryParams).length > 0 ? { queryParams } : undefined;
+      if (extras) this.router.navigate(['/p', id], extras);
+      else this.router.navigate(['/p', id]);
     } else {
       this.router.navigate(['/']);
     }

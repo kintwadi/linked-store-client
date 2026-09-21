@@ -11,6 +11,7 @@ type PickupStatusFilter = 'PAID' | 'PICKED_UP' | 'READY';
 type PickupTx = {
   id: string;
   status: string;
+  runnerId?: string | null;
   totalRetailCents: number;
   wholesalePayoutCents: number;
   arbitrageMarginCents: number;
@@ -30,6 +31,7 @@ type PickupTx = {
   updatedAt?: string;
   originatingStoreName?: string;
   fulfillingStoreName?: string;
+  _claimLoading?: boolean;
 };
 
 @Component({
@@ -296,6 +298,66 @@ type PickupTx = {
       cursor: pointer;
     }
     .copy-chip:hover { color: var(--color-ink); background: #fafafa; }
+    .banner {
+      display: flex;
+      align-items: flex-start;
+      gap: 10px;
+      padding: 12px 14px;
+      border-radius: 12px;
+      border: 1px solid transparent;
+      font-size: 13px;
+      font-weight: 500;
+    }
+    .banner-ok {
+      background: #ecfdf5;
+      border-color: #bbf7d0;
+      color: #065f46;
+    }
+    .banner-err {
+      background: #fef2f2;
+      border-color: #fecaca;
+      color: #991b1b;
+    }
+    .banner-ico {
+      width: 22px; height: 22px; flex-shrink: 0;
+      display: inline-grid; place-items: center;
+      border-radius: 999px;
+      font-weight: 800;
+      font-size: 13px;
+      line-height: 1;
+    }
+    .banner-ok .banner-ico { background: #10b981; color: #fff; }
+    .banner-err .banner-ico { background: #ef4444; color: #fff; }
+    .assign-chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      padding: 3px 8px;
+      border-radius: 999px;
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: 0.02em;
+      text-transform: uppercase;
+      border: 1px solid var(--color-border);
+      background: #fff;
+    }
+    .assign-chip.mine {
+      background: #ecfdf5;
+      border-color: #bbf7d0;
+      color: #065f46;
+    }
+    .assign-chip.unassigned {
+      background: #fffbeb;
+      border-color: #fde68a;
+      color: #92400e;
+    }
+    .status-col {
+      display: inline-flex;
+      gap: 6px;
+      align-items: center;
+      flex-wrap: wrap;
+      justify-content: flex-end;
+    }
     @media (max-width: 640px) {
       .page-title { font-size: 22px; }
       .card-head { grid-template-columns: 56px 1fr; }
@@ -306,11 +368,9 @@ type PickupTx = {
   template: `
     <div class="wrap">
       <div class="top">
-        <a routerLink="/" class="back">← Back to home</a>
         <div class="hero-meta">
           <span class="pill"><span class="dot"></span>Live · runner queue</span>
           <span class="pill">Signed in as {{ roleLabel() }}</span>
-          <a routerLink="/admin" class="btn btn-ghost">Open dashboard</a>
         </div>
       </div>
 
@@ -350,6 +410,19 @@ type PickupTx = {
         <a routerLink="/merchant/pickup" class="btn btn-primary">Open scanner →</a>
       </div>
 
+      @if (claimSuccess()) {
+        <div class="banner banner-ok">
+          <span class="banner-ico">✓</span>
+          <div>{{ claimSuccess() }}</div>
+        </div>
+      }
+      @if (claimError()) {
+        <div class="banner banner-err">
+          <span class="banner-ico">!</span>
+          <div>{{ claimError() }}</div>
+        </div>
+      }
+
       @if (loading()) {
         <div class="empty">
           <h3>Loading pickups…</h3>
@@ -366,9 +439,8 @@ type PickupTx = {
                 @case ('PICKED_UP') { You haven't picked anything up yet in this window. Once you scan items at the store, they will appear here. }
               }
             </p>
-            <div style="display:flex; gap:8px; margin-top:8px;">
-              <a routerLink="/admin" class="btn btn-primary">Go to dashboard</a>
-              <a routerLink="/" class="btn btn-ghost">Browse stores</a>
+            <div style="display:flex; gap:8px; margin-top:8px; justify-content:center;">
+              <button type="button" class="btn btn-ghost" [disabled]="loading()" (click)="reload()">⟳ Reload</button>
             </div>
           </div>
         } @else {
@@ -384,7 +456,14 @@ type PickupTx = {
                       {{ tx.fulfillingStoreName ?? (tx.fulfillingStoreId ?? '').slice(0,8) }}
                     </p>
                   </div>
-                  <span class="status" [ngClass]="statusClass(tx.status)">{{ tx.status }}</span>
+                  <div class="status-col">
+                    <span class="status" [ngClass]="statusClass(tx.status)">{{ tx.status }}</span>
+                    @if (assignedToMe(tx)) {
+                      <span class="assign-chip mine">👤 Mine</span>
+                    } @else if (needsClaim(tx)) {
+                      <span class="assign-chip unassigned">Unassigned</span>
+                    }
+                  </div>
                 </div>
 
                 <div class="store-row">
@@ -445,9 +524,25 @@ type PickupTx = {
                   </div>
                 </div>
 
-                <div class="actions">
+                <div class="actions" [style.grid-template-columns]="showClaimButton(tx) ? '1fr 1fr' : '1fr 1fr'">
+                  @if (showClaimButton(tx)) {
+                    <button
+                      type="button"
+                      class="btn btn-primary"
+                      style="grid-column: 1 / -1;"
+                      (click)="claim(tx)"
+                      [disabled]="!!tx._claimLoading || loading()">
+                      @if (tx._claimLoading) {
+                        ⟳ Claiming…
+                      } @else {
+                        👤 Claim pickup
+                      }
+                    </button>
+                  }
                   <a
-                    class="btn btn-primary"
+                    class="btn"
+                    [class.btn-primary]="!showClaimButton(tx)"
+                    [class.btn-ghost]="showClaimButton(tx)"
                     [routerLink]="'/merchant/pickup'"
                     [state]="{ prefill: tx.qrSecureToken ?? tx.qrFallbackCode ?? tx.id }">
                     Scan & verify
@@ -495,6 +590,9 @@ export class RunnerPickupPageComponent implements OnInit {
   readonly hasNext = signal(false);
   readonly hasPrevious = signal(false);
   readonly runnerName = signal<string>('Runner');
+  readonly runnerUserId = signal<string | null>(null);
+  readonly claimSuccess = signal<string | null>(null);
+  readonly claimError = signal<string | null>(null);
 
   readonly visible = signal<PickupTx[]>([]);
 
@@ -511,12 +609,66 @@ export class RunnerPickupPageComponent implements OnInit {
     return `${role}${email ? ' · ' + email.split('@')[0] : ''}`;
   }
 
+  /** True when the row's runnerId is either null or assigned to someone else (not me). */
+  needsClaim(tx: PickupTx): boolean {
+    const me = this.runnerUserId();
+    if (!me) return true;
+    const r = tx?.runnerId;
+    return !r || r !== me;
+  }
+
+  /** True when row already explicitly assigned to current runner. */
+  assignedToMe(tx: PickupTx): boolean {
+    const me = this.runnerUserId();
+    if (!me) return false;
+    return !!tx?.runnerId && tx.runnerId === me;
+  }
+
+  /** If a READY/PAID/PICKED_UP row has no runnerId yet OR assigned to someone else (same store, other runner): show Claim button. */
+  showClaimButton(tx: PickupTx): boolean {
+    const s = (tx?.status ?? '').toUpperCase();
+    if (s !== 'PAID' && s !== 'READY' && s !== 'PICKED_UP') return false;
+    return this.needsClaim(tx);
+  }
+
+  /** Runner self-assigns this pickup task (claim). On success reload list. */
+  async claim(tx: PickupTx): Promise<void> {
+    const txId = tx?.id;
+    if (!txId) return;
+    this.runnerUserId();
+    this.items.update(list => list.map(x => x.id === txId ? { ...x, _claimLoading: true } : x));
+    this.visible.update(list => list.map(x => x.id === txId ? { ...x, _claimLoading: true } : x));
+    this.claimSuccess.set(null);
+    this.claimError.set(null);
+    try {
+      const res = await this.products.claimRunnerPickup(txId);
+      if (res?.ok) {
+        this.claimSuccess.set(`Claimed ${txId.slice(0, 8)} — reloading queue…`);
+        setTimeout(() => this.claimSuccess.set(null), 2500);
+        await this.reload();
+      } else {
+        const msg = (res as any)?.message ?? (res as any)?.error ?? 'Claim failed.';
+        this.claimError.set(msg);
+        setTimeout(() => this.claimError.set(null), 4500);
+      }
+    } catch (err: any) {
+      this.claimError.set(err?.error?.message ?? err?.message ?? 'Claim failed.');
+      setTimeout(() => this.claimError.set(null), 4500);
+    } finally {
+      this.items.update(list => list.map(x => x.id === txId ? { ...x, _claimLoading: false } : x));
+      this.visible.update(list => list.map(x => x.id === txId ? { ...x, _claimLoading: false } : x));
+    }
+  }
+
   ngOnInit(): void {
     if (!this.auth.isLoggedIn()) {
       this.router.navigate(['/login'], { queryParams: { redirectTo: '/runner/pickup' } });
       return;
     }
     const u = this.auth.currentUser$.getValue();
+    if (u?.userId) {
+      this.runnerUserId.set(String(u.userId));
+    }
     if (u?.email) {
       this.runnerName.set(u.email.split('@')[0]);
     }

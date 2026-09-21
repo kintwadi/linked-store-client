@@ -165,11 +165,23 @@ export class AuthService {
 
   redirectAfterLogin(): void {
     const user = this.currentUser$.getValue();
-    if (user?.isGlobalAdmin || user?.role === 'GLOBAL_ADMIN' || user?.role === 'STORE_ADMIN' || user?.role === 'OWNER') {
-      this.router.navigate(['/admin']);
-    } else {
-      this.router.navigate(['/']);
+    const role = user?.role;
+    if (role === 'RUNNER') {
+      void this.router.navigate(['/runner', 'pickup']);
+      return;
     }
+    if (
+      user?.isGlobalAdmin ||
+      role === 'GLOBAL_ADMIN' ||
+      role === 'STORE_ADMIN' ||
+      role === 'OWNER' ||
+      role === 'STORE_REPRESENTATIVE' ||
+      role === 'CLERK'
+    ) {
+      void this.router.navigate(['/admin']);
+      return;
+    }
+    void this.router.navigate(['/']);
   }
 
   resolveApiBasePublic(): string {

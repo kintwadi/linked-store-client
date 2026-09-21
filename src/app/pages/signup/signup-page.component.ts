@@ -1075,7 +1075,20 @@ export class SignupPageComponent implements OnInit {
         inviteToken: this.inviteToken() ?? undefined,
       };
       const result = await this.authService.register(payload);
-      if (result.user?.isGlobalAdmin || result.user?.role === 'GLOBAL_ADMIN' || result.user?.role === 'STORE_ADMIN' || result.user?.role === 'OWNER' || result.user?.role === 'STORE_REPRESENTATIVE' || result.user?.role === 'CLERK' || result.user?.role === 'RUNNER') {
+      const u = result.user as any;
+      const isRunner = !!u && u.role === 'RUNNER';
+      const adminish = !!u && (
+        u.isGlobalAdmin === true ||
+        u.role === 'GLOBAL_ADMIN' ||
+        u.role === 'OWNER' ||
+        u.role === 'STORE_ADMIN' ||
+        u.role === 'STORE_REPRESENTATIVE' ||
+        u.role === 'CLERK' ||
+        u.role === 'RUNNER'
+      );
+      if (isRunner) {
+        await this.router.navigate(['/runner', 'pickup']);
+      } else if (adminish) {
         await this.router.navigate(['/admin']);
       } else {
         await this.router.navigate(['/']);

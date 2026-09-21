@@ -588,7 +588,9 @@ export class AdminNotificationsPageComponent implements OnInit, OnDestroy {
   readonly cdr = inject(ChangeDetectorRef);
 
   private readonly TERMINAL_GRACE_MS = 5 * 60 * 1000;
-  private readonly SUCCESS_RETENTION_MS = 24 * 60 * 60 * 1000;
+  // PAID/PICKED_UP are a short audit trail only — drop fast so old "payment received" events
+  // don't clutter the list for hours.
+  private readonly SUCCESS_RETENTION_MS = 5 * 60 * 1000;
 
   readonly events = signal<SseEventShape[]>([]);
   readonly loading = signal(true);
@@ -633,7 +635,7 @@ export class AdminNotificationsPageComponent implements OnInit, OnDestroy {
     this.events.update(list =>
       list.filter(ev => {
         if (this.isTerminalType(ev.type)) return false;
-        if (this.isSuccessType(ev.type) && this.ageMs(ev, now) >= this.TERMINAL_GRACE_MS) return false;
+        if (this.isSuccessType(ev.type)) return false;
         return true;
       })
     );
@@ -644,8 +646,25 @@ export class AdminNotificationsPageComponent implements OnInit, OnDestroy {
     const now = Date.now();
     let touched = false;
     this.events.update(list => {
-      const out: SseEventShape[] = [];
+      // (1) dedup per transactionId, keep newest
+      const byTx = new Map<string, SseEventShape>();
+      const noTx: SseEventShape[] = [];
       for (const ev of list) {
+        const tx = ev.transactionId;
+        if (!tx) { noTx.push(ev); continue; }
+        const existing = byTx.get(tx);
+        if (!existing) { byTx.set(tx, ev); continue; }
+        const exT = existing.createdAt ? new Date(existing.createdAt).getTime() : 0;
+        const evT = ev.createdAt ? new Date(ev.createdAt).getTime() : 0;
+        if (evT >= exT) { byTx.set(tx, ev); touched = true; }
+      }
+      const deduped: SseEventShape[] = [];
+      byTx.forEach(v => deduped.push(v));
+      deduped.push(...noTx);
+      if (deduped.length !== list.length) touched = true;
+
+      const out: SseEventShape[] = [];
+      for (const ev of deduped) {
         if (this.isEventStale(ev, now)) { touched = true; continue; }
         if ((ev.type === 'RESERVED' || ev.type === 'READY') && ev.expiresAt) {
           try {
@@ -717,7 +736,22 @@ export class AdminNotificationsPageComponent implements OnInit, OnDestroy {
         const r = arr[i];
         if (r && typeof r === 'object') shaped.push(r as SseEventShape);
       }
-      this.events.set(shaped);
+      // Client-side safety dedup: at most one row per transactionId (newest wins).
+      const byTx = new Map<string, SseEventShape>();
+      const noTx: SseEventShape[] = [];
+      for (const ev of shaped) {
+        const tx = ev.transactionId;
+        if (!tx) { noTx.push(ev); continue; }
+        const existing = byTx.get(tx);
+        if (!existing) { byTx.set(tx, ev); continue; }
+        const exT = existing.createdAt ? new Date(existing.createdAt).getTime() : 0;
+        const evT = ev.createdAt ? new Date(ev.createdAt).getTime() : 0;
+        if (evT >= exT) byTx.set(tx, ev);
+      }
+      const deduped: SseEventShape[] = [];
+      byTx.forEach(v => deduped.push(v));
+      deduped.push(...noTx);
+      this.events.set(deduped);
       this.connected.set(true);
       this.runGc();
       void this.hydrateStock();
@@ -870,7 +904,7 @@ export class AdminNotificationsPageComponent implements OnInit, OnDestroy {
       await firstValueFrom(this.http.post<any>(url, {}, { headers }));
       ev.type = 'READY';
       this.events.update(list => {
-        const dedup = list.filter(x => !(x.transactionId && ev.transactionId && x.transactionId === ev.transactionId && x.type === 'READY' && x !== ev));
+        const dedup = list.filter(x => !(x.transactionId && ev.transactionId && x.transactionId === ev.transactionId && x !== ev));
         return [ev, ...dedup];
       });
       this.showSuccess('Item marked ready.');
@@ -903,7 +937,7 @@ export class AdminNotificationsPageComponent implements OnInit, OnDestroy {
       await firstValueFrom(this.http.post<any>(url, {}, { headers }));
       ev.type = 'UNAVAILABLE';
       this.events.update(list => {
-        const dedup = list.filter(x => !(x.transactionId && ev.transactionId && x.transactionId === ev.transactionId && x.type === 'UNAVAILABLE' && x !== ev));
+        const dedup = list.filter(x => !(x.transactionId && ev.transactionId && x.transactionId === ev.transactionId && x !== ev));
         return [ev, ...dedup];
       });
       this.showSuccess('Item marked unavailable.');

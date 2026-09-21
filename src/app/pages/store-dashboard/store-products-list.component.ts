@@ -837,6 +837,7 @@ const PILL_CLASS_FROM_KEY: Record<string, string> = {
                         @if (v | can:'qr': (v.storeId ?? '')) {
                           <a class="qr-btn"
                              [routerLink]="['/p', v.productId ?? v.variantId, 'qr']"
+                             [queryParams]="gatewayQueryParamsFor(v)"
                              target="_blank" rel="noopener" title="Generate QR code">
                             <svg viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                               <rect x="3" y="3" width="7" height="7"></rect>
@@ -1020,6 +1021,12 @@ export class StoreProductsListComponent implements OnInit {
   // ===== Core state =====
   readonly mode = signal<ViewMode>('store');
   readonly storeId = signal<string>('');
+  readonly storeGatewayMap = signal<Record<string, string>>({});
+  readonly storeGatewayCode = computed<string | null>(() => {
+    const sid = this.storeId();
+    if (!sid || sid === 'me') return null;
+    return this.storeGatewayMap()[sid] ?? null;
+  });
 
   readonly loading = signal(true);
   readonly content = signal<InventoryVariant[]>([]);
@@ -1136,7 +1143,24 @@ export class StoreProductsListComponent implements OnInit {
       this.mode.set('store');
       this.size.set(10);
     }
-    void this.initialFetch();
+    void this.loadStoreGateways().then(() => this.initialFetch());
+  }
+
+  private async loadStoreGateways(): Promise<void> {
+    try {
+      const apiBase = this.authService.resolveApiBasePublic();
+      const stores = await firstValueFrom(this.http.get<any[]>(`${apiBase}/stores`));
+      if (!Array.isArray(stores)) return;
+      const map: Record<string, string> = {};
+      for (const s of stores) {
+        if (s?.id && s?.gatewayCode && /^\d{8}$/.test(String(s.gatewayCode))) {
+          map[String(s.id)] = String(s.gatewayCode);
+        }
+      }
+      this.storeGatewayMap.set(map);
+    } catch {
+      /* ignore */
+    }
   }
 
   private async initialFetch(): Promise<void> {
@@ -1186,6 +1210,29 @@ export class StoreProductsListComponent implements OnInit {
     else next.add(key);
     this.selectedStatuses.set(next);
     this.page.set(0);
+  }
+
+  gatewayQueryParamsFor(storeIdOrVariant: string | InventoryVariant | null | undefined): Record<string, string> | null {
+    if (!storeIdOrVariant) {
+      const current = this.storeGatewayCode();
+      return current ? { gateway: current } : null;
+    }
+    let sid: string | null = null;
+    if (typeof storeIdOrVariant === 'string') {
+      sid = storeIdOrVariant;
+    } else if (storeIdOrVariant.storeId) {
+      sid = storeIdOrVariant.storeId;
+    }
+    if (this.mode() === 'store') {
+      const current = this.storeGatewayCode();
+      if (current) return { gateway: current };
+    }
+    if (sid) {
+      const gw = this.storeGatewayMap()[sid];
+      if (gw) return { gateway: gw };
+    }
+    const current = this.storeGatewayCode();
+    return current ? { gateway: current } : null;
   }
 
   clearFilters(): void {
