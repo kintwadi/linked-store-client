@@ -391,6 +391,7 @@ export class ProductService {
     successUrl: string;
     cancelUrl: string;
     customerEmail?: string | null;
+    originatingStoreId?: string | null;
   }): Promise<{ id: string; url: string; status: string; message?: string }>;
   createCheckoutSession(payload: {
     transactionId: string;
@@ -420,6 +421,9 @@ export class ProductService {
         successUrl: payload.successUrl,
         cancelUrl: payload.cancelUrl,
         customerEmail: payload.customerEmail ?? undefined,
+        originatingStoreId: (payload.originatingStoreId && typeof payload.originatingStoreId === 'string')
+          ? payload.originatingStoreId
+          : undefined,
       };
     }
     return firstValueFrom(

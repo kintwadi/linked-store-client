@@ -307,9 +307,11 @@ import { ProductService } from '../../services/product.service';
 export class HomePageComponent implements OnInit {
   private readonly featuredId = signal<string>('');
   readonly loading = signal<boolean>(true);
-  readonly qrUrl = computed(() =>
-    this.featuredId() ? this.products.buildQrUrlFor(this.featuredId()) : window.location.origin
-  );
+  readonly qrUrl = computed(() => {
+    if (!this.featuredId()) return window.location.origin;
+    const cached = this.products.getBrowsingHostStore();
+    return this.products.buildQrUrlFor(this.featuredId(), { gatewayCode: cached?.gatewayCode ?? null });
+  });
 
   @ViewChild('ctaBtn', { static: false })
   private readonly ctaBtnRef?: ElementRef<HTMLButtonElement>;
@@ -338,7 +340,17 @@ export class HomePageComponent implements OnInit {
   onExplore(event?: MouseEvent): void {
     this.spawnRipple(event);
     const id = this.featuredId() || this.products.getFeaturedProductId();
-    this.router.navigate(['/p', id]);
+    if (!id) {
+      this.router.navigate(['/']);
+      return;
+    }
+    const cached = this.products.getBrowsingHostStore();
+    const queryParams: Record<string, string> = {};
+    if (cached?.gatewayCode) queryParams['gateway'] = cached.gatewayCode;
+    else if (cached?.storeId) queryParams['storeId'] = cached.storeId;
+    const extras = Object.keys(queryParams).length > 0 ? { queryParams } : undefined;
+    if (extras) this.router.navigate(['/p', id], extras);
+    else this.router.navigate(['/p', id]);
   }
 
   private spawnRipple(event?: MouseEvent): void {
