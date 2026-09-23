@@ -1,7 +1,10 @@
 import { Component, computed, ElementRef, OnInit, signal, ViewChild } from '@angular/core';
-import { Router, RouterLink } from '@angular/router';
+import { ActivatedRoute, Router, RouterLink } from '@angular/router';
+import { HttpClient } from '@angular/common/http';
+import { firstValueFrom } from 'rxjs';
 import { QRCodeModule } from 'angularx-qrcode';
 import { ProductService } from '../../services/product.service';
+import { AuthService } from '../../services/auth.service';
 
 @Component({
   selector: 'app-home-page',
@@ -282,6 +285,7 @@ import { ProductService } from '../../services/product.service';
               type="button"
               class="cta-button"
               (click)="onExplore($event)"
+              [disabled]="loading() || scanningStore()"
             >
               <span class="scan-icon" aria-hidden="true">
                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
@@ -307,10 +311,17 @@ import { ProductService } from '../../services/product.service';
 export class HomePageComponent implements OnInit {
   private readonly featuredId = signal<string>('');
   readonly loading = signal<boolean>(true);
+  readonly scanningStore = signal<boolean>(true);
+  readonly scannedStoreId = signal<string | null>(null);
+  readonly scannedStoreName = signal<string | null>(null);
+  readonly scannedStoreGateway = signal<string | null>(null);
+  private storeResolvedPromise: Promise<string | null> | null = null;
+
   readonly qrUrl = computed(() => {
     if (!this.featuredId()) return window.location.origin;
     const cached = this.products.getBrowsingHostStore();
-    return this.products.buildQrUrlFor(this.featuredId(), { gatewayCode: cached?.gatewayCode ?? null });
+    const gateway = cached?.gatewayCode ?? this.scannedStoreGateway();
+    return this.products.buildQrUrlFor(this.featuredId(), { gatewayCode: gateway ?? null });
   });
 
   @ViewChild('ctaBtn', { static: false })
@@ -319,35 +330,114 @@ export class HomePageComponent implements OnInit {
   constructor(
     private readonly products: ProductService,
     private readonly router: Router,
+    private readonly route: ActivatedRoute,
+    private readonly http: HttpClient,
+    private readonly auth: AuthService,
   ) {}
 
   async ngOnInit(): Promise<void> {
-    let id: string | null = null;
-    try {
-      const allProducts = await this.products.getAllProducts();
-      if (Array.isArray(allProducts) && allProducts.length > 0) {
-        const idx = Math.floor(Math.random() * allProducts.length);
-        id = allProducts[idx]?.id ?? null;
-      }
-    } catch {
-      id = null;
+    const cachedHost = this.products.getBrowsingHostStore();
+    if (cachedHost?.storeId) {
+      this.scannedStoreId.set(cachedHost.storeId);
+      if (cachedHost.businessName) this.scannedStoreName.set(cachedHost.businessName);
+      if (cachedHost.gatewayCode) this.scannedStoreGateway.set(cachedHost.gatewayCode);
     }
-    if (!id) id = this.products.getFeaturedProductId();
-    this.featuredId.set(id);
+    this.storeResolvedPromise = this.resolveScannedStoreFromUrl();
+
+    let productId: string | null = null;
+    const productPromise = (async () => {
+      try {
+        const allProducts = await this.products.getAllProducts();
+        if (Array.isArray(allProducts) && allProducts.length > 0) {
+          const idx = Math.floor(Math.random() * allProducts.length);
+          productId = allProducts[idx]?.id ?? null;
+        }
+      } catch {
+        productId = null;
+      }
+      if (!productId) productId = this.products.getFeaturedProductId();
+      if (productId) this.featuredId.set(String(productId));
+    })();
+
+    await Promise.all([productPromise, this.storeResolvedPromise]);
+    this.scanningStore.set(false);
     this.loading.set(false);
   }
 
-  onExplore(event?: MouseEvent): void {
+  private async resolveScannedStoreFromUrl(): Promise<string | null> {
+    const qp = this.route.snapshot.queryParamMap;
+    const gateway = qp.get('gateway') ?? qp.get('gatewayCode') ?? qp.get('token');
+    const storeId = qp.get('storeId') ?? qp.get('store');
+    const apiBase = this.auth.resolveApiBasePublic();
+
+    if (gateway && /^\d{8}$/.test(gateway.trim())) {
+      const code = gateway.trim();
+      try {
+        const s: any = await firstValueFrom(
+          this.http.get(`${apiBase}/stores/gateway/${encodeURIComponent(code)}`),
+        );
+        if (s && s.id) {
+          this.scannedStoreId.set(String(s.id));
+          this.scannedStoreName.set(String(s.businessName || 'Store'));
+          if (s.gatewayCode) this.scannedStoreGateway.set(String(s.gatewayCode));
+          this.products.setBrowsingHostStore({
+            storeId: String(s.id),
+            businessName: String(s.businessName || 'Store'),
+            gatewayCode: s.gatewayCode ? String(s.gatewayCode) : null,
+          });
+          return String(s.id);
+        }
+      } catch {
+        this.scannedStoreGateway.set(code);
+      }
+    }
+
+    if (storeId && /^[0-9a-fA-F-]{20,}$/.test(storeId.trim())) {
+      const sid = storeId.trim();
+      try {
+        const s: any = await firstValueFrom(
+          this.http.get(`${apiBase}/stores/${encodeURIComponent(sid)}`),
+        );
+        if (s && s.id) {
+          this.scannedStoreId.set(String(s.id));
+          this.scannedStoreName.set(String(s.businessName || 'Store'));
+          if (s.gatewayCode) this.scannedStoreGateway.set(String(s.gatewayCode));
+          this.products.setBrowsingHostStore({
+            storeId: String(s.id),
+            businessName: String(s.businessName || 'Store'),
+            gatewayCode: s.gatewayCode ? String(s.gatewayCode) : null,
+          });
+          return String(s.id);
+        }
+      } catch {
+        // ignore; fall through to cache default
+      }
+    }
+
+    return this.scannedStoreId();
+  }
+
+  async onExplore(event?: MouseEvent): Promise<void> {
     this.spawnRipple(event);
     const id = this.featuredId() || this.products.getFeaturedProductId();
     if (!id) {
       this.router.navigate(['/']);
       return;
     }
-    const cached = this.products.getBrowsingHostStore();
+
+    if (this.storeResolvedPromise) await this.storeResolvedPromise;
+
     const queryParams: Record<string, string> = {};
+    const cached = this.products.getBrowsingHostStore();
     if (cached?.gatewayCode) queryParams['gateway'] = cached.gatewayCode;
     else if (cached?.storeId) queryParams['storeId'] = cached.storeId;
+    else {
+      const qp = this.route.snapshot.queryParamMap;
+      const gw = qp.get('gateway') ?? qp.get('gatewayCode') ?? qp.get('token');
+      const sid = qp.get('storeId') ?? qp.get('store');
+      if (gw && /^\d{8}$/.test(gw.trim())) queryParams['gateway'] = gw.trim();
+      else if (sid && /^[0-9a-fA-F-]{20,}$/.test(sid.trim())) queryParams['storeId'] = sid.trim();
+    }
     const extras = Object.keys(queryParams).length > 0 ? { queryParams } : undefined;
     if (extras) this.router.navigate(['/p', id], extras);
     else this.router.navigate(['/p', id]);

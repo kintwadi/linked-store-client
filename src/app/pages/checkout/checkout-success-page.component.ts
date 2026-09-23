@@ -1,6 +1,7 @@
-import { Component, signal } from '@angular/core';
+import { Component, OnInit, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { RouterLink } from '@angular/router';
+import { ProductService } from '../../services/product.service';
 
 @Component({
   selector: 'app-checkout-success-page',
@@ -47,6 +48,20 @@ import { RouterLink } from '@angular/router';
       font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
       word-break: break-all;
     }
+    .confirm {
+      max-width: 480px;
+      padding: 12px 16px;
+      border-radius: var(--radius-md);
+      font-size: 14px;
+      background: #eff6ff;
+      color: #1e3a8a;
+      border: 1px solid #bfdbfe;
+    }
+    .confirm.err {
+      background: #fef2f2;
+      color: #7f1d1d;
+      border-color: #fecaca;
+    }
     .actions {
       display: flex;
       gap: 10px;
@@ -76,6 +91,9 @@ import { RouterLink } from '@angular/router';
       <div class="icon" aria-hidden="true">✓</div>
       <h1>Payment successful</h1>
       <p class="sub">Thanks — your order is now paid.</p>
+      @if (confirmMsg(); as msg) {
+        <div class="confirm" [class.err]="confirmError()">{{ msg }}</div>
+      }
       @if (sessionId()) {
         <div class="sid">Session: {{ sessionId() }}</div>
       }
@@ -85,15 +103,36 @@ import { RouterLink } from '@angular/router';
     </div>
   `,
 })
-export class CheckoutSuccessPageComponent {
+export class CheckoutSuccessPageComponent implements OnInit {
   readonly sessionId = signal<string | null>(null);
+  readonly confirmMsg = signal<string | null>(null);
+  readonly confirmError = signal(false);
 
-  constructor() {
+  constructor(private readonly products: ProductService) {
     try {
       const sid = new URLSearchParams(window.location.search).get('session_id');
       if (sid) this.sessionId.set(sid);
     } catch {
       // ignore
+    }
+  }
+
+  async ngOnInit(): Promise<void> {
+    const sid = this.sessionId();
+    if (!sid) return;
+    try {
+      const res = await this.products.confirmSessionPaid(sid);
+      if (res?.finalized) {
+        this.confirmMsg.set('Transaction finalized. Store dashboards updated live.');
+      } else if (res?.status === 'not_paid') {
+        this.confirmMsg.set(res.message ?? 'Awaiting payment confirmation.');
+        this.confirmError.set(true);
+      } else {
+        this.confirmMsg.set(res.message ?? 'Payment confirmed; webhook will finalize shortly.');
+      }
+    } catch (err: any) {
+      this.confirmError.set(true);
+      this.confirmMsg.set('Could not confirm session with backend; webhook will finalize it. ' + (err?.message ?? ''));
     }
   }
 }

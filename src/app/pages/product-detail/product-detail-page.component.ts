@@ -1085,6 +1085,8 @@ export class ProductDetailPageComponent implements OnInit, OnDestroy {
     const p = this.product();
     if (!p) return;
 
+    if (this.storeResolvedPromise) await this.storeResolvedPromise;
+
     if (this.reservationStatus() === 'pending') return;
     if (this.reservationStatus() === 'accepted') return;
     if (this.reservationStatus() === 'denied' || this.reservationStatus() === 'expired') {

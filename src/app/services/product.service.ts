@@ -431,6 +431,20 @@ export class ProductService {
     );
   }
 
+  confirmSessionPaid(sessionId: string): Promise<{
+    status: string;
+    message: string;
+    transactionId?: string;
+    transactionStatus?: string;
+    stripePaymentIntentId?: string;
+    finalized: boolean;
+  }> {
+    const api = resolveApiBase();
+    return firstValueFrom(
+      this.http.post<any>(`${api}/checkout/confirm-session-paid`, { sessionId })
+    );
+  }
+
   createReservation(payload: {
     productId: string;
     variantId?: string | null;
