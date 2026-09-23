@@ -7,7 +7,7 @@ import { Product, ProductVariant, SimilarProductsResult } from '../../shared/mod
 import { ProductService } from '../../services/product.service';
 import { AuthService } from '../../services/auth.service';
 
-type ReservationStatus = 'idle' | 'pending' | 'accepted' | 'denied' | 'expired';
+type ReservationStatus = 'idle' | 'pending' | 'reserved' | 'accepted' | 'denied' | 'expired';
 
 @Component({
   selector: 'app-product-detail-page',
@@ -298,6 +298,11 @@ type ReservationStatus = 'idle' | 'pending' | 'accepted' | 'denied' | 'expired';
       box-shadow: 0 12px 28px -14px rgba(6,95,70,0.55);
       border-color: rgba(255,255,255,0.12);
     }
+    .held-banner.reserved {
+      background: linear-gradient(135deg, #b45309 0%, #92400e 100%);
+      box-shadow: 0 12px 28px -14px rgba(146,64,14,0.55);
+      border-color: rgba(255,255,255,0.12);
+    }
     .held-head {
       display: flex; align-items: flex-start; justify-content: space-between;
       gap: 12px; flex-wrap: wrap;
@@ -307,6 +312,9 @@ type ReservationStatus = 'idle' | 'pending' | 'accepted' | 'denied' | 'expired';
       font-size: 17px; font-weight: 800; letter-spacing: -0.01em;
     }
     .held-title.ready-label {
+      font-size: 18px;
+    }
+    .held-title.reserved-label {
       font-size: 18px;
     }
     .held-title .dot {
@@ -319,6 +327,11 @@ type ReservationStatus = 'idle' | 'pending' | 'accepted' | 'denied' | 'expired';
       background: #fff;
       box-shadow: 0 0 0 4px rgba(255,255,255,0.3);
       animation: none;
+    }
+    .held-title .dot.reserved {
+      background: #fde047;
+      box-shadow: 0 0 0 4px rgba(253,224,71,0.3);
+      animation: liveBlink 1.3s ease-in-out infinite;
     }
     @keyframes liveBlink {
       0%,100% { opacity: 1; }
@@ -649,7 +662,8 @@ type ReservationStatus = 'idle' | 'pending' | 'accepted' | 'denied' | 'expired';
           }
 
           <div class="card request-card">
-            @if (reservationStatus() === 'pending' || reservationStatus() === 'denied' || reservationStatus() === 'expired') {
+            @if (reservationStatus() === 'pending' || reservationStatus() === 'reserved'
+                 || reservationStatus() === 'denied' || reservationStatus() === 'expired') {
               <div class="countdown" [class.accepted]="false"
                                    [class.denied]="reservationStatus() === 'denied'"
                                    [class.expired]="reservationStatus() === 'expired'">
@@ -657,6 +671,7 @@ type ReservationStatus = 'idle' | 'pending' | 'accepted' | 'denied' | 'expired';
                   <div class="label">
                     @switch (reservationStatus()) {
                       @case ('pending')  { Please wait }
+                      @case ('reserved') { Awaiting store confirmation }
                       @case ('denied')   { Not available }
                       @case ('expired')  { Request expired }
                     }
@@ -664,6 +679,7 @@ type ReservationStatus = 'idle' | 'pending' | 'accepted' | 'denied' | 'expired';
                   <div class="sub">
                     @switch (reservationStatus()) {
                       @case ('pending')  { Confirming availability for you. }
+                      @case ('reserved') { Hold placed — waiting for store to confirm. This usually takes less than 2 minutes. }
                       @case ('denied')   { Please try again later. }
                       @case ('expired')  { Please try again later. }
                     }
@@ -689,6 +705,46 @@ type ReservationStatus = 'idle' | 'pending' | 'accepted' | 'denied' | 'expired';
                 } @else {
                   {{ requestResult()!.message }}
                 }
+              </div>
+            }
+
+            @if (reservationStatus() === 'reserved' && reservation()) {
+              <div class="held-banner reserved" role="status" aria-live="polite">
+                <div class="held-head">
+                  <div style="display: grid; gap: 6px;">
+                    <div class="held-title reserved-label">
+                      <span class="dot reserved"></span>
+                      Awaiting store confirmation
+                    </div>
+                    <p class="held-sub">
+                      🔔 Your 15-minute hold is in place. Store staff will confirm availability shortly.
+                      You will see "Ready for checkout" here once confirmed.
+                    </p>
+                  </div>
+                </div>
+
+                <div class="held-timer-wrap">
+                  <div class="held-timer-head">
+                    <span>⏱ Hold time remaining</span>
+                    <span>{{ countdownMinutesLeft() }} min left</span>
+                  </div>
+                  <div class="held-timer" [class.soon]="currentSecondsLeftPublic() > 0 && currentSecondsLeftPublic() < 180">
+                    {{ formattedCountdown() }}
+                  </div>
+                  <div class="held-bar" aria-hidden="true">
+                    <div class="held-bar-fill reserved-bar" [style.width.%]="100 - countdownProgressPct()"></div>
+                  </div>
+                </div>
+
+                <div class="held-actions">
+                  <button class="cancel-btn-danger"
+                          type="button"
+                          (click)="onCancelHold()"
+                          [disabled]="cancelling() || requesting()">
+                    @if (cancelling()) { Releasing… }
+                    @else { ✗ Cancel hold }
+                  </button>
+                </div>
               </div>
             }
 
@@ -735,7 +791,7 @@ type ReservationStatus = 'idle' | 'pending' | 'accepted' | 'denied' | 'expired';
                   </button>
                 </div>
               </div>
-            } @else if (reservationStatus() !== 'accepted' || !reservation()) {
+            } @else if (reservationStatus() !== 'reserved' && reservationStatus() !== 'accepted') {
               <button
                 class="btn btn-primary btn-block"
                 (click)="onRequestNow()"
@@ -1088,6 +1144,7 @@ export class ProductDetailPageComponent implements OnInit, OnDestroy {
     if (this.storeResolvedPromise) await this.storeResolvedPromise;
 
     if (this.reservationStatus() === 'pending') return;
+    if (this.reservationStatus() === 'reserved') return;
     if (this.reservationStatus() === 'accepted') return;
     if (this.reservationStatus() === 'denied' || this.reservationStatus() === 'expired') {
       this.reservationStatus.set('idle');
@@ -1164,7 +1221,8 @@ export class ProductDetailPageComponent implements OnInit, OnDestroy {
       this.tick.update((t) => t + 1);
       const remaining = this.currentSecondsRemaining();
       if (remaining <= 0) {
-        if (this.reservationStatus() === 'pending' || this.reservationStatus() === 'accepted') {
+        const cur = this.reservationStatus();
+        if (cur === 'pending' || cur === 'reserved' || cur === 'accepted') {
           this.reservationStatus.set('expired');
         }
         this.clearCountdown();
@@ -1180,20 +1238,13 @@ export class ProductDetailPageComponent implements OnInit, OnDestroy {
 
     const api = this.auth.resolveApiBasePublic();
     const url = `${api}/transactions/${encodeURIComponent(txId)}`;
-    const startedAt = Date.now();
-    const maxMs = ProductDetailPageComponent.RESERVATION_POLL_MAX_SECONDS * 1000;
 
     let consecutiveErrors = 0;
 
     const tick = async (): Promise<void> => {
       if (this.reservationPollTimer === null) return;
       const status = this.reservationStatus();
-      if (status !== 'pending') return;
-      if (Date.now() - startedAt > maxMs) {
-        this.reservationStatus.set('accepted');
-        this.tick.update((t) => t + 1);
-        return;
-      }
+      if (status === 'accepted' || status === 'denied' || status === 'expired') return;
       try {
         const res: any = await firstValueFrom(this.http.get(url)).catch((e: any) => {
           throw e;
@@ -1224,18 +1275,16 @@ export class ProductDetailPageComponent implements OnInit, OnDestroy {
               message: 'The store could not fulfill this item right now. Please try again later.',
             });
             return;
+          case 'RESERVED':
           default:
+            if (this.reservationStatus() === 'pending') this.reservationStatus.set('reserved');
+            this.tick.update((t) => t + 1);
             this.scheduleNextPoll(tick);
             return;
         }
       } catch {
         consecutiveErrors += 1;
-        if (consecutiveErrors >= 5) {
-          this.reservationStatus.set('accepted');
-          this.tick.update((t) => t + 1);
-          this.clearReservationPolling();
-          return;
-        }
+        if (consecutiveErrors >= 10) consecutiveErrors = 10;
         this.scheduleNextPoll(tick);
         return;
       }
