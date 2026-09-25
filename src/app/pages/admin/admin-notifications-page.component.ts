@@ -7,7 +7,7 @@ import { AuthService, AuthUser } from '../../services/auth.service';
 
 interface SseEventShape {
   eventId?: string | null;
-  type: 'RESERVED' | 'READY' | 'UNAVAILABLE' | 'PAID' | 'PICKED_UP' | 'CANCELLED' | 'EXPIRED' | string;
+  type: 'REQUESTED' | 'FULFILLER_ACCEPTED' | 'FULFILLER_REJECTED' | 'RESERVED' | 'READY' | 'UNAVAILABLE' | 'PAID' | 'PICKED_UP' | 'CANCELLED' | 'EXPIRED' | string;
   createdAt?: string | null;
   transactionId?: string | null;
   storeId?: string | null;
@@ -105,13 +105,16 @@ interface SseEventShape {
       font-size: 11px; font-weight: 800; padding: 3px 9px; border-radius: 999px;
       text-transform: uppercase; letter-spacing: 0.03em;
     }
-    .ev-badge.RESERVED     { background: #ede9fe; color: #6d28d9; }
-    .ev-badge.READY        { background: #dcfce7; color: #166534; }
-    .ev-badge.UNAVAILABLE  { background: #fee2e2; color: #991b1b; }
-    .ev-badge.PAID         { background: #dbeafe; color: #1e40af; }
-    .ev-badge.PICKED_UP    { background: #d1fae5; color: #065f46; }
-    .ev-badge.CANCELLED    { background: #f3f4f6; color: #4b5563; }
-    .ev-badge.EXPIRED      { background: #fef3c7; color: #92400e; }
+    .ev-badge.REQUESTED           { background: #fef3c7; color: #92400e; }
+    .ev-badge.FULFILLER_ACCEPTED  { background: #ede9fe; color: #6d28d9; }
+    .ev-badge.FULFILLER_REJECTED  { background: #fee2e2; color: #991b1b; }
+    .ev-badge.RESERVED            { background: #ede9fe; color: #6d28d9; }
+    .ev-badge.READY               { background: #dcfce7; color: #166534; }
+    .ev-badge.UNAVAILABLE         { background: #fee2e2; color: #991b1b; }
+    .ev-badge.PAID                { background: #dbeafe; color: #1e40af; }
+    .ev-badge.PICKED_UP           { background: #d1fae5; color: #065f46; }
+    .ev-badge.CANCELLED           { background: #f3f4f6; color: #4b5563; }
+    .ev-badge.EXPIRED             { background: #fef3c7; color: #92400e; }
 
     .chip {
       display: inline-flex; align-items: center; gap: 5px;
@@ -528,7 +531,7 @@ interface SseEventShape {
                     </div>
                   }
 
-                  @if (ev.expiresAt && (ev.type === 'RESERVED' || ev.type === 'READY')) {
+                  @if (ev.expiresAt && (ev.type === 'REQUESTED' || ev.type === 'RESERVED' || ev.type === 'FULFILLER_ACCEPTED' || ev.type === 'READY')) {
                     <div>
                       <span class="countdown">
                         ⏱ Expires in <b>{{ formatCountdown(ev.expiresAt) }}</b>
@@ -551,7 +554,7 @@ interface SseEventShape {
                   }
                 </div>
 
-                @if (ev.type === 'RESERVED' || ev.type === 'READY') {
+                @if (ev.type === 'REQUESTED' || ev.type === 'RESERVED' || ev.type === 'READY') {
                   <div class="card-actions" (click)="$event.stopPropagation()">
                     <button type="button"
                             class="btn btn-primary"
@@ -560,7 +563,7 @@ interface SseEventShape {
                       @if (evAcceptPending(ev)) {
                         <span class="spinner" style="width:14px;height:14px;border-top-color:#fff;border-width:2px;"></span>
                       } @else { ✓ }
-                      Mark Ready
+                      {{ ev.type === 'REQUESTED' ? 'Accept Request' : 'Mark Ready' }}
                     </button>
                     <button type="button"
                             class="btn btn-secondary-warn"
@@ -569,7 +572,7 @@ interface SseEventShape {
                       @if (evDenyPending(ev)) {
                         <span class="spinner" style="width:14px;height:14px;border-width:2px;"></span>
                       } @else { ✕ }
-                      Mark Unavailable
+                      {{ ev.type === 'REQUESTED' ? 'Reject' : 'Mark Unavailable' }}
                     </button>
                   </div>
                 }
@@ -600,7 +603,7 @@ export class AdminNotificationsPageComponent implements OnInit, OnDestroy {
   readonly toastError = signal<string | null>(null);
 
   private isTerminalType(t: string): boolean {
-    return t === 'EXPIRED' || t === 'CANCELLED' || t === 'UNAVAILABLE';
+    return t === 'EXPIRED' || t === 'CANCELLED' || t === 'UNAVAILABLE' || t === 'FULFILLER_REJECTED';
   }
   private isSuccessType(t: string): boolean {
     return t === 'PAID' || t === 'PICKED_UP';
@@ -614,7 +617,7 @@ export class AdminNotificationsPageComponent implements OnInit, OnDestroy {
   }
   private isEventStale(ev: SseEventShape, nowMs: number): boolean {
     const t = ev.type;
-    if (t === 'RESERVED' || t === 'READY') {
+    if (t === 'REQUESTED' || t === 'RESERVED' || t === 'FULFILLER_ACCEPTED' || t === 'READY') {
       if (ev.expiresAt) {
         try { return new Date(ev.expiresAt).getTime() <= nowMs; } catch { /* ignore */ }
       }
@@ -666,7 +669,7 @@ export class AdminNotificationsPageComponent implements OnInit, OnDestroy {
       const out: SseEventShape[] = [];
       for (const ev of deduped) {
         if (this.isEventStale(ev, now)) { touched = true; continue; }
-        if ((ev.type === 'RESERVED' || ev.type === 'READY') && ev.expiresAt) {
+        if ((ev.type === 'REQUESTED' || ev.type === 'RESERVED' || ev.type === 'FULFILLER_ACCEPTED' || ev.type === 'READY') && ev.expiresAt) {
           try {
             if (new Date(ev.expiresAt).getTime() <= now) {
               out.push({ ...ev, type: 'EXPIRED', status: 'EXPIRED', _read: true });
@@ -818,14 +821,17 @@ export class AdminNotificationsPageComponent implements OnInit, OnDestroy {
 
   eventIcon(type: string): string {
     switch (type) {
-      case 'RESERVED':    return '⏳';
-      case 'READY':       return '✅';
-      case 'UNAVAILABLE': return '🚫';
-      case 'PAID':        return '💳';
-      case 'PICKED_UP':   return '📦';
-      case 'CANCELLED':   return '🗙';
-      case 'EXPIRED':     return '⏰';
-      default:            return '🔔';
+      case 'REQUESTED':           return '⏳';
+      case 'FULFILLER_ACCEPTED':  return '✅';
+      case 'FULFILLER_REJECTED':  return '🚫';
+      case 'RESERVED':            return '⏳';
+      case 'READY':               return '✅';
+      case 'UNAVAILABLE':         return '🚫';
+      case 'PAID':                return '💳';
+      case 'PICKED_UP':           return '📦';
+      case 'CANCELLED':           return '🗙';
+      case 'EXPIRED':             return '⏰';
+      default:                    return '🔔';
     }
   }
 
@@ -894,22 +900,26 @@ export class AdminNotificationsPageComponent implements OnInit, OnDestroy {
     const token = this.authService.getToken();
     try {
       const headers: Record<string, string> = token ? { Authorization: 'Bearer ' + token } : {};
+      const isRequested = ev.type === 'REQUESTED' || ev.status === 'REQUESTED';
+      const endpoint = isRequested ? 'accept-request' : 'mark-ready';
+      const targetType = isRequested ? 'FULFILLER_ACCEPTED' : 'READY';
+      const okMsg = isRequested ? 'Request accepted — inventory held 15 min.' : 'Item marked ready.';
       let url: string;
       const storeId = ev.fulfillingStoreId || ev.storeId || this.currentUser?.storeId;
       if (this.globalAdmin && storeId) {
-        url = `${api}/admin/stores/${encodeURIComponent(storeId)}/transactions/${encodeURIComponent(ev.transactionId)}/mark-ready`;
+        url = `${api}/admin/stores/${encodeURIComponent(storeId)}/transactions/${encodeURIComponent(ev.transactionId)}/${endpoint}`;
       } else {
-        url = `${api}/admin/stores/me/transactions/${encodeURIComponent(ev.transactionId)}/mark-ready`;
+        url = `${api}/admin/stores/me/transactions/${encodeURIComponent(ev.transactionId)}/${endpoint}`;
       }
       await firstValueFrom(this.http.post<any>(url, {}, { headers }));
-      ev.type = 'READY';
+      ev.type = targetType;
       this.events.update(list => {
         const dedup = list.filter(x => !(x.transactionId && ev.transactionId && x.transactionId === ev.transactionId && x !== ev));
         return [ev, ...dedup];
       });
-      this.showSuccess('Item marked ready.');
+      this.showSuccess(okMsg);
     } catch (err: any) {
-      this.showError(err?.error?.message ?? err?.message ?? 'Failed to mark ready.');
+      this.showError(err?.error?.message ?? err?.message ?? 'Failed to accept.');
     } finally {
       ev['_actionPending'] = null;
       this.events.update(list => list.slice());
@@ -927,22 +937,26 @@ export class AdminNotificationsPageComponent implements OnInit, OnDestroy {
     const token = this.authService.getToken();
     try {
       const headers: Record<string, string> = token ? { Authorization: 'Bearer ' + token } : {};
+      const isRequested = ev.type === 'REQUESTED' || ev.status === 'REQUESTED';
+      const endpoint = isRequested ? 'reject-request' : 'mark-unavailable';
+      const targetType = isRequested ? 'FULFILLER_REJECTED' : 'UNAVAILABLE';
+      const okMsg = isRequested ? 'Request rejected.' : 'Item marked unavailable.';
       let url: string;
       const storeId = ev.fulfillingStoreId || ev.storeId || this.currentUser?.storeId;
       if (this.globalAdmin && storeId) {
-        url = `${api}/admin/stores/${encodeURIComponent(storeId)}/transactions/${encodeURIComponent(ev.transactionId)}/mark-unavailable`;
+        url = `${api}/admin/stores/${encodeURIComponent(storeId)}/transactions/${encodeURIComponent(ev.transactionId)}/${endpoint}`;
       } else {
-        url = `${api}/admin/stores/me/transactions/${encodeURIComponent(ev.transactionId)}/mark-unavailable`;
+        url = `${api}/admin/stores/me/transactions/${encodeURIComponent(ev.transactionId)}/${endpoint}`;
       }
       await firstValueFrom(this.http.post<any>(url, {}, { headers }));
-      ev.type = 'UNAVAILABLE';
+      ev.type = targetType;
       this.events.update(list => {
         const dedup = list.filter(x => !(x.transactionId && ev.transactionId && x.transactionId === ev.transactionId && x !== ev));
         return [ev, ...dedup];
       });
-      this.showSuccess('Item marked unavailable.');
+      this.showSuccess(okMsg);
     } catch (err: any) {
-      this.showError(err?.error?.message ?? err?.message ?? 'Failed to mark unavailable.');
+      this.showError(err?.error?.message ?? err?.message ?? 'Failed.');
     } finally {
       ev['_actionPending'] = null;
       this.events.update(list => list.slice());

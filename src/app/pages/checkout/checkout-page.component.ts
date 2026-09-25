@@ -340,7 +340,11 @@ export class CheckoutPageComponent implements OnInit {
               variantId: p.variantId ?? null,
               successUrl,
               cancelUrl,
-              originatingStoreId: this.productService.getBrowsingHostStore()?.storeId ?? null,
+              originatingStoreId:
+                this.productService.getBrowsingHostStore()?.storeId ??
+                p.storeId ??
+                (p.variants && p.variants[0]?.storeId) ??
+                null,
             });
 
       sessionPromise.then((res) => {

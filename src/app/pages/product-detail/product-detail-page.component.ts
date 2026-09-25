@@ -7,7 +7,7 @@ import { Product, ProductVariant, SimilarProductsResult } from '../../shared/mod
 import { ProductService } from '../../services/product.service';
 import { AuthService } from '../../services/auth.service';
 
-type ReservationStatus = 'idle' | 'pending' | 'reserved' | 'accepted' | 'denied' | 'expired';
+type ReservationStatus = 'idle' | 'pending' | 'requested' | 'reserved' | 'accepted' | 'denied' | 'expired';
 
 @Component({
   selector: 'app-product-detail-page',
@@ -181,6 +181,11 @@ type ReservationStatus = 'idle' | 'pending' | 'reserved' | 'accepted' | 'denied'
       color: #065f46;
       border-color: #a7f3d0;
     }
+    .countdown.requested {
+      background: #fffbeb;
+      color: #92400e;
+      border-color: #fde68a;
+    }
     .countdown.denied,
     .countdown.expired {
       background: #fef2f2;
@@ -221,10 +226,11 @@ type ReservationStatus = 'idle' | 'pending' | 'reserved' | 'accepted' | 'denied'
       font-weight: 600;
       background: rgba(0,0,0,.04);
     }
-    .status-pill.pending  { background: #e0e7ff; color: #3730a3; }
-    .status-pill.accepted { background: #d1fae5; color: #065f46; }
-    .status-pill.denied   { background: #fee2e2; color: #991b1b; }
-    .status-pill.expired  { background: #fee2e2; color: #991b1b; }
+    .status-pill.pending   { background: #e0e7ff; color: #3730a3; }
+    .status-pill.requested { background: #fef3c7; color: #92400e; }
+    .status-pill.accepted  { background: #d1fae5; color: #065f46; }
+    .status-pill.denied    { background: #fee2e2; color: #991b1b; }
+    .status-pill.expired   { background: #fee2e2; color: #991b1b; }
 
     .meta-row {
       display: grid;
@@ -298,6 +304,11 @@ type ReservationStatus = 'idle' | 'pending' | 'reserved' | 'accepted' | 'denied'
       box-shadow: 0 12px 28px -14px rgba(6,95,70,0.55);
       border-color: rgba(255,255,255,0.12);
     }
+    .held-banner.requested {
+      background: linear-gradient(135deg, #d97706 0%, #b45309 100%);
+      box-shadow: 0 12px 28px -14px rgba(180,83,9,0.55);
+      border-color: rgba(255,255,255,0.12);
+    }
     .held-banner.reserved {
       background: linear-gradient(135deg, #b45309 0%, #92400e 100%);
       box-shadow: 0 12px 28px -14px rgba(146,64,14,0.55);
@@ -327,6 +338,11 @@ type ReservationStatus = 'idle' | 'pending' | 'reserved' | 'accepted' | 'denied'
       background: #fff;
       box-shadow: 0 0 0 4px rgba(255,255,255,0.3);
       animation: none;
+    }
+    .held-title .dot.requested {
+      background: #fbbf24;
+      box-shadow: 0 0 0 4px rgba(251,191,36,0.3);
+      animation: liveBlink 1.1s ease-in-out infinite;
     }
     .held-title .dot.reserved {
       background: #fde047;
@@ -662,26 +678,29 @@ type ReservationStatus = 'idle' | 'pending' | 'reserved' | 'accepted' | 'denied'
           }
 
           <div class="card request-card">
-            @if (reservationStatus() === 'pending' || reservationStatus() === 'reserved'
+            @if (reservationStatus() === 'pending' || reservationStatus() === 'requested' || reservationStatus() === 'reserved'
                  || reservationStatus() === 'denied' || reservationStatus() === 'expired') {
               <div class="countdown" [class.accepted]="false"
+                                   [class.requested]="reservationStatus() === 'requested'"
                                    [class.denied]="reservationStatus() === 'denied'"
                                    [class.expired]="reservationStatus() === 'expired'">
                 <div>
                   <div class="label">
                     @switch (reservationStatus()) {
-                      @case ('pending')  { Please wait }
-                      @case ('reserved') { Awaiting store confirmation }
-                      @case ('denied')   { Not available }
-                      @case ('expired')  { Request expired }
+                      @case ('pending')   { Please wait }
+                      @case ('requested') { Awaiting seller confirmation }
+                      @case ('reserved')  { Awaiting store confirmation }
+                      @case ('denied')    { Not available }
+                      @case ('expired')   { Request expired }
                     }
                   </div>
                   <div class="sub">
                     @switch (reservationStatus()) {
-                      @case ('pending')  { Confirming availability for you. }
-                      @case ('reserved') { Hold placed — waiting for store to confirm. This usually takes less than 2 minutes. }
-                      @case ('denied')   { Please try again later. }
-                      @case ('expired')  { Please try again later. }
+                      @case ('pending')   { Confirming availability for you. }
+                      @case ('requested') { The fulfilling store has been notified and will confirm availability shortly. This can take a few minutes. }
+                      @case ('reserved')  { Hold placed — waiting for store to confirm. This usually takes less than 2 minutes. }
+                      @case ('denied')    { Please try again later. }
+                      @case ('expired')   { Please try again later. }
                     }
                   </div>
                 </div>
@@ -705,6 +724,47 @@ type ReservationStatus = 'idle' | 'pending' | 'reserved' | 'accepted' | 'denied'
                 } @else {
                   {{ requestResult()!.message }}
                 }
+              </div>
+            }
+
+            @if (reservationStatus() === 'requested' && reservation()) {
+              <div class="held-banner requested" role="status" aria-live="polite">
+                <div class="held-head">
+                  <div style="display: grid; gap: 6px;">
+                    <div class="held-title requested-label">
+                      <span class="dot requested"></span>
+                      Awaiting seller confirmation
+                    </div>
+                    <p class="held-sub">
+                      📣 The fulfilling store has been notified of your request.
+                      Store staff must confirm item availability before a hold is placed.
+                      This page will update automatically — please stay connected.
+                    </p>
+                  </div>
+                </div>
+
+                <div class="held-timer-wrap">
+                  <div class="held-timer-head">
+                    <span>⏳ Waiting for seller (expires soon)</span>
+                    <span>{{ countdownMinutesLeft() }} min left</span>
+                  </div>
+                  <div class="held-timer" [class.soon]="currentSecondsLeftPublic() > 0 && currentSecondsLeftPublic() < 180">
+                    {{ formattedCountdown() }}
+                  </div>
+                  <div class="held-bar" aria-hidden="true">
+                    <div class="held-bar-fill reserved-bar" [style.width.%]="100 - countdownProgressPct()"></div>
+                  </div>
+                </div>
+
+                <div class="held-actions">
+                  <button class="cancel-btn-danger"
+                          type="button"
+                          (click)="onCancelHold()"
+                          [disabled]="cancelling() || requesting()">
+                    @if (cancelling()) { Cancelling… }
+                    @else { ✗ Cancel request }
+                  </button>
+                </div>
               </div>
             }
 
@@ -791,12 +851,13 @@ type ReservationStatus = 'idle' | 'pending' | 'reserved' | 'accepted' | 'denied'
                   </button>
                 </div>
               </div>
-            } @else if (reservationStatus() !== 'reserved' && reservationStatus() !== 'accepted') {
+            } @else if (reservationStatus() !== 'requested' && reservationStatus() !== 'reserved' && reservationStatus() !== 'accepted') {
               <button
                 class="btn btn-primary btn-block"
                 (click)="onRequestNow()"
                 [disabled]="requesting() || reservationStatus() === 'pending' || chosenVariantStock() === 0">
                 @if (reservationStatus() === 'pending')  { Waiting… }
+                @if (reservationStatus() === 'requested') { Awaiting confirmation }
                 @if (reservationStatus() === 'accepted') { Reserved ✓ }
                 @if (reservationStatus() === 'denied' || reservationStatus() === 'expired') { Try again }
                 @if (reservationStatus() === 'idle') {
@@ -1062,15 +1123,15 @@ export class ProductDetailPageComponent implements OnInit, OnDestroy {
   }
 
   private async resolveOriginatingStoreId(_product: Product): Promise<string> {
-    // PRIMARY RULE: originating store = RETAIL HOST — the store the customer is
-    // currently shopping inside (where they are physically located / where they
-    // scanned the QR). It is NEVER the variant's own product.storeId, because
-    // that is the WHOLESALE FULFILLER owner and would incorrectly collapse the
-    // split-ledger into a single-store self-fulfill transaction.
     const explicit = this.scannedStoreId();
     if (explicit) return explicit;
     const cachedHost = this.products.getBrowsingHostStore();
     if (cachedHost?.storeId) return cachedHost.storeId;
+    if (_product?.storeId) return _product.storeId;
+    if (_product?.variants && _product.variants.length > 0) {
+      const firstVid = _product.variants.find(v => typeof v.storeId === 'string' && v.storeId.length > 0);
+      if (firstVid?.storeId) return firstVid.storeId;
+    }
     const apiBase = this.auth.resolveApiBasePublic();
     try {
       const list: any[] = await firstValueFrom(this.http.get<any[]>(`${apiBase}/stores`));
@@ -1222,7 +1283,7 @@ export class ProductDetailPageComponent implements OnInit, OnDestroy {
       const remaining = this.currentSecondsRemaining();
       if (remaining <= 0) {
         const cur = this.reservationStatus();
-        if (cur === 'pending' || cur === 'reserved' || cur === 'accepted') {
+        if (cur === 'pending' || cur === 'requested' || cur === 'reserved' || cur === 'accepted') {
           this.reservationStatus.set('expired');
         }
         this.clearCountdown();
@@ -1266,6 +1327,7 @@ export class ProductDetailPageComponent implements OnInit, OnDestroy {
           case 'CANCELED':
           case 'EXPIRED':
           case 'CANCELLED':
+          case 'FULFILLER_REJECTED':
             this.reservationStatus.set('denied');
             this.clearCountdown();
             this.clearReservationPolling();
@@ -1275,9 +1337,17 @@ export class ProductDetailPageComponent implements OnInit, OnDestroy {
               message: 'The store could not fulfill this item right now. Please try again later.',
             });
             return;
+          case 'REQUESTED':
+            if (this.reservationStatus() !== 'requested') {
+              this.reservationStatus.set('requested');
+            }
+            this.tick.update((t) => t + 1);
+            this.scheduleNextPoll(tick);
+            return;
           case 'RESERVED':
+          case 'FULFILLER_ACCEPTED':
           default:
-            if (this.reservationStatus() === 'pending') this.reservationStatus.set('reserved');
+            if (this.reservationStatus() === 'pending' || this.reservationStatus() === 'requested') this.reservationStatus.set('reserved');
             this.tick.update((t) => t + 1);
             this.scheduleNextPoll(tick);
             return;

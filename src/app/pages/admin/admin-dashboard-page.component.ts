@@ -12,7 +12,7 @@ type TabKey = 'stores' | 'users' | 'transactions';
 
 interface SseEventShape {
   eventId?: string | null;
-  type: 'RESERVED' | 'READY' | 'UNAVAILABLE' | 'PAID' | 'PICKED_UP' | 'CANCELLED' | 'EXPIRED' | string;
+  type: 'REQUESTED' | 'FULFILLER_ACCEPTED' | 'FULFILLER_REJECTED' | 'RESERVED' | 'READY' | 'UNAVAILABLE' | 'PAID' | 'PICKED_UP' | 'CANCELLED' | 'EXPIRED' | string;
   createdAt?: string | null;
   transactionId?: string | null;
   storeId?: string | null;
@@ -1875,7 +1875,7 @@ interface SseEventShape {
                               @if (tx.perspectiveRole === 'WHOLESALE_SELLER') {
                                 <span class="chip" style="font-size:10px; padding: 1px 6px; justify-self: start;">Wholesale payout</span>
                               } @else if (tx.perspectiveRole === 'RETAIL_HOST') {
-                                <span class="chip purple" style="font-size:10px; padding: 1px 6px; justify-self: start;">Retail revenue</span>
+                                <span class="chip purple" style="font-size:10px; padding: 1px 6px; justify-self: start;">Arbitrage gain</span>
                               } @else {
                                 <span class="chip" style="font-size:10px; padding: 1px 6px; justify-self: start;">Retail (network)</span>
                               }
@@ -1884,6 +1884,12 @@ interface SseEventShape {
                           <td>{{ tx.createdAt | date:'short' }}</td>
                           <td>
                             <div class="row-actions">
+                              @if (txShowAwaitingSellerPill(tx)) {
+                                <span class="status-pill" style="background:#fef3c7;color:#92400e;">
+                                  <span style="width:6px;height:6px;border-radius:50%;background:#f59e0b;display:inline-block;margin-right:6px;"></span>
+                                  Awaiting seller confirmation
+                                </span>
+                              }
                               @if (txShowAcceptButton(tx)) {
                                 <button type="button" class="btn btn-primary"
                                         [disabled]="txAcceptLoading(tx)"
@@ -2924,7 +2930,7 @@ export class AdminDashboardPageComponent implements OnInit, OnDestroy {
   readonly sseConnected = signal(false);
 
   private isTerminalType(type: string): boolean {
-    return type === 'EXPIRED' || type === 'CANCELLED' || type === 'UNAVAILABLE';
+    return type === 'EXPIRED' || type === 'CANCELLED' || type === 'UNAVAILABLE' || type === 'FULFILLER_REJECTED';
   }
 
   private isSuccessType(type: string): boolean {
@@ -2942,9 +2948,9 @@ export class AdminDashboardPageComponent implements OnInit, OnDestroy {
 
   private isEventStaleForBell(ev: SseEventShape, nowMs: number): boolean {
     const t = ev.type;
-    if (t === 'RESERVED' || t === 'READY') {
-      // Safety net: if a *newer* PAID / PICKED_UP / EXPIRED / CANCELED / UNAVAILABLE event
-      // already exists in the same list for this transactionId, then this RESERVED/READY is
+    if (t === 'REQUESTED' || t === 'RESERVED' || t === 'FULFILLER_ACCEPTED' || t === 'READY') {
+      // Safety net: if a *newer* PAID / PICKED_UP / EXPIRED / CANCELED / UNAVAILABLE / FULFILLER_REJECTED event
+      // already exists in the same list for this transactionId, then this REQUESTED/RESERVED/READY is
       // stale now — regardless of its own countdown. Hides rows like "READY Item marked ready"
       // alongside "PAID Payment received" for the same order.
       if (this.hasNewerSupersedingEvent(ev, this.events())) return true;
@@ -3077,8 +3083,8 @@ export class AdminDashboardPageComponent implements OnInit, OnDestroy {
       for (const ev of deduped) {
         // (a) drop unconditionally if they're stale
         if (this.isEventStaleForBell(ev, now)) { touched = true; continue; }
-        // (b) optimistic relabel past-expires RESERVED/READY to EXPIRED read=true
-        if ((ev.type === 'RESERVED' || ev.type === 'READY') && ev.expiresAt) {
+        // (b) optimistic relabel past-expires REQUESTED/RESERVED/FULFILLER_ACCEPTED/READY to EXPIRED read=true
+        if ((ev.type === 'REQUESTED' || ev.type === 'RESERVED' || ev.type === 'FULFILLER_ACCEPTED' || ev.type === 'READY') && ev.expiresAt) {
           try {
             if (new Date(ev.expiresAt).getTime() <= now) {
               const copy: SseEventShape = { ...ev, type: 'EXPIRED', status: 'EXPIRED', _read: true };
@@ -3114,7 +3120,7 @@ export class AdminDashboardPageComponent implements OnInit, OnDestroy {
     setTimeout(() => this.bellPulse.set(false), 1200);
     // Toast for important events (show the toast even if we hide from bell list instantly for
     // PAID/PICKED_UP successes so clerk sees the green confirmation pop up briefly).
-    if (['RESERVED', 'READY', 'UNAVAILABLE', 'PAID', 'PICKED_UP', 'CANCELLED', 'EXPIRED'].includes(ev.type)) {
+    if (['REQUESTED', 'FULFILLER_ACCEPTED', 'FULFILLER_REJECTED', 'RESERVED', 'READY', 'UNAVAILABLE', 'PAID', 'PICKED_UP', 'CANCELLED', 'EXPIRED'].includes(ev.type)) {
       const toastId = 't_' + (ev.eventId || (Date.now() + '_' + Math.random().toString(36).slice(2, 7)));
       const t = { ...ev, id: toastId, leaving: false };
       this.toasts.update(list => [t, ...list].slice(0, 4));
@@ -3143,27 +3149,33 @@ export class AdminDashboardPageComponent implements OnInit, OnDestroy {
 
   toastIcon(type: string): string {
     switch (type) {
-      case 'RESERVED':    return '⏳';
-      case 'READY':       return '✅';
-      case 'UNAVAILABLE': return '🚫';
-      case 'PAID':        return '💳';
-      case 'PICKED_UP':   return '📦';
-      case 'CANCELLED':   return '🗙';
-      case 'EXPIRED':     return '⏰';
-      default:            return '🔔';
+      case 'REQUESTED':           return '⏳';
+      case 'FULFILLER_ACCEPTED':  return '✅';
+      case 'FULFILLER_REJECTED':  return '🚫';
+      case 'RESERVED':            return '⏳';
+      case 'READY':               return '✅';
+      case 'UNAVAILABLE':         return '🚫';
+      case 'PAID':                return '💳';
+      case 'PICKED_UP':           return '📦';
+      case 'CANCELLED':           return '🗙';
+      case 'EXPIRED':             return '⏰';
+      default:                    return '🔔';
     }
   }
 
   toastTitle(ev: SseEventShape): string {
     switch (ev.type) {
-      case 'RESERVED':    return 'New customer request';
-      case 'READY':       return 'Item marked ready';
-      case 'UNAVAILABLE': return 'Item marked unavailable';
-      case 'PAID':        return 'Payment received';
-      case 'PICKED_UP':   return 'Order picked up';
-      case 'CANCELLED':   return 'Reservation cancelled';
-      case 'EXPIRED':     return 'Reservation expired';
-      default:            return ev.status ? `Status: ${ev.status}` : 'Update';
+      case 'REQUESTED':           return 'New cross-store customer request awaiting confirmation';
+      case 'FULFILLER_ACCEPTED':  return 'Accepted — inventory held 15 min for checkout';
+      case 'FULFILLER_REJECTED':  return 'Customer request rejected';
+      case 'RESERVED':            return 'New customer request';
+      case 'READY':               return 'Item marked ready';
+      case 'UNAVAILABLE':         return 'Item marked unavailable';
+      case 'PAID':                return 'Payment received';
+      case 'PICKED_UP':           return 'Order picked up';
+      case 'CANCELLED':           return 'Reservation cancelled';
+      case 'EXPIRED':             return 'Reservation expired';
+      default:                    return ev.status ? `Status: ${ev.status}` : 'Update';
     }
   }
 
@@ -3249,7 +3261,7 @@ export class AdminDashboardPageComponent implements OnInit, OnDestroy {
 
   hydrateEventStockIfPanelOpen(): void {
     if (this.bellPanelOpen() || this.events().some(e =>
-      (e.type === 'RESERVED' || e.type === 'READY') &&
+      (e.type === 'REQUESTED' || e.type === 'RESERVED' || e.type === 'FULFILLER_ACCEPTED' || e.type === 'READY') &&
       typeof e['_stockQuantity'] !== 'number'
     )) {
       void this.hydrateEventStock();
@@ -3267,16 +3279,18 @@ export class AdminDashboardPageComponent implements OnInit, OnDestroy {
     const token = this.authService.getToken();
     try {
       const headers: Record<string, string> = token ? { Authorization: 'Bearer ' + token } : {};
+      const isRequested = ev.type === 'REQUESTED' || ev.status === 'REQUESTED';
+      const endpoint = isRequested ? 'accept-request' : 'mark-ready';
+      const okEvent: SseEventShape = { ...ev, type: isRequested ? 'FULFILLER_ACCEPTED' : 'READY' };
       await firstValueFrom(
-        this.http.post<any>(`${api}/admin/stores/me/transactions/${encodeURIComponent(ev.transactionId)}/mark-ready`, {}, { headers })
+        this.http.post<any>(`${api}/admin/stores/me/transactions/${encodeURIComponent(ev.transactionId)}/${endpoint}`, {}, { headers })
       );
-      const readyEvent: SseEventShape = { ...ev, type: 'READY' };
-      ev.type = 'READY';
-      this.pushEvent(readyEvent);
-      this.userSuccess.set('Item marked ready.');
-      setTimeout(() => { if (this.userSuccess() === 'Item marked ready.') this.userSuccess.set(null); }, 3000);
+      ev.type = okEvent.type!;
+      this.pushEvent(okEvent);
+      this.userSuccess.set(isRequested ? 'Request accepted — inventory held 15 min.' : 'Item marked ready.');
+      setTimeout(() => { if (this.userSuccess() && this.userSuccess()!.startsWith('Request')) this.userSuccess.set(null); }, 3000);
     } catch (err: any) {
-      this.userError.set(err?.error?.message ?? err?.message ?? 'Failed to mark ready.');
+      this.userError.set(err?.error?.message ?? err?.message ?? 'Failed to accept.');
       setTimeout(() => { if (this.userError()) this.userError.set(null); }, 4000);
     } finally {
       ev['_actionPending'] = null;
@@ -3296,16 +3310,18 @@ export class AdminDashboardPageComponent implements OnInit, OnDestroy {
     const token = this.authService.getToken();
     try {
       const headers: Record<string, string> = token ? { Authorization: 'Bearer ' + token } : {};
+      const isRequested = ev.type === 'REQUESTED' || ev.status === 'REQUESTED';
+      const endpoint = isRequested ? 'reject-request' : 'mark-unavailable';
+      const endEvent: SseEventShape = { ...ev, type: isRequested ? 'FULFILLER_REJECTED' : 'UNAVAILABLE' };
       await firstValueFrom(
-        this.http.post<any>(`${api}/admin/stores/me/transactions/${encodeURIComponent(ev.transactionId)}/mark-unavailable`, {}, { headers })
+        this.http.post<any>(`${api}/admin/stores/me/transactions/${encodeURIComponent(ev.transactionId)}/${endpoint}`, {}, { headers })
       );
-      const unavailEvent: SseEventShape = { ...ev, type: 'UNAVAILABLE' };
-      ev.type = 'UNAVAILABLE';
-      this.pushEvent(unavailEvent);
-      this.userSuccess.set('Item marked unavailable.');
-      setTimeout(() => { if (this.userSuccess() === 'Item marked unavailable.') this.userSuccess.set(null); }, 3000);
+      ev.type = endEvent.type!;
+      this.pushEvent(endEvent);
+      this.userSuccess.set(isRequested ? 'Request rejected.' : 'Item marked unavailable.');
+      setTimeout(() => { if (this.userSuccess() && (this.userSuccess() === 'Request rejected.' || this.userSuccess() === 'Item marked unavailable.')) this.userSuccess.set(null); }, 3000);
     } catch (err: any) {
-      this.userError.set(err?.error?.message ?? err?.message ?? 'Failed to mark unavailable.');
+      this.userError.set(err?.error?.message ?? err?.message ?? 'Failed.');
       setTimeout(() => { if (this.userError()) this.userError.set(null); }, 4000);
     } finally {
       ev['_actionPending'] = null;
@@ -3314,16 +3330,44 @@ export class AdminDashboardPageComponent implements OnInit, OnDestroy {
     }
   }
 
-  /** Dashboard Transactions tab: show Accept button for RESERVED/PENDING_RESERVATION only. */
-  txShowAcceptButton(tx: { status?: string | null | undefined } | null | undefined): boolean {
-    const s = tx?.status;
-    return s === 'RESERVED' || s === 'PENDING_RESERVATION';
+  /** True if the current user-scoped store is the FULFILLING (seller) store of this transaction, not originating (host). */
+  txIsFulfillingScope(tx: any): boolean {
+    if (!tx) return false;
+    const u = this.currentUser();
+    const myStoreId = u?.storeId;
+    const fulfillId = tx.fulfillingStoreId || tx.storeId;
+    const originId = tx.originatingStoreId;
+    if (this.isGlobalAdmin()) return true;
+    if (!myStoreId) return false;
+    if (originId && fulfillId && fulfillId === myStoreId) return true;
+    if (!originId && fulfillId === myStoreId) return true;
+    return false;
   }
 
-  /** Dashboard Transactions tab: show Deny button for RESERVED/PENDING_RESERVATION only. */
-  txShowDenyButton(tx: { status?: string | null | undefined } | null | undefined): boolean {
+  /** True if REQUESTED status and current scope is originating (host) store — show readonly pill. */
+  txShowAwaitingSellerPill(tx: any): boolean {
+    if (!tx || tx?.status !== 'REQUESTED') return false;
+    return !this.txIsFulfillingScope(tx);
+  }
+
+  /** Dashboard Transactions tab: show Accept button for RESERVED/PENDING_RESERVATION (any scope same-store),
+   *  or REQUESTED only for fulfilling-store admin scope (never for originating store admin).
+   */
+  txShowAcceptButton(tx: any): boolean {
     const s = tx?.status;
-    return s === 'RESERVED' || s === 'PENDING_RESERVATION';
+    if (s === 'RESERVED' || s === 'PENDING_RESERVATION') return true;
+    if (s === 'REQUESTED') return this.txIsFulfillingScope(tx);
+    return false;
+  }
+
+  /** Dashboard Transactions tab: show Deny button for RESERVED/PENDING_RESERVATION (any scope same-store),
+   *  or REQUESTED only for fulfilling-store admin scope.
+   */
+  txShowDenyButton(tx: any): boolean {
+    const s = tx?.status;
+    if (s === 'RESERVED' || s === 'PENDING_RESERVATION') return true;
+    if (s === 'REQUESTED') return this.txIsFulfillingScope(tx);
+    return false;
   }
 
   /** Dashboard Transactions tab: show Cancel (mark-unavailable) button for READY rows. */
@@ -3342,18 +3386,21 @@ export class AdminDashboardPageComponent implements OnInit, OnDestroy {
       const headers: Record<string, string> = token ? { Authorization: 'Bearer ' + token } : {};
       const u = this.currentUser();
       const storeId = tx.fulfillingStoreId || tx.storeId || u?.storeId;
+      const isRequested = tx?.status === 'REQUESTED';
+      const endpoint = isRequested ? 'accept-request' : 'mark-ready';
+      const okMsg = isRequested ? 'Request accepted — inventory held 15 min.' : 'Transaction marked ready.';
       let url: string;
       if (this.isGlobalAdmin() && storeId) {
-        url = `${api}/admin/stores/${encodeURIComponent(storeId)}/transactions/${encodeURIComponent(id)}/mark-ready`;
+        url = `${api}/admin/stores/${encodeURIComponent(storeId)}/transactions/${encodeURIComponent(id)}/${endpoint}`;
       } else {
-        url = `${api}/admin/stores/me/transactions/${encodeURIComponent(id)}/mark-ready`;
+        url = `${api}/admin/stores/me/transactions/${encodeURIComponent(id)}/${endpoint}`;
       }
       await firstValueFrom(this.http.post<any>(url, {}, { headers }));
-      this.userSuccess.set('Transaction marked ready.');
-      setTimeout(() => { if (this.userSuccess() === 'Transaction marked ready.') this.userSuccess.set(null); }, 3000);
+      this.userSuccess.set(okMsg);
+      setTimeout(() => { if (this.userSuccess() === okMsg) this.userSuccess.set(null); }, 3000);
       await this.loadTransactions();
     } catch (err: any) {
-      this.userError.set(err?.error?.message ?? err?.message ?? 'Failed to mark ready.');
+      this.userError.set(err?.error?.message ?? err?.message ?? 'Failed to accept.');
       setTimeout(() => { if (this.userError()) this.userError.set(null); }, 4000);
     } finally {
       this.acceptingTx[id] = false;
@@ -3372,18 +3419,21 @@ export class AdminDashboardPageComponent implements OnInit, OnDestroy {
       const headers: Record<string, string> = token ? { Authorization: 'Bearer ' + token } : {};
       const u = this.currentUser();
       const storeId = tx.fulfillingStoreId || tx.storeId || u?.storeId;
+      const isRequested = tx?.status === 'REQUESTED';
+      const endpoint = isRequested ? 'reject-request' : 'mark-unavailable';
+      const okMsg = isRequested ? 'Request rejected.' : 'Transaction marked unavailable.';
       let url: string;
       if (this.isGlobalAdmin() && storeId) {
-        url = `${api}/admin/stores/${encodeURIComponent(storeId)}/transactions/${encodeURIComponent(id)}/mark-unavailable`;
+        url = `${api}/admin/stores/${encodeURIComponent(storeId)}/transactions/${encodeURIComponent(id)}/${endpoint}`;
       } else {
-        url = `${api}/admin/stores/me/transactions/${encodeURIComponent(id)}/mark-unavailable`;
+        url = `${api}/admin/stores/me/transactions/${encodeURIComponent(id)}/${endpoint}`;
       }
       await firstValueFrom(this.http.post<any>(url, {}, { headers }));
-      this.userSuccess.set('Transaction marked unavailable.');
-      setTimeout(() => { if (this.userSuccess() === 'Transaction marked unavailable.') this.userSuccess.set(null); }, 3000);
+      this.userSuccess.set(okMsg);
+      setTimeout(() => { if (this.userSuccess() === okMsg) this.userSuccess.set(null); }, 3000);
       await this.loadTransactions();
     } catch (err: any) {
-      this.userError.set(err?.error?.message ?? err?.message ?? 'Failed to mark unavailable.');
+      this.userError.set(err?.error?.message ?? err?.message ?? 'Failed.');
       setTimeout(() => { if (this.userError()) this.userError.set(null); }, 4000);
     } finally {
       this.denyingTx[id] = false;
