@@ -664,7 +664,7 @@ type ReservationStatus = 'idle' | 'pending' | 'requested' | 'reserved' | 'accept
                       }
                     </span>
                     <span class="sw-price">
-                      {{ products.formatPrice(v.retailPriceCents, product()!.currency) }}
+                      {{ products.formatPrice(variantDisplayPriceCents(v), product()!.currency) }}
                     </span>
                     @if (variantHasStock(v)) {
                       <span class="sw-stock in">In stock ({{ v.stockQuantity }})</span>
@@ -969,8 +969,30 @@ export class ProductDetailPageComponent implements OnInit, OnDestroy {
 
   readonly chosenPriceCents = computed(() => {
     const v = this.currentVariant();
-    if (v) return v.retailPriceCents;
-    return this.product()?.retailPriceCents ?? 0;
+    const ownerStoreId = v?.storeId ?? this.product()?.storeId ?? null;
+    const browsingOriginId = this.browsingOriginStoreId();
+    const crossStore = !!(browsingOriginId && ownerStoreId && browsingOriginId !== ownerStoreId);
+    let base = 0;
+    if (v) base = v.retailPriceCents;
+    else base = this.product()?.retailPriceCents ?? 0;
+    if (crossStore) {
+      const ws = v?.wholesalePriceCents ?? this.product()?.wholesalePriceCents ?? 0;
+      base = Math.max(base, base + Math.max(0, ws));
+    }
+    return base;
+  });
+
+  readonly browsingOriginStoreId = computed<string | null>(() => {
+    if (this.scannedStoreId()) return this.scannedStoreId();
+    const cached = this.products.getBrowsingHostStore();
+    if (cached?.storeId) return cached.storeId;
+    const p = this.product();
+    if (p?.storeId) return p.storeId;
+    if (p?.variants && p.variants.length > 0) {
+      const f = p.variants.find(v => typeof v.storeId === 'string' && v.storeId.length > 0);
+      if (f?.storeId) return f.storeId;
+    }
+    return null;
   });
 
   readonly chosenVariantStock = computed(() => {
@@ -1033,6 +1055,15 @@ export class ProductDetailPageComponent implements OnInit, OnDestroy {
 
   variantSoldOut(v: unknown): boolean { return this.variantStockNum(v) === 0; }
   variantHasStock(v: unknown): boolean { return this.variantStockNum(v) > 0; }
+  variantDisplayPriceCents(v: { retailPriceCents?: number; wholesalePriceCents?: number; storeId?: string }): number {
+    const ownerStoreId = v.storeId ?? this.product()?.storeId ?? null;
+    const browsingOriginId = this.browsingOriginStoreId();
+    const crossStore = !!(browsingOriginId && ownerStoreId && browsingOriginId !== ownerStoreId);
+    const base = Number(v.retailPriceCents ?? 0);
+    if (!crossStore) return base;
+    const ws = Number(v.wholesalePriceCents ?? 0);
+    return base + Math.max(0, ws);
+  }
 
   countdownMinutesLeft(): number {
     return Math.floor(this.currentSecondsRemaining() / 60);

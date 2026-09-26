@@ -182,9 +182,9 @@ type CheckoutStatus = 'reserved' | 'loading' | 'confirmed' | 'error';
           <h2>Summary</h2>
           <div class="rows">
             <div class="row"><span>Subtotal</span><span>{{ formattedPrice() }}</span></div>
-            <div class="row"><span>Tax (estimated)</span><span>{{ formattedTax() }}</span></div>
+            <div class="row"><span>Tax (estimated)</span><span>{{ formatPrice(0, product()?.currency ?? 'USD') }}</span></div>
             <div class="row"><span>Delivery</span><span>Free</span></div>
-            <div class="row total"><span>Total</span><span>{{ formattedTotal() }}</span></div>
+            <div class="row total"><span>Total</span><span>{{ formattedPrice() }}</span></div>
           </div>
         </section>
 
