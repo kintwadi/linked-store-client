@@ -188,26 +188,6 @@ type CheckoutStatus = 'reserved' | 'loading' | 'confirmed' | 'error';
           </div>
         </section>
 
-        @if (transaction()) {
-          <section class="card ledger">
-            <h2>Ledger breakdown</h2>
-            <div class="rows">
-              <div class="row">
-                <span>Wholesale to Fulfilling Store</span>
-                <span>{{ formatPrice(transaction()!.wholesalePayoutCents ?? 0, transaction()!.currency) }}</span>
-              </div>
-              <div class="row">
-                <span>Originating Store margin</span>
-                <span>{{ formatPrice(transaction()!.arbitrageMarginCents ?? 0, transaction()!.currency) }}</span>
-              </div>
-              <div class="row">
-                <span>Platform fee</span>
-                <span>{{ formatPrice(0, transaction()!.currency) }}</span>
-              </div>
-            </div>
-          </section>
-        }
-
         @if (status() === 'error' && errorMessage()) {
           <div class="card" style="border-color:#fecaca; background:#fef2f2; color:#991b1b;">
             {{ errorMessage() }}
