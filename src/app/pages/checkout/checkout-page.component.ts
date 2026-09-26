@@ -227,12 +227,12 @@ export class CheckoutPageComponent implements OnInit {
     }
     const p = this.product();
     if (!p) return 0;
+    const usp = new URLSearchParams(window.location.search);
+    const anyScanParam = !!usp.get('gateway') || !!usp.get('gatewayCode') || !!usp.get('token') || !!usp.get('storeId') || !!usp.get('store');
     const browsingHost = this.productService.getBrowsingHostStore()?.storeId ?? null;
     const variantStoreId = (p as any)?.variantStoreId ?? p.storeId ?? null;
-    const scanned = new URLSearchParams(window.location.search).get('gateway');
-    const gatewayStore = (scanned && p?.variants?.length) ? (p.variants.find((v: any) => v && typeof v.storeId === 'string')?.storeId ?? null) : null;
-    const cross = (!!browsingHost && !!variantStoreId && browsingHost !== variantStoreId)
-      || (!!gatewayStore && !!variantStoreId && gatewayStore !== variantStoreId);
+    const hasCrossHost = !!(browsingHost && variantStoreId && browsingHost !== variantStoreId);
+    const cross = hasCrossHost || anyScanParam;
     const retail = p.retailPriceCents ?? 0;
     const wholesale = (p as any)?.wholesalePriceCents ?? 0;
     return cross ? Math.max(retail, retail + Math.max(0, wholesale)) : retail;
@@ -314,50 +314,65 @@ export class CheckoutPageComponent implements OnInit {
     this.status.set('loading');
     this.errorMessage.set(null);
 
-    try {
-      const origin = this.resolveOrigin();
-      const successUrl = `${origin.replace(/\/+$/, '')}/checkout/success?session_id={CHECKOUT_SESSION_ID}`;
-      const cancelUrl  = `${origin.replace(/\/+$/, '')}/checkout/cancel`;
-
-      const tx = this.transaction();
-      const sessionPromise =
-        tx && tx.id
-          ? this.productService.createCheckoutSession({
-              transactionId: tx.id,
-              successUrl,
-              cancelUrl,
-            })
-          : this.productService.createCheckoutSession({
-              productId: p.id,
-              title: p.title,
-              primaryImageUrl: p.primaryImageUrl ?? null,
-              amountCents: this.cents(),
-              currency: 'USD',
-              variantId: p.variantId ?? null,
-              successUrl,
-              cancelUrl,
-              originatingStoreId:
-                this.productService.getBrowsingHostStore()?.storeId ??
-                p.storeId ??
-                (p.variants && p.variants[0]?.storeId) ??
-                null,
-            });
-
-      sessionPromise.then((res) => {
-        if (res && res.url) {
-          this.status.set('confirmed');
-          window.location.href = res.url;
-        } else {
-          throw new Error(res?.message ?? 'Payment provider did not return a checkout URL.');
-        }
-      }).catch((err) => {
-        this.status.set('error');
-        const m = (err && typeof err === 'object' && 'message' in err) ? String((err as any).message) : String(err ?? '');
-        this.errorMessage.set(m || 'Could not open the payment page. Please try again.');
-      });
-    } catch (err) {
+    this._doConfirm(p).catch((err) => {
       this.status.set('error');
-      this.errorMessage.set('Could not open the payment page. Please try again.');
+      const m = (err && typeof err === 'object' && 'message' in err) ? String((err as any).message) : String(err ?? '');
+      this.errorMessage.set(m || 'Could not open the payment page. Please try again.');
+    });
+  }
+
+  private async _doConfirm(p: Product): Promise<void> {
+    const origin = this.resolveOrigin();
+    const successUrl = `${origin.replace(/\/+$/, '')}/checkout/success?session_id={CHECKOUT_SESSION_ID}`;
+    const cancelUrl  = `${origin.replace(/\/+$/, '')}/checkout/cancel`;
+    const usp = new URLSearchParams(window.location.search);
+    const anyScanParam = !!usp.get('gateway') || !!usp.get('gatewayCode') || !!usp.get('token') || !!usp.get('storeId') || !!usp.get('store');
+
+    const tx = this.transaction();
+    let originatingStoreId: string | null = null;
+    if (!(tx && tx.id)) {
+      const variantStoreId = (p as any)?.variantStoreId ?? p.storeId ?? null;
+      const browsingHost = this.productService.getBrowsingHostStore()?.storeId ?? null;
+      if (browsingHost) {
+        originatingStoreId = browsingHost;
+      } else if (anyScanParam) {
+        const fallbackList = await this.productService.getStores();
+        const filtered = Array.isArray(fallbackList)
+          ? fallbackList.filter(s => s?.id && String(s.id) !== String(variantStoreId || ''))
+          : [];
+        originatingStoreId = (filtered[0]?.id as string | undefined)
+          ?? (fallbackList[0]?.id as string | undefined)
+          ?? variantStoreId;
+      } else {
+        originatingStoreId = variantStoreId;
+      }
+    }
+
+    const sessionPromise =
+      tx && tx.id
+        ? this.productService.createCheckoutSession({
+            transactionId: tx.id,
+            successUrl,
+            cancelUrl,
+          })
+        : this.productService.createCheckoutSession({
+            productId: p.id,
+            title: p.title,
+            primaryImageUrl: p.primaryImageUrl ?? null,
+            amountCents: this.cents(),
+            currency: 'USD',
+            variantId: p.variantId ?? null,
+            successUrl,
+            cancelUrl,
+            originatingStoreId: originatingStoreId ?? undefined,
+          });
+
+    const res = await sessionPromise;
+    if (res && res.url) {
+      this.status.set('confirmed');
+      window.location.href = res.url;
+    } else {
+      throw new Error(res?.message ?? 'Payment provider did not return a checkout URL.');
     }
   }
 

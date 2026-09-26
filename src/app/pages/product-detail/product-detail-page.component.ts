@@ -1154,19 +1154,42 @@ export class ProductDetailPageComponent implements OnInit, OnDestroy {
         : undefined)
       ?? _product?.storeId
       ?? null;
+    const qp = this.route.snapshot.queryParamMap;
+    const anyScanParam = !!this.scannedStoreId() || !!qp.get('gateway') || !!qp.get('gatewayCode') || !!qp.get('token') || !!qp.get('storeId') || !!qp.get('store');
     const scanned = this.scannedStoreId();
+
+    const pickFirstOtherStoreId = async (avoidId: string | null, fallback: string): Promise<string> => {
+      const apiB = this.auth.resolveApiBasePublic();
+      try {
+        const list: any[] = await firstValueFrom(this.http.get<any[]>(`${apiB}/stores`));
+        if (Array.isArray(list)) {
+          const candidates = list.filter(s => s?.id && String(s.id) !== String(avoidId || ''));
+          if (candidates.length > 0) return String(candidates[0].id);
+          if (list.length > 0 && list[0]?.id) return String(list[0].id);
+        }
+      } catch {
+        // ignore
+      }
+      return fallback;
+    };
+    const defaultFallback = 'd7e59214-5adf-4788-beb0-ffccf4ab18f9';
+
+    if (anyScanParam) {
+      const candidate = scanned || variantOwnerId || _product?.storeId;
+      if (candidate && String(candidate) !== String(variantOwnerId || '')) return String(candidate);
+      return await pickFirstOtherStoreId(variantOwnerId, defaultFallback);
+    }
+
     if (scanned) return scanned;
     if (variantOwnerId) return variantOwnerId;
     if (_product?.storeId) return _product.storeId;
-    const apiBase = this.auth.resolveApiBasePublic();
     try {
-      const list: any[] = await firstValueFrom(this.http.get<any[]>(`${apiBase}/stores`));
+      const list: any[] = await firstValueFrom(this.http.get<any[]>(`${this.auth.resolveApiBasePublic()}/stores`));
       if (Array.isArray(list) && list.length > 0 && list[0]?.id) return String(list[0].id);
     } catch {
       // ignore
     }
-    const fallback = 'd7e59214-5adf-4788-beb0-ffccf4ab18f9';
-    return fallback;
+    return defaultFallback;
   }
 
   ngOnDestroy(): void {
