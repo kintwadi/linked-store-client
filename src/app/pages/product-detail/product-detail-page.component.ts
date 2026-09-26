@@ -597,14 +597,9 @@ type ReservationStatus = 'idle' | 'pending' | 'requested' | 'reserved' | 'accept
             <div class="store-scan-banner" *ngIf="!loading()">
               <div class="store-scan-ico">🏬</div>
               <div class="store-scan-text">
-                @if (scannedStoreName()) {
-                  <div class="store-scan-title">Shopping from {{ scannedStoreName() }}</div>
-                } @else if (scannedStoreGateway()) {
-                  <div class="store-scan-title">Store token {{ scannedStoreGateway() }}</div>
-                }
+                <div class="store-scan-title">Shopping from partner location</div>
                 <div class="store-scan-sub">
-                  Your request will notify this store's team.
-                  @if (scannedStoreGateway()) { Token: <span class="mono">{{ scannedStoreGateway() }}</span> }
+                  Your request will notify our network location for fulfillment.
                 </div>
               </div>
             </div>
