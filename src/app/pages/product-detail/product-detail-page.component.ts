@@ -1157,12 +1157,24 @@ export class ProductDetailPageComponent implements OnInit, OnDestroy {
 
     const pickFirstOtherStoreId = async (avoidId: string | null, fallback: string): Promise<string> => {
       const apiB = this.auth.resolveApiBasePublic();
+      const priorityScore = (name: string | null | undefined): number => {
+        const n = String(name ?? '').toLowerCase();
+        if (n.startsWith('storea')) return 0;
+        if (n.startsWith('storeb')) return 1;
+        if (n.includes('brooklyn')) return 2;
+        if (n.includes('sole') || n.includes('uptown')) return 3;
+        if (n.includes('downtown') || n.includes('kicks')) return 4;
+        return 9;
+      };
       try {
         const list: any[] = await firstValueFrom(this.http.get<any[]>(`${apiB}/stores`));
         if (Array.isArray(list)) {
-          const candidates = list.filter(s => s?.id && String(s.id) !== String(avoidId || ''));
+          const candidates = list
+            .filter(s => s?.id && String(s.id) !== String(avoidId || ''))
+            .sort((a, b) => priorityScore(a?.businessName) - priorityScore(b?.businessName));
           if (candidates.length > 0) return String(candidates[0].id);
-          if (list.length > 0 && list[0]?.id) return String(list[0].id);
+          const all = [...list].sort((a, b) => priorityScore(a?.businessName) - priorityScore(b?.businessName));
+          if (all.length > 0 && all[0]?.id) return String(all[0].id);
         }
       } catch {
         // ignore

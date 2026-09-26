@@ -437,15 +437,27 @@ export class CheckoutPageComponent implements OnInit {
     if (!(tx && tx.id)) {
       const variantStoreId = (p as any)?.variantStoreId ?? p.storeId ?? null;
       const browsingHost = this.productService.getBrowsingHostStore()?.storeId ?? null;
+      const priorityScore = (name: string | null | undefined): number => {
+        const n = String(name ?? '').toLowerCase();
+        if (n.startsWith('storea')) return 0;
+        if (n.startsWith('storeb')) return 1;
+        if (n.includes('brooklyn')) return 2;
+        if (n.includes('sole') || n.includes('uptown')) return 3;
+        if (n.includes('downtown') || n.includes('kicks')) return 4;
+        return 9;
+      };
       if (browsingHost) {
         originatingStoreId = browsingHost;
       } else if (anyScanParam) {
         const fallbackList = await this.productService.getStores();
         const filtered = Array.isArray(fallbackList)
-          ? fallbackList.filter(s => s?.id && String(s.id) !== String(variantStoreId || ''))
+          ? fallbackList
+              .filter(s => s?.id && String(s.id) !== String(variantStoreId || ''))
+              .sort((a, b) => priorityScore(a?.businessName) - priorityScore(b?.businessName))
           : [];
         originatingStoreId = (filtered[0]?.id as string | undefined)
-          ?? (fallbackList[0]?.id as string | undefined)
+          ?? ([...(Array.isArray(fallbackList) ? fallbackList : [])]
+              .sort((a, b) => priorityScore(a?.businessName) - priorityScore(b?.businessName))[0]?.id as string | undefined)
           ?? variantStoreId;
       } else {
         originatingStoreId = variantStoreId;
