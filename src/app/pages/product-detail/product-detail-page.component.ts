@@ -1146,17 +1146,14 @@ export class ProductDetailPageComponent implements OnInit, OnDestroy {
   }
 
   private async resolveOriginatingStoreId(_product: Product): Promise<string> {
-    const cachedHost = this.products.getBrowsingHostStore();
-    if (cachedHost?.storeId) return cachedHost.storeId;
+    const qp = this.route.snapshot.queryParamMap;
+    const anyScanParam = !!this.scannedStoreId() || !!qp.get('gateway') || !!qp.get('gatewayCode') || !!qp.get('token') || !!qp.get('storeId') || !!qp.get('store');
     const variantOwnerId =
       (_product?.variants && _product.variants.length > 0
         ? _product.variants.find((v: any) => v && typeof v.storeId === 'string' && v.storeId.length > 0)?.storeId
         : undefined)
       ?? _product?.storeId
       ?? null;
-    const qp = this.route.snapshot.queryParamMap;
-    const anyScanParam = !!this.scannedStoreId() || !!qp.get('gateway') || !!qp.get('gatewayCode') || !!qp.get('token') || !!qp.get('storeId') || !!qp.get('store');
-    const scanned = this.scannedStoreId();
 
     const pickFirstOtherStoreId = async (avoidId: string | null, fallback: string): Promise<string> => {
       const apiB = this.auth.resolveApiBasePublic();
@@ -1174,9 +1171,20 @@ export class ProductDetailPageComponent implements OnInit, OnDestroy {
     };
     const defaultFallback = 'd7e59214-5adf-4788-beb0-ffccf4ab18f9';
 
+    const cachedHost = this.products.getBrowsingHostStore();
+    if (cachedHost?.storeId) {
+      if (anyScanParam && variantOwnerId && String(cachedHost.storeId) === String(variantOwnerId)) {
+        this.products.clearBrowsingHostStore();
+      } else {
+        return cachedHost.storeId;
+      }
+    }
+
+    const scanned = this.scannedStoreId();
+
     if (anyScanParam) {
       const candidate = scanned || variantOwnerId || _product?.storeId;
-      if (candidate && String(candidate) !== String(variantOwnerId || '')) return String(candidate);
+      if (candidate && variantOwnerId && String(candidate) !== String(variantOwnerId)) return String(candidate);
       return await pickFirstOtherStoreId(variantOwnerId, defaultFallback);
     }
 
@@ -1430,13 +1438,29 @@ export class ProductDetailPageComponent implements OnInit, OnDestroy {
     if (!reservationResult) return;
     this.clearCountdown();
     this.clearReservationPolling();
+    const qp = this.route.snapshot.queryParamMap;
+    const anyScanParam = !!this.scannedStoreId() || !!qp.get('gateway') || !!qp.get('gatewayCode') || !!qp.get('token') || !!qp.get('storeId') || !!qp.get('store');
+    const currentProduct = this.product();
+    const currentVariant = this.currentVariant();
     const state = {
       transactionId: reservationResult.transactionId,
       qrSecureToken: reservationResult.qrSecureToken,
       qrFallbackCode: reservationResult.qrFallbackCode,
       reservation: structuredClone(reservationResult),
+      hasScanContext: anyScanParam,
+      scanGateway: qp.get('gateway') || qp.get('gatewayCode') || qp.get('token') || this.scannedStoreId() || '',
+      product: currentProduct ? structuredClone(currentProduct) : undefined,
+      variantStoreId: currentVariant?.storeId ?? currentProduct?.storeId ?? undefined,
+      variantWholesalePriceCents: currentVariant?.wholesalePriceCents ?? (currentProduct as any)?.wholesalePriceCents ?? undefined,
     };
-    const extras = { state, replaceUrl: false };
+    const queryParams: Record<string, string> = {};
+    const gw = qp.get('gateway') || qp.get('gatewayCode') || qp.get('token');
+    if (gw) queryParams['gateway'] = gw;
+    const scannedId = this.scannedStoreId();
+    if (scannedId) queryParams['storeId'] = scannedId;
+    if (qp.get('store')) queryParams['store'] = qp.get('store')!;
+    const extras: any = { state, replaceUrl: false };
+    if (Object.keys(queryParams).length > 0) extras.queryParams = queryParams;
     try { this.router.navigate(['/checkout'], extras); return; } catch { /* fallthrough */ }
     this.tick.update((t) => t + 1);
   }

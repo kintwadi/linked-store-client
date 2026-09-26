@@ -219,23 +219,50 @@ export class CheckoutPageComponent implements OnInit {
   readonly loading = signal(true);
   readonly status  = signal<CheckoutStatus>('reserved');
   readonly errorMessage = signal<string | null>(null);
+  readonly scanContextFromState = signal(false);
+
+  private detectCrossIndicators(): {
+    anyScanParam: boolean;
+    browsingHost: string | null;
+    variantStoreId: string | null;
+    txOrigin: string;
+    txFulfill: string;
+    txIsCross: boolean;
+    hasCrossHost: boolean;
+    cross: boolean;
+  } {
+    const tx = this.transaction();
+    const p = this.product();
+    const usp = new URLSearchParams(window.location.search);
+    const anyScanParam =
+      this.scanContextFromState() ||
+      !!usp.get('gateway') || !!usp.get('gatewayCode') || !!usp.get('token') ||
+      !!usp.get('storeId') || !!usp.get('store');
+    const browsingHost = this.productService.getBrowsingHostStore()?.storeId ?? null;
+    const variantStoreId = (p as any)?.variantStoreId ?? p?.storeId ?? null;
+    const txOrigin = String((tx as any)?.originatingStoreId ?? '');
+    const txFulfill = String((tx as any)?.fulfillingStoreId ?? '');
+    const txIsCross = !!(txOrigin && txFulfill && txOrigin !== txFulfill);
+    const hasCrossHost = !!(browsingHost && variantStoreId && browsingHost !== variantStoreId);
+    const cross = hasCrossHost || anyScanParam || txIsCross;
+    return { anyScanParam, browsingHost, variantStoreId, txOrigin, txFulfill, txIsCross, hasCrossHost, cross };
+  }
 
   readonly cents = computed(() => {
+    const p = this.product();
+    const { cross } = this.detectCrossIndicators();
     const tx = this.transaction();
+    if (p) {
+      const retail = Number(p.retailPriceCents ?? 0);
+      const wholesale = Number((p as any)?.wholesalePriceCents ?? 0);
+      const catalogCross = Math.max(retail, retail + Math.max(0, wholesale));
+      if (cross) return catalogCross;
+      if (retail > 0) return retail;
+    }
     if (tx && typeof tx.totalRetailCents === 'number' && tx.totalRetailCents > 0) {
       return tx.totalRetailCents;
     }
-    const p = this.product();
-    if (!p) return 0;
-    const usp = new URLSearchParams(window.location.search);
-    const anyScanParam = !!usp.get('gateway') || !!usp.get('gatewayCode') || !!usp.get('token') || !!usp.get('storeId') || !!usp.get('store');
-    const browsingHost = this.productService.getBrowsingHostStore()?.storeId ?? null;
-    const variantStoreId = (p as any)?.variantStoreId ?? p.storeId ?? null;
-    const hasCrossHost = !!(browsingHost && variantStoreId && browsingHost !== variantStoreId);
-    const cross = hasCrossHost || anyScanParam;
-    const retail = p.retailPriceCents ?? 0;
-    const wholesale = (p as any)?.wholesalePriceCents ?? 0;
-    return cross ? Math.max(retail, retail + Math.max(0, wholesale)) : retail;
+    return p?.retailPriceCents ?? 0;
   });
   readonly formattedPrice = computed(() => this.formatPrice(this.cents()));
   readonly formattedTax   = computed(() => this.formatPrice(0, this.product()?.currency ?? 'USD'));
@@ -256,27 +283,98 @@ export class CheckoutPageComponent implements OnInit {
 
   async ngOnInit(): Promise<void> {
     const nav = this.router.getCurrentNavigation();
+    const navState: any = (nav?.extras?.state as any) ?? {};
+    const historyState: any = (history.state as any) ?? {};
+    const scanCtx = !!(navState.hasScanContext || historyState.hasScanContext);
+    if (scanCtx) this.scanContextFromState.set(true);
+    const stateProduct: Product | undefined = navState.product ?? historyState.product;
+    const stateVariantStoreId = navState.variantStoreId ?? historyState.variantStoreId;
+    const stateWholesale = navState.variantWholesalePriceCents ?? historyState.variantWholesalePriceCents;
+    if (stateProduct && typeof stateWholesale === 'number') {
+      (stateProduct as any).wholesalePriceCents = stateWholesale;
+    }
+    if (stateProduct && stateVariantStoreId && !(stateProduct as any).variantStoreId) {
+      (stateProduct as any).variantStoreId = stateVariantStoreId;
+    }
+
     const txId =
-      (nav?.extras?.state as any)?.transactionId ??
-      (history.state as any)?.transactionId ??
+      navState.transactionId ??
+      historyState.transactionId ??
       new URLSearchParams(window.location.search).get('tx');
 
     if (txId) {
       this.loading.set(true);
       try {
         const tx = await this.productService.getTransaction(txId);
+        const usp = new URLSearchParams(window.location.search);
+        const anyScanParam =
+          this.scanContextFromState() ||
+          !!usp.get('gateway') || !!usp.get('gatewayCode') || !!usp.get('token') ||
+          !!usp.get('storeId') || !!usp.get('store');
+        const txOrigin = String((tx as any)?.originatingStoreId ?? '');
+        const txFulfill = String((tx as any)?.fulfillingStoreId ?? '');
+        const sameStoreCorrupted = !!txOrigin && !!txFulfill && txOrigin === txFulfill;
+        const paid = (tx as any).status === 'PAID' || (tx as any).status === 'PICKED_UP';
+        const gw =
+          navState.scanGateway ?? historyState.scanGateway ??
+          usp.get('gateway') ?? usp.get('gatewayCode') ?? usp.get('token') ?? '';
+        if (sameStoreCorrupted && !paid && anyScanParam && tx.productId) {
+          const redirect = gw
+            ? `/p/${encodeURIComponent(String(tx.productId))}?gateway=${encodeURIComponent(gw)}`
+            : `/p/${encodeURIComponent(String(tx.productId))}`;
+          this.productService.clearBrowsingHostStore();
+          this.router.navigateByUrl(redirect, { replaceUrl: true });
+          return;
+        }
         this.transaction.set(tx);
-        const virtualProduct: Product = {
-          id: tx.productId ?? tx.id,
-          title: tx.productTitle ?? 'Product',
-          primaryImageUrl: tx.productImageUrl ?? undefined,
-          retailPriceCents: tx.totalRetailCents,
-          currency: tx.currency ?? 'USD',
-          sku: tx.sku ?? undefined,
-          variantId: tx.variantId ?? '',
-          inStock: true,
-        } as any;
-        this.product.set(virtualProduct);
+
+        let mergedProduct: Product | null = null;
+        if (stateProduct && stateProduct.id === (tx.productId ?? tx.id)) {
+          mergedProduct = stateProduct;
+        } else if (tx.productId) {
+          try {
+            const fetched = await this.productService.getProduct(String(tx.productId));
+            if (fetched && fetched.id) mergedProduct = fetched;
+          } catch { /* ignore */ }
+        }
+
+        if (mergedProduct) {
+          const variantStoreId = (mergedProduct as any).variantStoreId ?? mergedProduct.storeId ?? null;
+          const txVariantId = tx.variantId ?? '';
+          let variantRetail = mergedProduct.retailPriceCents ?? 0;
+          let variantWholesale = (mergedProduct as any).wholesalePriceCents ?? 0;
+          if (txVariantId && Array.isArray((mergedProduct as any).variants)) {
+            const matched = (mergedProduct as any).variants.find((v: any) => v && String(v.id) === String(txVariantId));
+            if (matched) {
+              variantRetail = matched.retailPriceCents ?? variantRetail;
+              variantWholesale = matched.wholesalePriceCents ?? variantWholesale;
+              if (matched.storeId && !(mergedProduct as any).variantStoreId) {
+                (mergedProduct as any).variantStoreId = matched.storeId;
+              }
+            }
+          }
+          mergedProduct.retailPriceCents = variantRetail;
+          (mergedProduct as any).wholesalePriceCents = variantWholesale;
+          if (!(mergedProduct as any).variantStoreId && variantStoreId) {
+            (mergedProduct as any).variantStoreId = variantStoreId;
+          }
+          if (!(mergedProduct as any).currency || tx.currency) {
+            (mergedProduct as any).currency = tx.currency ?? (mergedProduct as any).currency;
+          }
+          this.product.set(mergedProduct);
+        } else {
+          const virtualProduct: Product = {
+            id: tx.productId ?? tx.id,
+            title: tx.productTitle ?? 'Product',
+            primaryImageUrl: tx.productImageUrl ?? undefined,
+            retailPriceCents: tx.totalRetailCents,
+            currency: tx.currency ?? 'USD',
+            sku: tx.sku ?? undefined,
+            variantId: tx.variantId ?? '',
+            inStock: true,
+          } as any;
+          this.product.set(virtualProduct);
+        }
       } catch (err) {
         this.errorMessage.set('Could not load transaction details.');
       } finally {
@@ -285,9 +383,12 @@ export class CheckoutPageComponent implements OnInit {
       return;
     }
 
-    const state = nav?.extras?.state as { product?: Product } | undefined;
-    const passed = state?.product ?? (history.state?.product as Product | undefined);
-
+    if (stateProduct && stateProduct.id) {
+      this.product.set(stateProduct);
+      this.loading.set(false);
+      return;
+    }
+    const passed = (historyState?.product as Product | undefined);
     if (passed && passed.id) {
       this.product.set(passed);
       this.loading.set(false);
@@ -326,7 +427,10 @@ export class CheckoutPageComponent implements OnInit {
     const successUrl = `${origin.replace(/\/+$/, '')}/checkout/success?session_id={CHECKOUT_SESSION_ID}`;
     const cancelUrl  = `${origin.replace(/\/+$/, '')}/checkout/cancel`;
     const usp = new URLSearchParams(window.location.search);
-    const anyScanParam = !!usp.get('gateway') || !!usp.get('gatewayCode') || !!usp.get('token') || !!usp.get('storeId') || !!usp.get('store');
+    const anyScanParam =
+      this.scanContextFromState() ||
+      !!usp.get('gateway') || !!usp.get('gatewayCode') || !!usp.get('token') ||
+      !!usp.get('storeId') || !!usp.get('store');
 
     const tx = this.transaction();
     let originatingStoreId: string | null = null;
