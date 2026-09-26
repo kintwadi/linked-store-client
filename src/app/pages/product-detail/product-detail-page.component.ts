@@ -972,12 +972,12 @@ export class ProductDetailPageComponent implements OnInit, OnDestroy {
     const ownerStoreId = v?.storeId ?? this.product()?.storeId ?? null;
     const browsingHostOrigin = this.browsingOriginStoreId();
     const scannedTokenOwner = this.scannedStoreId();
-    const hasExplicitCrossCache = !!(browsingHostOrigin && ownerStoreId && browsingHostOrigin !== ownerStoreId);
-    const hasScanDifferentFromOwner = !!(scannedTokenOwner && ownerStoreId && scannedTokenOwner !== ownerStoreId);
-    const scanDiffersFromBrowsing = !!(scannedTokenOwner && browsingHostOrigin && scannedTokenOwner !== browsingHostOrigin);
-    const crossStore = hasExplicitCrossCache || hasScanDifferentFromOwner || scanDiffersFromBrowsing;
     const retail = v ? v.retailPriceCents : (this.product()?.retailPriceCents ?? 0);
     const wholesale = v ? (v.wholesalePriceCents ?? 0) : (this.product()?.wholesalePriceCents ?? 0);
+    const qp = this.route.snapshot.queryParamMap;
+    const anyScanParam = !!scannedTokenOwner || !!qp.get('gateway') || !!qp.get('gatewayCode') || !!qp.get('token') || !!qp.get('storeId') || !!qp.get('store');
+    const hasCrossHost = !!(browsingHostOrigin && ownerStoreId && browsingHostOrigin !== ownerStoreId);
+    const crossStore = anyScanParam || hasCrossHost;
     if (crossStore) {
       return Math.max(retail, retail + Math.max(0, wholesale));
     }
@@ -1060,14 +1060,16 @@ export class ProductDetailPageComponent implements OnInit, OnDestroy {
     const ownerStoreId = v.storeId ?? this.product()?.storeId ?? null;
     const browsingHostOrigin = this.browsingOriginStoreId();
     const scannedTokenOwner = this.scannedStoreId();
-    const hasExplicitCrossCache = !!(browsingHostOrigin && ownerStoreId && browsingHostOrigin !== ownerStoreId);
-    const hasScanDifferentFromOwner = !!(scannedTokenOwner && ownerStoreId && scannedTokenOwner !== ownerStoreId);
-    const scanDiffersFromBrowsing = !!(scannedTokenOwner && browsingHostOrigin && scannedTokenOwner !== browsingHostOrigin);
-    const crossStore = hasExplicitCrossCache || hasScanDifferentFromOwner || scanDiffersFromBrowsing;
-    const base = Number(v.retailPriceCents ?? 0);
-    if (!crossStore) return base;
-    const ws = Number(v.wholesalePriceCents ?? 0);
-    return base + Math.max(0, ws);
+    const retail = Number(v.retailPriceCents ?? 0);
+    const wholesale = Number(v.wholesalePriceCents ?? 0);
+    const qp = this.route.snapshot.queryParamMap;
+    const anyScanParam = !!scannedTokenOwner || !!qp.get('gateway') || !!qp.get('gatewayCode') || !!qp.get('token') || !!qp.get('storeId') || !!qp.get('store');
+    const hasCrossHost = !!(browsingHostOrigin && ownerStoreId && browsingHostOrigin !== ownerStoreId);
+    const crossStore = anyScanParam || hasCrossHost;
+    if (crossStore) {
+      return Math.max(retail, retail + Math.max(0, wholesale));
+    }
+    return retail;
   }
 
   countdownMinutesLeft(): number {
@@ -1121,11 +1123,6 @@ export class ProductDetailPageComponent implements OnInit, OnDestroy {
           this.scannedStoreId.set(String(s.id));
           this.scannedStoreName.set(String(s.businessName || 'Store'));
           if (s.gatewayCode) this.scannedStoreGateway.set(String(s.gatewayCode));
-          this.products.setBrowsingHostStore({
-            storeId: String(s.id),
-            businessName: String(s.businessName || 'Store'),
-            gatewayCode: s.gatewayCode ? String(s.gatewayCode) : null,
-          });
           return String(s.id);
         }
       } catch {
@@ -1143,11 +1140,6 @@ export class ProductDetailPageComponent implements OnInit, OnDestroy {
           this.scannedStoreId.set(String(s.id));
           this.scannedStoreName.set(String(s.businessName || 'Store'));
           if (s.gatewayCode) this.scannedStoreGateway.set(String(s.gatewayCode));
-          this.products.setBrowsingHostStore({
-            storeId: String(s.id),
-            businessName: String(s.businessName || 'Store'),
-            gatewayCode: s.gatewayCode ? String(s.gatewayCode) : null,
-          });
           return String(s.id);
         }
       } catch {
