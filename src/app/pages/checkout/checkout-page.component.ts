@@ -240,10 +240,26 @@ export class CheckoutPageComponent implements OnInit {
   readonly status  = signal<CheckoutStatus>('reserved');
   readonly errorMessage = signal<string | null>(null);
 
-  readonly cents = computed(() => this.product()?.retailPriceCents ?? 0);
+  readonly cents = computed(() => {
+    const tx = this.transaction();
+    if (tx && typeof tx.totalRetailCents === 'number' && tx.totalRetailCents > 0) {
+      return tx.totalRetailCents;
+    }
+    const p = this.product();
+    if (!p) return 0;
+    const browsingHost = this.productService.getBrowsingHostStore()?.storeId ?? null;
+    const variantStoreId = (p as any)?.variantStoreId ?? p.storeId ?? null;
+    const scanned = new URLSearchParams(window.location.search).get('gateway');
+    const gatewayStore = (scanned && p?.variants?.length) ? (p.variants.find((v: any) => v && typeof v.storeId === 'string')?.storeId ?? null) : null;
+    const cross = (!!browsingHost && !!variantStoreId && browsingHost !== variantStoreId)
+      || (!!gatewayStore && !!variantStoreId && gatewayStore !== variantStoreId);
+    const retail = p.retailPriceCents ?? 0;
+    const wholesale = (p as any)?.wholesalePriceCents ?? 0;
+    return cross ? Math.max(retail, retail + Math.max(0, wholesale)) : retail;
+  });
   readonly formattedPrice = computed(() => this.formatPrice(this.cents()));
-  readonly formattedTax   = computed(() => this.formatPrice(Math.round(this.cents() * 0.08)));
-  readonly formattedTotal = computed(() => this.formatPrice(Math.round(this.cents() * 1.08)));
+  readonly formattedTax   = computed(() => this.formatPrice(0, this.product()?.currency ?? 'USD'));
+  readonly formattedTotal = computed(() => this.formatPrice(this.cents(), this.product()?.currency ?? 'USD'));
 
   formatPrice(cents: number, currency = 'USD'): string {
     return new Intl.NumberFormat('en-US', {

@@ -970,20 +970,21 @@ export class ProductDetailPageComponent implements OnInit, OnDestroy {
   readonly chosenPriceCents = computed(() => {
     const v = this.currentVariant();
     const ownerStoreId = v?.storeId ?? this.product()?.storeId ?? null;
-    const browsingOriginId = this.browsingOriginStoreId();
-    const crossStore = !!(browsingOriginId && ownerStoreId && browsingOriginId !== ownerStoreId);
-    let base = 0;
-    if (v) base = v.retailPriceCents;
-    else base = this.product()?.retailPriceCents ?? 0;
+    const browsingHostOrigin = this.browsingOriginStoreId();
+    const scannedTokenOwner = this.scannedStoreId();
+    const hasExplicitCrossCache = !!(browsingHostOrigin && ownerStoreId && browsingHostOrigin !== ownerStoreId);
+    const hasScanDifferentFromOwner = !!(scannedTokenOwner && ownerStoreId && scannedTokenOwner !== ownerStoreId);
+    const scanDiffersFromBrowsing = !!(scannedTokenOwner && browsingHostOrigin && scannedTokenOwner !== browsingHostOrigin);
+    const crossStore = hasExplicitCrossCache || hasScanDifferentFromOwner || scanDiffersFromBrowsing;
+    const retail = v ? v.retailPriceCents : (this.product()?.retailPriceCents ?? 0);
+    const wholesale = v ? (v.wholesalePriceCents ?? 0) : (this.product()?.wholesalePriceCents ?? 0);
     if (crossStore) {
-      const ws = v?.wholesalePriceCents ?? this.product()?.wholesalePriceCents ?? 0;
-      base = Math.max(base, base + Math.max(0, ws));
+      return Math.max(retail, retail + Math.max(0, wholesale));
     }
-    return base;
+    return retail;
   });
 
   readonly browsingOriginStoreId = computed<string | null>(() => {
-    if (this.scannedStoreId()) return this.scannedStoreId();
     const cached = this.products.getBrowsingHostStore();
     if (cached?.storeId) return cached.storeId;
     const p = this.product();
@@ -1057,8 +1058,12 @@ export class ProductDetailPageComponent implements OnInit, OnDestroy {
   variantHasStock(v: unknown): boolean { return this.variantStockNum(v) > 0; }
   variantDisplayPriceCents(v: { retailPriceCents?: number; wholesalePriceCents?: number; storeId?: string }): number {
     const ownerStoreId = v.storeId ?? this.product()?.storeId ?? null;
-    const browsingOriginId = this.browsingOriginStoreId();
-    const crossStore = !!(browsingOriginId && ownerStoreId && browsingOriginId !== ownerStoreId);
+    const browsingHostOrigin = this.browsingOriginStoreId();
+    const scannedTokenOwner = this.scannedStoreId();
+    const hasExplicitCrossCache = !!(browsingHostOrigin && ownerStoreId && browsingHostOrigin !== ownerStoreId);
+    const hasScanDifferentFromOwner = !!(scannedTokenOwner && ownerStoreId && scannedTokenOwner !== ownerStoreId);
+    const scanDiffersFromBrowsing = !!(scannedTokenOwner && browsingHostOrigin && scannedTokenOwner !== browsingHostOrigin);
+    const crossStore = hasExplicitCrossCache || hasScanDifferentFromOwner || scanDiffersFromBrowsing;
     const base = Number(v.retailPriceCents ?? 0);
     if (!crossStore) return base;
     const ws = Number(v.wholesalePriceCents ?? 0);
@@ -1154,15 +1159,18 @@ export class ProductDetailPageComponent implements OnInit, OnDestroy {
   }
 
   private async resolveOriginatingStoreId(_product: Product): Promise<string> {
-    const explicit = this.scannedStoreId();
-    if (explicit) return explicit;
     const cachedHost = this.products.getBrowsingHostStore();
     if (cachedHost?.storeId) return cachedHost.storeId;
+    const variantOwnerId =
+      (_product?.variants && _product.variants.length > 0
+        ? _product.variants.find((v: any) => v && typeof v.storeId === 'string' && v.storeId.length > 0)?.storeId
+        : undefined)
+      ?? _product?.storeId
+      ?? null;
+    const scanned = this.scannedStoreId();
+    if (scanned) return scanned;
+    if (variantOwnerId) return variantOwnerId;
     if (_product?.storeId) return _product.storeId;
-    if (_product?.variants && _product.variants.length > 0) {
-      const firstVid = _product.variants.find(v => typeof v.storeId === 'string' && v.storeId.length > 0);
-      if (firstVid?.storeId) return firstVid.storeId;
-    }
     const apiBase = this.auth.resolveApiBasePublic();
     try {
       const list: any[] = await firstValueFrom(this.http.get<any[]>(`${apiBase}/stores`));
