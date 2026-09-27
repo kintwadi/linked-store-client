@@ -18,6 +18,7 @@ import { StoreDashboardShellComponent } from './pages/store-dashboard/store-dash
 import { StoreProductsListComponent } from './pages/store-dashboard/store-products-list.component';
 import { StoreProductFormComponent } from './pages/store-dashboard/store-product-form.component';
 import { StoreTransactionsListComponent } from './pages/store-dashboard/store-transactions-list.component';
+import { AdminRefundPageComponent } from './pages/admin/admin-refund-page.component';
 
 export const routes: Routes = [
   { path: '',                        component: HomePageComponent,              title: 'Linked-Store' },
@@ -42,5 +43,6 @@ export const routes: Routes = [
     { path: 'products/:variantId', component: StoreProductFormComponent },
     { path: 'transactions', component: StoreTransactionsListComponent },
   ]},
+  { path: 'admin/refunds/:transactionId', component: AdminRefundPageComponent, canActivate: [authGuard], data: { requireStoreAdmin: true } },
   { path: '**',                      redirectTo: '' },
 ];

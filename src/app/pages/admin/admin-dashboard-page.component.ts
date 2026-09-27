@@ -1,8 +1,8 @@
-import { Component, OnInit, signal, computed, inject, ChangeDetectorRef, SecurityContext, OnDestroy } from '@angular/core';
+import { Component, OnInit, signal, computed, inject, ChangeDetectorRef, SecurityContext, OnDestroy, WritableSignal } from '@angular/core';
 import { CommonModule, DatePipe } from '@angular/common';
 import { FormsModule, ReactiveFormsModule, FormBuilder, FormGroup, Validators } from '@angular/forms';
 import { Router, RouterLink } from '@angular/router';
-import { HttpClient } from '@angular/common/http';
+import { HttpClient, HttpErrorResponse } from '@angular/common/http';
 import { DomSanitizer, SafeUrl } from '@angular/platform-browser';
 import { firstValueFrom } from 'rxjs';
 import { AuthService, AuthUser } from '../../services/auth.service';
@@ -1260,6 +1260,8 @@ interface SseEventShape {
     .toast.PICKED_UP   { border-left-color: #059669; }
     .toast.CANCELLED   { border-left-color: #6b7280; }
     .toast.EXPIRED     { border-left-color: #d97706; }
+    .toast.REFUND_COMPLETED { border-left-color: #059669; }
+    .toast.REFUND_FAILED   { border-left-color: #dc2626; }
     @keyframes toastIn {
       from { transform: translateX(12px); opacity: 0; }
       to   { transform: translateX(0); opacity: 1; }
@@ -1387,6 +1389,7 @@ interface SseEventShape {
       color: #9ca3af;
       font-weight: 500;
     }
+    .chip.refunded { color:#c2410c; background:#fff7ed; border:1px solid #fdba74; font-weight:600; }
   `],
   template: `
     <!-- SSE Toast stack -->
@@ -2344,9 +2347,13 @@ interface SseEventShape {
                             }
                           </td>
                           <td>
-                            <span class="status-badge" [class]="txStatusClass(tx.status)">
-                              {{ tx.status || '—' }}
-                            </span>
+                            @if (refundedTxIds().has(tx.id)) {
+                              <span class="chip refunded">Refunded</span>
+                            } @else {
+                              <span class="status-badge" [class]="txStatusClass(tx.status)">
+                                {{ tx.status || '—' }}
+                              </span>
+                            }
                           </td>
                           <td>
                             <div style="display: grid; gap: 2px;">
@@ -2397,6 +2404,12 @@ interface SseEventShape {
                                 <button type="button" class="btn btn-secondary" (click)="openRequestDetail(tx)">
                                   Open
                                 </button>
+                              }
+                              @if (tx.status === 'PAID' || tx.status === 'PICKED_UP') {
+                                <a class="btn btn-secondary" routerLink="/admin/refunds/{{tx.id}}">
+                                  <svg class="ico" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7v6h6"/><path d="M21 17a9 9 0 0 0-9-9 9 9 0 0 0-6.7 3L3 13"/></svg>
+                                  Refund
+                                </a>
                               }
                             </div>
                           </td>
@@ -2601,6 +2614,7 @@ export class AdminDashboardPageComponent implements OnInit, OnDestroy {
   readonly txError = signal<string | null>(null);
   readonly txPage = signal(0);
   readonly txPageSize = 10;
+  readonly refundedTxIds: WritableSignal<Set<string>> = signal(new Set());
 
   readonly loggingOut = signal(false);
 
@@ -3352,6 +3366,18 @@ export class AdminDashboardPageComponent implements OnInit, OnDestroy {
       this.txError.set(err?.error?.message ?? err?.message ?? 'Failed to load transactions.');
     } finally {
       this.txLoading.set(false);
+      try {
+        const api = this.api();
+        const refundedRes = await firstValueFrom(this.http.get<any>(`${api}/admin/stores/me/refunded-tx-ids`));
+        if (refundedRes && Array.isArray(refundedRes.transactionIds)) {
+          this.refundedTxIds.set(new Set(refundedRes.transactionIds));
+        }
+      } catch (refErr: any) {
+        if (refErr instanceof HttpErrorResponse) {
+          // swallow: leave refundedTxIds as empty Set (0 visual change)
+        }
+        // any other error also tolerated — no badge swap, refund buttons still route.
+      }
     }
   }
 
@@ -3409,11 +3435,11 @@ export class AdminDashboardPageComponent implements OnInit, OnDestroy {
   readonly sseConnected = signal(false);
 
   private isTerminalType(type: string): boolean {
-    return type === 'EXPIRED' || type === 'CANCELLED' || type === 'UNAVAILABLE' || type === 'FULFILLER_REJECTED';
+    return type === 'EXPIRED' || type === 'CANCELLED' || type === 'UNAVAILABLE' || type === 'FULFILLER_REJECTED' || type === 'REFUND_FAILED';
   }
 
   private isSuccessType(type: string): boolean {
-    return type === 'PAID' || type === 'PICKED_UP';
+    return type === 'PAID' || type === 'PICKED_UP' || type === 'REFUND_COMPLETED';
   }
 
   private ageMs(ev: SseEventShape, nowMs: number): number {
@@ -3731,6 +3757,8 @@ export class AdminDashboardPageComponent implements OnInit, OnDestroy {
       case 'PICKED_UP':           return 'Order picked up';
       case 'CANCELLED':           return 'Reservation cancelled';
       case 'EXPIRED':             return 'Reservation expired';
+      case 'REFUND_COMPLETED':    return 'Transaction refunded successfully';
+      case 'REFUND_FAILED':       return 'Refund failed';
       default:                    return ev.status ? `Status: ${ev.status}` : 'Update';
     }
   }

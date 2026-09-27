@@ -1,6 +1,6 @@
-import { Component, OnInit, signal, inject, ChangeDetectorRef, OnDestroy } from '@angular/core';
+import { Component, OnInit, signal, inject, ChangeDetectorRef, OnDestroy, WritableSignal } from '@angular/core';
 import { CommonModule, DatePipe } from '@angular/common';
-import { ActivatedRoute } from '@angular/router';
+import { ActivatedRoute, Router, RouterModule } from '@angular/router';
 import { HttpClient } from '@angular/common/http';
 import { firstValueFrom } from 'rxjs';
 import { AuthService } from '../../services/auth.service';
@@ -25,7 +25,7 @@ interface Transaction {
 @Component({
   selector: 'app-store-transactions-list',
   standalone: true,
-  imports: [CommonModule, DatePipe],
+  imports: [CommonModule, DatePipe, RouterModule],
   styles: [`
     :host { display: block; }
 
@@ -167,6 +167,10 @@ interface Transaction {
     }
     .empty h4 { margin: 0; font-size: 16px; font-weight: 700; color: #111827; }
     .empty p  { margin: 0; font-size: 13px; color: #6b7280; max-width: 360px; }
+
+    .chip.refunded, .status-badge.refunded { color:#c2410c; background:#fff7ed; border:1px solid #fdba74; font-weight:600; }
+    .btn-secondary { background:#fff7ed; color:#c2410c; border:1px solid #fdba74; }
+    .btn-secondary svg { flex-shrink: 0; }
   `],
   template: `
     <section class="panel">
@@ -216,13 +220,17 @@ interface Transaction {
                       </span>
                     </td>
                     <td>
-                      <span class="status-badge"
-                            [class.ok]="statusClass(tx.status) === 'ok'"
-                            [class.warn]="statusClass(tx.status) === 'warn'"
-                            [class.err]="statusClass(tx.status) === 'err'"
-                            [class.info]="statusClass(tx.status) === 'info'">
-                        {{ tx.status || 'PENDING' }}
-                      </span>
+                      @if (refundedTxIds().has(tx.id)) {
+                        <span class="chip refunded" title="Transaction status: refunded. This transaction was refunded.">Refunded</span>
+                      } @else {
+                        <span class="status-badge"
+                              [class.ok]="statusClass(tx.status) === 'ok'"
+                              [class.warn]="statusClass(tx.status) === 'warn'"
+                              [class.err]="statusClass(tx.status) === 'err'"
+                              [class.info]="statusClass(tx.status) === 'info'">
+                          {{ tx.status || 'PENDING' }}
+                        </span>
+                      }
                     </td>
                     <td>
                       @if (tx.expiresAt && (tx.status === 'RESERVED' || tx.status === 'PENDING_RESERVATION' || tx.status === 'READY')) {
@@ -255,6 +263,12 @@ interface Transaction {
                         } @else if (tx.status === 'READY') {
                           <span class="chip ok">✓ Confirmed ready</span>
                         }
+                        @if (tx.status === 'PAID' || tx.status === 'PICKED_UP') {
+                          <a class="btn btn-secondary" [routerLink]="['/admin','refunds', tx.id]" style="display:inline-flex; align-items:center; gap:6px; margin-left:8px;">
+                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg>
+                            Refund
+                          </a>
+                        }
                       </div>
                     </td>
                   </tr>
@@ -284,9 +298,11 @@ export class StoreTransactionsListComponent implements OnInit, OnDestroy {
   readonly markingReady = signal<Record<string, boolean>>({});
   readonly markingUnavail = signal<Record<string, boolean>>({});
   readonly justUpdated = signal<Record<string, boolean>>({});
+  readonly refundedTxIds: WritableSignal<Set<string>> = signal(new Set());
   private currentStoreId: string | null = null;
   private tickerHandle: any = null;
   private sseSource: EventSource | null = null;
+  private readonly router = inject(Router);
 
   ngOnInit(): void {
     this.loadTransactions();
@@ -317,7 +333,8 @@ export class StoreTransactionsListComponent implements OnInit, OnDestroy {
       const types = [
         'REQUESTED', 'FULFILLER_ACCEPTED', 'FULFILLER_REJECTED',
         'RESERVED', 'READY', 'UNAVAILABLE',
-        'PAID', 'PICKED_UP', 'CANCELLED', 'EXPIRED'
+        'PAID', 'PICKED_UP', 'CANCELLED', 'EXPIRED',
+        'REFUND_COMPLETED', 'REFUND_FAILED'
       ];
       for (const t of types) {
         this.sseSource.addEventListener(t, (e: any) => {
@@ -398,6 +415,20 @@ export class StoreTransactionsListComponent implements OnInit, OnDestroy {
     } finally {
       this.loading.set(false);
       this.cdr.markForCheck();
+    }
+  }
+
+  private async loadRefundedTxIds(): Promise<void> {
+    try {
+      const api = this.authService.resolveApiBasePublic();
+      const data = await firstValueFrom(
+        this.http.get<{ transactionIds: string[] }>(
+          `${api}/admin/stores/me/refunded-tx-ids`
+        )
+      );
+      this.refundedTxIds.set(new Set(data.transactionIds || []));
+    } catch {
+      this.refundedTxIds.set(new Set());
     }
   }
 
