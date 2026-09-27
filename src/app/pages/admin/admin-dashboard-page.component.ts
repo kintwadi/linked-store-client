@@ -1113,7 +1113,7 @@ interface SseEventShape {
                                     }
                                   </div>
                                 }
-                                @if ((ev.type === 'RESERVED' || ev.type === 'READY') && !isSupersededBellEvent(ev)) {
+                                @if (((ev.type === 'REQUESTED' && txIsFulfillingScope(ev)) || ev.type === 'RESERVED' || ev.type === 'READY') && !isSupersededBellEvent(ev)) {
                                   <div class="bell-action-row" (click)="$event.stopPropagation()">
                                     <button type="button"
                                             class="bell-action-btn btn-primary"
@@ -3132,6 +3132,83 @@ export class AdminDashboardPageComponent implements OnInit, OnDestroy {
     // New terminal/success events immediately trigger one GC pass so the dedup/supersede takes
     // effect right away (e.g. incoming PAID replaces old RESERVED row instantly).
     setTimeout(() => this.runNotificationGcPass(), 100);
+    // Sync live SSE events into the dashboard Transactions table so rows appear/refresh
+    // without requiring a browser reload.
+    setTimeout(() => this.syncSseEventToTransactionsTable(ev), 0);
+  }
+
+  private syncSseEventToTransactionsTable(ev: SseEventShape): void {
+    if (!ev || !ev.transactionId) return;
+    const txId = String(ev.transactionId).trim().toLowerCase();
+    if (!txId) return;
+    const eventStatus: Record<string, string> = {
+      REQUESTED: 'REQUESTED',
+      FULFILLER_ACCEPTED: 'FULFILLER_ACCEPTED',
+      FULFILLER_REJECTED: 'FULFILLER_REJECTED',
+      RESERVED: 'RESERVED',
+      READY: 'READY',
+      UNAVAILABLE: 'CANCELED',
+      PAID: 'PAID',
+      PICKED_UP: 'PICKED_UP',
+      CANCELLED: 'CANCELED',
+      EXPIRED: 'EXPIRED'
+    };
+    const nextStatus = ev.status || eventStatus[ev.type] || null;
+    const matchId = (t: any): boolean => {
+      if (!t) return false;
+      const candidates: string[] = [];
+      if (t.id != null) candidates.push(String(t.id));
+      if (t.transactionId != null) candidates.push(String(t.transactionId));
+      return candidates.some(c => c.trim().toLowerCase() === txId);
+    };
+    this.transactions.update(list => {
+      const idx = list.findIndex(matchId);
+      if (idx >= 0) {
+        const patch: any = { id: list[idx].id };
+        if (nextStatus) patch.status = nextStatus;
+        if (ev.expiresAt) patch.expiresAt = ev.expiresAt;
+        if (ev.createdAt && !list[idx].createdAt) patch.createdAt = ev.createdAt;
+        const arr = list.slice();
+        arr[idx] = { ...arr[idx], ...patch };
+        return arr;
+      }
+      if (!nextStatus) return list;
+      if (nextStatus === 'CANCELED' || nextStatus === 'EXPIRED' ||
+          nextStatus === 'FULFILLER_REJECTED' || nextStatus === 'UNAVAILABLE') {
+        return list;
+      }
+      const totalCents = typeof ev.retailPrice === 'number'
+        ? Math.round(ev.retailPrice)
+        : null;
+      const synthetic: any = {
+        id: String(ev.transactionId),
+        transactionId: String(ev.transactionId),
+        createdAt: ev.createdAt || new Date().toISOString(),
+        originatingStoreId: ev.originatingStoreId || null,
+        fulfillingStoreId: ev.fulfillingStoreId || ev.storeId || null,
+        status: nextStatus,
+        totalAmountCents: totalCents,
+        totalRetailCents: totalCents,
+        itemsCount: 1,
+        lineItems: null,
+        role: null,
+        expiresAt: ev.expiresAt || null,
+        variantId: ev.variantId || null,
+        productTitle: ev.productTitle || null,
+        sku: ev.sku || null,
+        currency: ev.currency || null,
+        _sseSynthetic: true
+      };
+      const me = this.currentUser();
+      const myStoreId = me?.storeId;
+      const scopeMatch = this.isGlobalAdmin() ||
+        (!!myStoreId && (
+          synthetic.originatingStoreId === myStoreId ||
+          synthetic.fulfillingStoreId === myStoreId
+        ));
+      if (!scopeMatch) return list;
+      return [synthetic, ...list];
+    });
   }
 
   private scheduleToastDismiss(id: string, ms: number): void {
@@ -3289,6 +3366,7 @@ export class AdminDashboardPageComponent implements OnInit, OnDestroy {
       this.pushEvent(okEvent);
       this.userSuccess.set(isRequested ? 'Request accepted — inventory held 15 min.' : 'Item marked ready.');
       setTimeout(() => { if (this.userSuccess() && this.userSuccess()!.startsWith('Request')) this.userSuccess.set(null); }, 3000);
+      await this.loadTransactions();
     } catch (err: any) {
       this.userError.set(err?.error?.message ?? err?.message ?? 'Failed to accept.');
       setTimeout(() => { if (this.userError()) this.userError.set(null); }, 4000);
@@ -3320,6 +3398,7 @@ export class AdminDashboardPageComponent implements OnInit, OnDestroy {
       this.pushEvent(endEvent);
       this.userSuccess.set(isRequested ? 'Request rejected.' : 'Item marked unavailable.');
       setTimeout(() => { if (this.userSuccess() && (this.userSuccess() === 'Request rejected.' || this.userSuccess() === 'Item marked unavailable.')) this.userSuccess.set(null); }, 3000);
+      await this.loadTransactions();
     } catch (err: any) {
       this.userError.set(err?.error?.message ?? err?.message ?? 'Failed.');
       setTimeout(() => { if (this.userError()) this.userError.set(null); }, 4000);
@@ -3350,23 +3429,19 @@ export class AdminDashboardPageComponent implements OnInit, OnDestroy {
     return !this.txIsFulfillingScope(tx);
   }
 
-  /** Dashboard Transactions tab: show Accept button for RESERVED/PENDING_RESERVATION (any scope same-store),
-   *  or REQUESTED only for fulfilling-store admin scope (never for originating store admin).
+  /** Dashboard Transactions tab: Accept/Deny buttons are broker-flow REQUESTED-stage only:
+   *  the fulfilling store admin approves inventory before any stock is locked. Once the tx
+   *  is RESERVED/READY/PAID (i.e. already locked or past), these buttons must not appear.
    */
   txShowAcceptButton(tx: any): boolean {
     const s = tx?.status;
-    if (s === 'RESERVED' || s === 'PENDING_RESERVATION') return true;
-    if (s === 'REQUESTED') return this.txIsFulfillingScope(tx);
+    if (s === 'REQUESTED' || s === 'PENDING_RESERVATION') return this.txIsFulfillingScope(tx);
     return false;
   }
 
-  /** Dashboard Transactions tab: show Deny button for RESERVED/PENDING_RESERVATION (any scope same-store),
-   *  or REQUESTED only for fulfilling-store admin scope.
-   */
   txShowDenyButton(tx: any): boolean {
     const s = tx?.status;
-    if (s === 'RESERVED' || s === 'PENDING_RESERVATION') return true;
-    if (s === 'REQUESTED') return this.txIsFulfillingScope(tx);
+    if (s === 'REQUESTED' || s === 'PENDING_RESERVATION') return this.txIsFulfillingScope(tx);
     return false;
   }
 
@@ -3528,9 +3603,13 @@ export class AdminDashboardPageComponent implements OnInit, OnDestroy {
           if (data && typeof data === 'object') this.pushEvent(data as SseEventShape);
         } catch { /* ignore */ }
       };
-      const types = ['RESERVED', 'READY', 'UNAVAILABLE', 'PAID', 'PICKED_UP', 'CANCELLED', 'EXPIRED'];
+      const types: Array<SseEventShape['type']> = [
+        'REQUESTED', 'FULFILLER_ACCEPTED', 'FULFILLER_REJECTED',
+        'RESERVED', 'READY', 'UNAVAILABLE',
+        'PAID', 'PICKED_UP', 'CANCELLED', 'EXPIRED'
+      ];
       for (const t of types) {
-        this.sseSource.addEventListener(t, (e: any) => {
+        this.sseSource.addEventListener(t as string, (e: any) => {
           try {
             const data = JSON.parse(e.data || 'null');
             if (data && typeof data === 'object') {

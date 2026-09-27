@@ -1346,7 +1346,21 @@ export class ProductDetailPageComponent implements OnInit, OnDestroy {
     this.deadlineMs.set(deadline);
     this.reservationStatus.set('pending');
     this.startReservationPolling();
+    this._installCountdownTicker();
+  }
 
+  private restartCountdownFrom(expiresAtIso: string | null | undefined): void {
+    if (!expiresAtIso) return;
+    const t = new Date(expiresAtIso).getTime();
+    if (!t || Number.isNaN(t)) return;
+    if (t <= Date.now()) return;
+    this.clearCountdown();
+    this.deadlineMs.set(t);
+    this._installCountdownTicker();
+  }
+
+  private _installCountdownTicker(): void {
+    if (this.countdownTimer !== null) return;
     this.countdownTimer = window.setInterval(() => {
       this.tick.update((t) => t + 1);
       const remaining = this.currentSecondsRemaining();
@@ -1387,9 +1401,27 @@ export class ProductDetailPageComponent implements OnInit, OnDestroy {
         }
         switch (txStatus) {
           case 'READY':
+          case 'RESERVED':
+          case 'FULFILLER_ACCEPTED':
           case 'PAID':
           case 'PICKED_UP':
             this.reservationStatus.set('accepted');
+            const fresh = this.reservation();
+            if (fresh) {
+              if (res?.expiresAt) fresh.expiresAt = res.expiresAt;
+              if (res?.lock?.expiresAt) {
+                fresh.lock = fresh.lock || {};
+                fresh.lock.expiresAt = res.lock.expiresAt;
+                if (!fresh.expiresAt) fresh.expiresAt = res.lock.expiresAt;
+              }
+              if (typeof res?.totalRetailCents === 'number') fresh.totalRetailCents = res.totalRetailCents;
+              if (typeof res?.totalWholesaleCents === 'number') fresh.totalWholesaleCents = res.totalWholesaleCents;
+              if (typeof res?.crossCustomerStoreSellCents === 'number') fresh.crossCustomerStoreSellCents = res.crossCustomerStoreSellCents;
+              if (res?.qrSecureToken) fresh.qrSecureToken = res.qrSecureToken;
+              if (res?.qrFallbackCode) fresh.qrFallbackCode = res.qrFallbackCode;
+              this.reservation.set(structuredClone(fresh));
+              this.restartCountdownFrom(fresh.expiresAt || (fresh.lock && fresh.lock.expiresAt) || null);
+            }
             this.tick.update((t) => t + 1);
             this.clearReservationPolling();
             return;
@@ -1413,10 +1445,7 @@ export class ProductDetailPageComponent implements OnInit, OnDestroy {
             this.tick.update((t) => t + 1);
             this.scheduleNextPoll(tick);
             return;
-          case 'RESERVED':
-          case 'FULFILLER_ACCEPTED':
           default:
-            if (this.reservationStatus() === 'pending' || this.reservationStatus() === 'requested') this.reservationStatus.set('reserved');
             this.tick.update((t) => t + 1);
             this.scheduleNextPoll(tick);
             return;

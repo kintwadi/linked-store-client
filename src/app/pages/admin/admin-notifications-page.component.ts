@@ -688,6 +688,7 @@ export class AdminNotificationsPageComponent implements OnInit, OnDestroy {
   currentUser: AuthUser | null = null;
   globalAdmin = false;
 
+  private sseSource: EventSource | null = null;
   private sseTick: any = null;
   private gcTick: any = null;
 
@@ -709,12 +710,63 @@ export class AdminNotificationsPageComponent implements OnInit, OnDestroy {
 
     this.gcTick = setInterval(() => this.runGc(), 60 * 1000);
 
-    void this.loadRecent();
+    void this.loadRecent().then(() => {
+      void this.startSse();
+    });
   }
 
   ngOnDestroy(): void {
     if (this.sseTick) { clearInterval(this.sseTick); this.sseTick = null; }
     if (this.gcTick) { clearInterval(this.gcTick); this.gcTick = null; }
+    if (this.sseSource) { try { this.sseSource.close(); } catch { /* ignore */ } this.sseSource = null; }
+  }
+
+  private pushEvent(ev: SseEventShape): void {
+    ev._read = false;
+    this.events.update(list => {
+      let dedup: SseEventShape[] = list;
+      if (ev.transactionId) {
+        dedup = dedup.filter(x => !(x.transactionId && x.transactionId === ev.transactionId));
+      } else {
+        dedup = dedup.filter(x => !(x.eventId && ev.eventId && x.eventId === ev.eventId));
+      }
+      return [ev, ...dedup].slice(0, 200);
+    });
+    setTimeout(() => this.runGc(), 100);
+    setTimeout(() => { void this.hydrateStock(); }, 20);
+    this.touch();
+  }
+
+  private async startSse(): Promise<void> {
+    const api = this.api();
+    const token = this.authService.getToken();
+    if (!token) return;
+    const sseTail = this.globalAdmin
+      ? `/admin/sse/events`
+      : `/stores/me/sse/events`;
+    const url = `${api}${sseTail}?access_token=${encodeURIComponent(token)}`;
+    if (typeof EventSource === 'undefined') return;
+    try {
+      this.sseSource = new EventSource(url, { withCredentials: false });
+      this.sseSource.onopen = () => { this.connected.set(true); this.touch(); };
+      this.sseSource.onerror = () => { this.connected.set(false); this.touch(); };
+      const types: Array<SseEventShape['type']> = [
+        'REQUESTED', 'FULFILLER_ACCEPTED', 'FULFILLER_REJECTED',
+        'RESERVED', 'READY', 'UNAVAILABLE',
+        'PAID', 'PICKED_UP', 'CANCELLED', 'EXPIRED'
+      ];
+      for (const t of types) {
+        this.sseSource.addEventListener(t as string, (e: any) => {
+          try {
+            const data = JSON.parse(e.data || 'null');
+            if (data && typeof data === 'object') {
+              if (!data.type) data.type = t;
+              this.pushEvent(data as SseEventShape);
+            }
+          } catch { /* ignore */ }
+        });
+      }
+    } catch { /* ignore */ }
   }
 
   private async loadRecent(): Promise<void> {
@@ -755,7 +807,6 @@ export class AdminNotificationsPageComponent implements OnInit, OnDestroy {
       byTx.forEach(v => deduped.push(v));
       deduped.push(...noTx);
       this.events.set(deduped);
-      this.connected.set(true);
       this.runGc();
       void this.hydrateStock();
     } catch (err: any) {

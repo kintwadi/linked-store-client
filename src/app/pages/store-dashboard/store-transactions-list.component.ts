@@ -294,11 +294,71 @@ export class StoreTransactionsListComponent implements OnInit, OnDestroy {
       const any = this.transactions().some(t => t.expiresAt && (t.status === 'RESERVED' || t.status === 'PENDING_RESERVATION' || t.status === 'READY'));
       if (any) this.cdr.markForCheck();
     }, 1000);
+    void this.startSse();
   }
 
   ngOnDestroy(): void {
     if (this.tickerHandle) clearInterval(this.tickerHandle);
     if (this.sseSource) { try { this.sseSource.close(); } catch {} }
+  }
+
+  private async startSse(): Promise<void> {
+    const api = this.authService.resolveApiBasePublic();
+    const token = this.authService.getToken();
+    if (!token) return;
+    const { storeId, isMe } = this.getStoreIdParam();
+    const ssePath = isMe
+      ? `/stores/me/sse/events`
+      : `/stores/${encodeURIComponent(storeId)}/sse/events`;
+    const url = `${api}${ssePath}?access_token=${encodeURIComponent(token)}`;
+    if (typeof EventSource === 'undefined') return;
+    try {
+      this.sseSource = new EventSource(url, { withCredentials: false });
+      const types = [
+        'REQUESTED', 'FULFILLER_ACCEPTED', 'FULFILLER_REJECTED',
+        'RESERVED', 'READY', 'UNAVAILABLE',
+        'PAID', 'PICKED_UP', 'CANCELLED', 'EXPIRED'
+      ];
+      for (const t of types) {
+        this.sseSource.addEventListener(t, (e: any) => {
+          try {
+            const data = JSON.parse(e.data || 'null');
+            if (data && typeof data === 'object') {
+              this.applySseTxUpdate(data);
+            }
+          } catch { /* ignore */ }
+        });
+      }
+    } catch { /* ignore */ }
+  }
+
+  private applySseTxUpdate(ev: { transactionId?: string | null; status?: string | null; type?: string; expiresAt?: string | null }): void {
+    const txId = ev.transactionId;
+    const mapTypeToStatus: Record<string, string> = {
+      REQUESTED: 'REQUESTED',
+      FULFILLER_ACCEPTED: 'FULFILLER_ACCEPTED',
+      FULFILLER_REJECTED: 'FULFILLER_REJECTED',
+      RESERVED: 'RESERVED',
+      READY: 'READY',
+      UNAVAILABLE: 'CANCELED',
+      PAID: 'PAID',
+      PICKED_UP: 'PICKED_UP',
+      CANCELLED: 'CANCELED',
+      EXPIRED: 'EXPIRED'
+    };
+    const nextStatus = ev.status || (ev.type ? mapTypeToStatus[ev.type] : null) || null;
+    if (txId) {
+      const existing = this.transactions().find(t => t.id === txId);
+      if (existing) {
+        const patch: Partial<Transaction> & { id: string } = { id: txId };
+        if (nextStatus) patch.status = nextStatus;
+        if (ev.expiresAt) patch.expiresAt = ev.expiresAt;
+        this.mergeIncomingTx(patch);
+        this.pulseRow(txId);
+      } else {
+        void this.loadTransactions();
+      }
+    }
   }
 
   private getStoreIdParam(): { storeId: string; isMe: boolean } {
