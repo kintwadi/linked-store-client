@@ -355,7 +355,7 @@ export class HomePageComponent implements OnInit {
       } catch {
         productId = null;
       }
-      if (!productId) productId = this.products.getFeaturedProductId();
+      if (!productId) productId = await this.products.getFeaturedProductId();
       if (productId) this.featuredId.set(String(productId));
     })();
 
@@ -419,7 +419,7 @@ export class HomePageComponent implements OnInit {
 
   async onExplore(event?: MouseEvent): Promise<void> {
     this.spawnRipple(event);
-    const id = this.featuredId() || this.products.getFeaturedProductId();
+    const id = this.featuredId() || (await this.products.getFeaturedProductId());
     if (!id) {
       this.router.navigate(['/']);
       return;

@@ -4,6 +4,7 @@ export interface ProductVariant {
   retailPriceCents: number;
   wholesalePriceCents?: number;
   imageUrl?: string;
+  galleryImageUrls?: string[];
   stockQuantity: number;
   storeId: string;
   variantAttributes?: Record<string, any> | null;

@@ -1,6 +1,6 @@
-import { Injectable, InjectionToken } from '@angular/core';
+import { Injectable, InjectionToken, signal, WritableSignal } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
-import { BehaviorSubject, firstValueFrom, Observable, of } from 'rxjs';
+import { BehaviorSubject, firstValueFrom, from, Observable, of } from 'rxjs';
 import { delay, map, tap } from 'rxjs/operators';
 import { Product, SimilarProductsResult } from '../shared/models/product.model';
 
@@ -200,7 +200,44 @@ const MOCK_PRODUCTS: Product[] = [
 export class ProductService {
   private readonly fallback = new BehaviorSubject<boolean>(false);
 
+  private _listSignal: WritableSignal<Product[] | null> = signal<Product[] | null>(null);
+  private _listPromise: Promise<Product[]> | null = null;
+  private _listStaleAt = 0;
+  private static readonly LIST_TTL_MS = 1000 * 60 * 10;
+
   constructor(private readonly http: HttpClient) {}
+
+  private async _loadAllProductsOnce(): Promise<Product[]> {
+    const now = Date.now();
+    if (this._listPromise && now < this._listStaleAt) return this._listPromise;
+    if (this._listSignal() != null && now < this._listStaleAt) {
+      return this._listSignal() as Product[];
+    }
+    this._listPromise = (async () => {
+      try {
+        const raw: any[] = await firstValueFrom(
+          this.http.get<any[]>(`${resolveApiBase()}/products`)
+        );
+        const mapped = Array.isArray(raw) ? raw.map((r) => this.mapBackendProduct(r)) : [];
+        this._listSignal.set(mapped);
+        this._listStaleAt = Date.now() + ProductService.LIST_TTL_MS;
+        this.fallback.next(false);
+        return mapped;
+      } catch (e) {
+        this.fallback.next(true);
+        this._listSignal.set(MOCK_PRODUCTS);
+        this._listStaleAt = Date.now() + 60_000;
+        return MOCK_PRODUCTS;
+      }
+    })();
+    return this._listPromise;
+  }
+
+  invalidateProductCache(): void {
+    this._listSignal.set(null);
+    this._listPromise = null;
+    this._listStaleAt = 0;
+  }
 
   formatPrice(cents: number, currency = 'USD'): string {
     const formatter = new Intl.NumberFormat('en-US', {
@@ -212,58 +249,85 @@ export class ProductService {
   }
 
   async getAllProducts(): Promise<any[]> {
-    return firstValueFrom(this.http.get<any[]>(`${resolveApiBase()}/products`)).catch(() => Promise.resolve(MOCK_PRODUCTS));
+    const cached = await this._loadAllProductsOnce();
+    return cached;
   }
 
   private mapBackendProduct(response: any): Product {
-    const attrs = response.attributes ?? {};
-    const category = attrs.category ?? (response.variants?.[0]?.attributes?.category) ?? undefined;
-    const brand = attrs.brand ?? (response.variants?.[0]?.attributes?.brand) ?? undefined;
-    const gender = attrs.gender ?? undefined;
-    const priceFromAttrs = attrs.price ? Number(attrs.price) : undefined;
-    const primaryImage = response.primaryImageUrl || response.thumbnailUrl || '';
-
-    const variantsArr: any[] = Array.isArray(response.variants) ? response.variants : [];
+    const attrs = response?.attributes ?? {};
+    const variantsArr: any[] = Array.isArray(response?.variants) ? response.variants : [];
 
     const inStockVariants = variantsArr
-      .filter((v: any) => Number(v.stockQuantity) > 0)
-      .sort((a: any, b: any) => Number(a.retailPriceCents) - Number(b.retailPriceCents));
+      .filter((v: any) => Number(v?.stockQuantity ?? 0) > 0)
+      .sort((a: any, b: any) => Number(a.retailPriceCents ?? 0) - Number(b.retailPriceCents ?? 0));
 
-    const chosenVariant: any = inStockVariants.length > 0 ? inStockVariants[0] : (variantsArr[0] ?? null);
+    const chosenVariant: any = inStockVariants.length > 0
+      ? inStockVariants[0]
+      : (variantsArr[0] ?? null);
 
-    const chosenVariantId = chosenVariant?.id ?? response.variants?.[0]?.id ?? response.id;
+    const category = attrs?.category
+      ?? chosenVariant?.variantAttributes?.category
+      ?? chosenVariant?.attributes?.category
+      ?? undefined;
+    const brand = attrs?.brand
+      ?? chosenVariant?.variantAttributes?.brand
+      ?? chosenVariant?.attributes?.brand
+      ?? undefined;
+    const priceFromAttrs = attrs?.price ? Number(attrs.price) : undefined;
+    const primaryImage = response?.primaryImageUrl ?? response?.thumbnailUrl ?? '';
+
+    const chosenVariantId = chosenVariant?.id ?? response?.variants?.[0]?.id ?? response?.id;
     const chosenRetailPriceCents = chosenVariant?.retailPriceCents != null
       ? Number(chosenVariant.retailPriceCents)
-      : (priceFromAttrs ?? response.retailPriceCents ?? 0);
-    const chosenStoreId = chosenVariant?.storeId ?? response.storeId;
-    const chosenSku = chosenVariant?.sku ?? response.sku;
-    const chosenInStock = chosenVariant ? Number(chosenVariant.stockQuantity) > 0 : true;
+      : (priceFromAttrs ?? Number(response?.retailPriceCents ?? 0));
+    const chosenStoreId = chosenVariant?.storeId ?? response?.storeId;
+    const chosenSku = chosenVariant?.sku ?? response?.sku;
+    const chosenInStock = chosenVariant ? Number(chosenVariant.stockQuantity ?? 0) > 0 : true;
+
+    const currencyRaw = response?.currencyCode
+      ?? chosenVariant?.currencyCode
+      ?? response?.currency
+      ?? 'USD';
+    const currency = typeof currencyRaw === 'string' && currencyRaw.trim()
+      ? currencyRaw.trim().toUpperCase()
+      : 'USD';
 
     const mappedVariants = variantsArr.map((v: any) => ({
-      id: String(v.id ?? ''),
-      sku: String(v.sku ?? ''),
-      retailPriceCents: Number(v.retailPriceCents ?? 0),
-      wholesalePriceCents: v.wholesalePriceCents != null ? Number(v.wholesalePriceCents) : undefined,
-      imageUrl: v.imageUrl ?? undefined,
-      stockQuantity: Number(v.stockQuantity ?? 0),
-      storeId: String(v.storeId ?? ''),
-      variantAttributes: v.variantAttributes ?? v.attributes ?? null,
+      id: String(v?.id ?? ''),
+      sku: String(v?.sku ?? ''),
+      retailPriceCents: Number(v?.retailPriceCents ?? 0),
+      wholesalePriceCents: v?.wholesalePriceCents != null ? Number(v.wholesalePriceCents) : undefined,
+      imageUrl: v?.imageUrl ?? undefined,
+      stockQuantity: Number(v?.stockQuantity ?? 0),
+      storeId: v?.storeId ? String(v.storeId) : (chosenStoreId != null ? String(chosenStoreId) : ''),
+      variantAttributes: v?.variantAttributes ?? v?.attributes ?? null,
     }));
 
+    const galleryFromVariants = mappedVariants
+      .filter((v) => !!v.imageUrl && v.imageUrl !== primaryImage)
+      .slice(0, 5)
+      .map((v) => v.imageUrl as string);
+    const fallbackPrimary = primaryImage;
+    const gallery: string[] = [
+      fallbackPrimary,
+      ...galleryFromVariants,
+    ].filter(Boolean).filter((s, i, a) => a.indexOf(s) === i);
+    while (gallery.length < 3) gallery.push(fallbackPrimary);
+
     return {
-      id: response.id,
-      title: response.title,
-      description: response.description,
+      id: response?.id,
+      title: response?.title ?? '',
+      description: response?.description ?? '',
       primaryImageUrl: primaryImage,
-      thumbnailUrl: response.thumbnailUrl,
-      galleryImages: [primaryImage, primaryImage, primaryImage],
+      thumbnailUrl: response?.thumbnailUrl,
+      galleryImages: gallery,
       retailPriceCents: chosenRetailPriceCents,
-      currency: 'USD',
+      currency,
       category,
       brand,
       inStock: chosenInStock,
       variantId: chosenVariantId,
-      storeId: chosenStoreId,
+      storeId: chosenStoreId != null ? String(chosenStoreId) : undefined,
       sku: chosenSku,
       variants: mappedVariants.length > 0 ? mappedVariants : undefined,
     };
@@ -289,10 +353,13 @@ export class ProductService {
   }
 
   list(): Observable<Product[]> {
-    return of(MOCK_PRODUCTS).pipe(delay(120));
+    return from(this._loadAllProductsOnce());
   }
 
-  getFeaturedProductId(): string {
+  async getFeaturedProductId(): Promise<string> {
+    const cached = await this._loadAllProductsOnce();
+    const first = cached[0];
+    if (first?.id) return String(first.id);
     return MOCK_PRODUCTS[0].id;
   }
 
@@ -363,16 +430,32 @@ export class ProductService {
     const all = await firstValueFrom(this.list());
     const seed = all.find((p) => p.id === productId);
     if (!seed) return all.slice(0, limit);
+    const seedStoreId = this.resolveStoreId(seed);
     return all
       .filter((p) => p.id !== productId)
       .sort((a, b) => {
-        const sa =
+        const saStore = this.resolveStoreId(a);
+        const sbStore = this.resolveStoreId(b);
+        const aStore = seedStoreId && saStore && saStore === seedStoreId ? 4 : 0;
+        const bStore = seedStoreId && sbStore && sbStore === seedStoreId ? 4 : 0;
+        const sa = aStore +
           (a.category === seed.category ? 2 : 0) + (a.brand === seed.brand ? 1 : 0);
-        const sb =
+        const sb = bStore +
           (b.category === seed.category ? 2 : 0) + (b.brand === seed.brand ? 1 : 0);
-        return sb - sa;
+        if (sb !== sa) return sb - sa;
+        return Number(!!b.inStock) - Number(!!a.inStock);
       })
       .slice(0, limit);
+  }
+
+  private resolveStoreId(p: Product | undefined | null): string | null {
+    if (!p) return null;
+    if (p.storeId) return p.storeId;
+    if (p.variants && p.variants.length > 0) {
+      const f = p.variants.find(v => !!v.storeId);
+      if (f?.storeId) return f.storeId;
+    }
+    return null;
   }
 
   async getWithSimilar(productId: string): Promise<SimilarProductsResult> {

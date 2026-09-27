@@ -45,49 +45,495 @@ interface SseEventShape {
   imports: [CommonModule, FormsModule, RouterLink, ReactiveFormsModule, DatePipe, CanPipe],
   styles: [`
     :host { display: block; }
+
+    /* ====== DESIGN TOKENS (from new_dashboard_layout.html) ====== */
+    :host {
+      --bg: #f8fafc;
+      --surface: #ffffff;
+      --surface-2: #f1f5f9;
+      --border: #e2e8f0;
+      --text: #0f172a;
+      --text-muted: #64748b;
+      --text-light: #94a3b8;
+      --primary: #6366f1;
+      --primary-dark: #4f46e5;
+      --primary-light: #eef2ff;
+      --success: #10b981;
+      --success-light: #ecfdf5;
+      --success-dark: #059669;
+      --warning: #f59e0b;
+      --danger: #ef4444;
+      --accent: #8b5cf6;
+      --shadow-sm: 0 1px 2px rgba(15,23,42,0.04);
+      --shadow: 0 1px 3px rgba(15,23,42,0.06), 0 1px 2px rgba(15,23,42,0.04);
+      --shadow-md: 0 4px 6px -1px rgba(15,23,42,0.07), 0 2px 4px -2px rgba(15,23,42,0.05);
+      --shadow-lg: 0 10px 25px -5px rgba(15,23,42,0.08), 0 8px 10px -6px rgba(15,23,42,0.04);
+      --radius: 12px;
+      --radius-lg: 16px;
+      background: var(--bg);
+    }
+
+    /* ====== TOP NAV (from design) ====== */
+    .topnav {
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      padding: 14px 32px;
+      display: flex; align-items: center; justify-content: space-between;
+      position: sticky; top: 0; z-index: 50;
+      backdrop-filter: blur(12px);
+      background: rgba(255,255,255,0.85);
+    }
+    .logo {
+      display: flex; align-items: center; gap: 10px;
+      font-weight: 700; font-size: 1.05rem; color: var(--text);
+      text-decoration: none;
+    }
+    .logo-dot {
+      width: 28px; height: 28px; border-radius: 8px;
+      background: linear-gradient(135deg, #6366f1, #8b5cf6);
+      display: grid; place-items: center; color: #fff;
+    }
+    .topnav-right { display: flex; align-items: center; gap: 16px; }
+    .nav-link {
+      font-size: 0.875rem; color: var(--text-muted); text-decoration: none;
+      font-weight: 500; transition: color 0.15s;
+    }
+    .nav-link:hover { color: var(--text); }
+
+    /* ====== MAIN CONTAINER ====== */
     .wrap {
-      max-width: 1400px;
+      max-width: 1200px;
       margin: 0 auto;
-      padding: 28px 20px 80px;
+      padding: 24px 32px 64px;
       display: grid;
       gap: 24px;
     }
-    .back {
+    .back-link {
       display: inline-flex; align-items: center; gap: 6px;
-      color: var(--color-muted); text-decoration: none; font-size: 14px;
-      font-weight: 500;
+      font-size: 0.875rem; color: var(--text-muted);
+      text-decoration: none; font-weight: 500;
+      padding: 8px 0; transition: color 0.15s;
     }
-    .back:hover { color: var(--color-ink, #111827); }
+    .back-link:hover { color: var(--text); }
 
-    /* ============ HERO HEADER ============ */
+    /* ====== HERO CARD (from design) ====== */
     .hero {
-      background: #fff;
-      border-radius: 20px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
       padding: 28px 32px;
-      color: #111827;
-      box-shadow: 0 1px 3px rgba(0,0,0,0.06);
-      position: relative;
-      overflow: visible;
-      border: 1px solid #f3f4f6;
-    }
-    .hero::before { display: none; }
-    .hero-inner {
-      position: relative; z-index: 1;
       display: flex; align-items: center; justify-content: space-between;
       gap: 24px; flex-wrap: wrap;
+      box-shadow: var(--shadow-sm);
+      position: relative; overflow: visible;
     }
-    .hero-left { display: grid; gap: 10px; max-width: 680px; }
-    .hero-greet {
-      display: inline-flex; align-items: center; gap: 8px;
-      padding: 5px 12px; border-radius: 999px;
-      background: #f3f4f6;
-      color: #4b5563;
-      font-size: 13px; font-weight: 600;
+    .hero-left { display: grid; gap: 8px; max-width: 560px; }
+    .hero-badge {
+      display: inline-flex; align-items: center; gap: 6px;
+      font-size: 0.75rem; font-weight: 600; color: var(--text-muted);
+      text-transform: uppercase; letter-spacing: 0.5px;
+    }
+    .hero-badge::before {
+      content: ''; width: 6px; height: 6px; border-radius: 50%;
+      background: var(--primary);
+    }
+    .hero h1 {
+      font-size: 1.75rem; font-weight: 700;
+      letter-spacing: -0.02em; color: var(--text);
+      margin: 0;
+    }
+    .hero p {
+      color: var(--text-muted); font-size: 0.9375rem;
+      margin: 0; line-height: 1.5;
+    }
+    .hero-right { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; flex-shrink: 0; justify-content: flex-end; }
+
+    .icon-btn {
+      width: 40px; height: 40px; border-radius: 10px;
+      border: 1px solid var(--border); background: var(--surface);
+      display: grid; place-items: center;
+      cursor: pointer; transition: all 0.15s; color: var(--text-muted);
+    }
+    .icon-btn:hover { background: var(--surface-2); color: var(--text); }
+
+    .user-chip {
+      display: flex; align-items: center; gap: 10px;
+      padding: 6px 14px 6px 6px;
+      border: 1px solid var(--border); border-radius: 999px;
+      background: var(--surface); cursor: pointer;
+      transition: all 0.15s;
+    }
+    .user-chip:hover { background: var(--surface-2); }
+    .user-chip.purple { background: #f5f3ff; border-color: #ede9fe; }
+    .user-avatar {
+      width: 32px; height: 32px; border-radius: 50%;
+      background: linear-gradient(135deg, #6366f1, #8b5cf6);
+      display: grid; place-items: center; color: #fff;
+      font-weight: 600; font-size: 0.8125rem;
+    }
+    .user-chip-info { display: flex; flex-direction: column; line-height: 1.2; }
+    .user-chip-name { font-weight: 600; font-size: 0.8125rem; color: var(--text); }
+    .user-chip-role {
+      font-size: 0.6875rem; color: var(--text-muted);
+      background: #eef2ff; color: #4338ca;
+      padding: 2px 8px; border-radius: 999px;
+      font-weight: 600; margin-top: 2px; width: fit-content;
+    }
+
+    .btn-ghost {
+      font-family: inherit; font-size: 0.875rem; font-weight: 500;
+      padding: 8px 16px; border: 1px solid var(--border);
+      border-radius: 10px; background: var(--surface);
+      color: var(--text); cursor: pointer;
+      transition: all 0.15s;
+    }
+    .btn-ghost:hover { background: var(--surface-2); }
+
+    /* ====== STATS GRID (from design) ====== */
+    .stat-grid {
+      display: grid; grid-template-columns: repeat(4, 1fr);
+      gap: 16px;
+    }
+    @media (max-width: 900px)  { .stat-grid { grid-template-columns: repeat(2, 1fr); } }
+    @media (max-width: 560px)  { .stat-grid { grid-template-columns: 1fr; } }
+
+    .stat-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 20px;
+      position: relative; overflow: hidden;
+      transition: all 0.2s;
+      box-shadow: var(--shadow-sm);
+    }
+    .stat-card::before {
+      content: ''; position: absolute; top: 0; left: 0;
+      width: 3px; height: 100%;
+    }
+    .stat-card.stores::before   { background: var(--primary); }
+    .stat-card.onboarded::before { background: var(--success); }
+    .stat-card.users::before    { background: var(--warning); }
+    .stat-card.tx::before       { background: var(--accent); }
+    .stat-card:hover { transform: translateY(-2px); box-shadow: var(--shadow-md); }
+
+    .stat-header {
+      display: flex; align-items: center; justify-content: space-between;
+      margin-bottom: 12px;
+    }
+    .stat-label {
+      font-size: 0.8125rem; color: var(--text-muted); font-weight: 500;
+    }
+    .stat-icon {
+      width: 36px; height: 36px; border-radius: 10px;
+      display: grid; place-items: center;
+    }
+    .stat-card.stores    .stat-icon { background: #eef2ff; color: var(--primary); }
+    .stat-card.onboarded .stat-icon { background: var(--success-light); color: var(--success); }
+    .stat-card.users     .stat-icon { background: #fef3c7; color: var(--warning); }
+    .stat-card.tx        .stat-icon { background: #f3e8ff; color: var(--accent); }
+
+    .stat-value {
+      font-size: 1.75rem; font-weight: 700;
+      letter-spacing: -0.02em; margin-bottom: 4px;
+      color: var(--text);
+    }
+    .stat-sub {
+      font-size: 0.75rem; color: var(--text-muted);
+      display: flex; align-items: center; gap: 6px;
+    }
+    .stat-sub .dot {
+      width: 6px; height: 6px; border-radius: 50%;
+      background: var(--success);
+    }
+    .stat-sub .dot-warn { background: var(--warning); }
+
+    /* ====== TABS BAR (from design) ====== */
+    .tabs {
+      display: inline-flex; background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px; padding: 4px;
+      box-shadow: var(--shadow-sm);
       justify-self: start;
     }
-    .hero-title { margin: 0; font-size: 30px; font-weight: 800; letter-spacing: -0.01em; color: #111827; }
-    .hero-subtitle { margin: 0; font-size: 15px; color: #6b7280; line-height: 1.5; max-width: 600px; }
-    .hero-right { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; justify-content: flex-end; }
+    .tab {
+      font-family: inherit;
+      font-size: 0.875rem; font-weight: 500;
+      padding: 8px 18px; border: none;
+      background: transparent; color: var(--text-muted);
+      border-radius: 8px; cursor: pointer;
+      display: inline-flex; align-items: center; gap: 8px;
+      transition: all 0.15s; white-space: nowrap;
+    }
+    .tab:hover { color: var(--text); }
+    .tab.active {
+      background: var(--primary); color: #fff;
+      box-shadow: 0 2px 4px rgba(99,102,241,0.3);
+    }
+
+    /* ====== SECTION CARD (from design) ====== */
+    .panel {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      margin-bottom: 20px;
+      box-shadow: var(--shadow-sm);
+      overflow: hidden;
+      display: grid;
+    }
+    .panel-head {
+      padding: 20px 24px;
+      border-bottom: 1px solid var(--border);
+      display: flex; align-items: center; justify-content: space-between;
+      gap: 10px; flex-wrap: wrap;
+    }
+    .panel-head .section-title-wrap { display: grid; gap: 6px; }
+    .panel-head h2 {
+      margin: 0; font-size: 1rem; font-weight: 600;
+      display: inline-flex; align-items: center; gap: 10px;
+      color: var(--text);
+    }
+    .section-icon {
+      width: 32px; height: 32px; border-radius: 8px;
+      background: var(--primary-light); color: var(--primary);
+      display: grid; place-items: center; flex-shrink: 0;
+    }
+    .panel-head .muted {
+      font-size: 0.875rem; color: var(--text-muted); font-weight: 400;
+    }
+    .panel-body { padding: 0; display: grid; }
+    .panel-body > * + * { border-top: 1px solid var(--border); }
+
+    /* ====== STORE TAB: store-row / store-stats / catalog-banner / details-grid / success-banner ====== */
+    .store-row {
+      padding: 24px; display: flex; align-items: center; gap: 20px;
+      border-bottom: 1px solid var(--border); flex-wrap: wrap;
+    }
+    .store-logo {
+      width: 56px; height: 56px; border-radius: 14px;
+      background: linear-gradient(135deg, #eef2ff, #f3e8ff);
+      display: grid; place-items: center;
+      font-size: 1.5rem; flex-shrink: 0; overflow: hidden;
+    }
+    .store-logo img { width: 100%; height: 100%; object-fit: cover; }
+    .store-main { flex: 1; min-width: 0; }
+    .store-name-row {
+      display: flex; align-items: center; gap: 10px;
+      margin-bottom: 4px; flex-wrap: wrap;
+    }
+    .store-name {
+      font-size: 1.25rem; font-weight: 700;
+      letter-spacing: -0.01em; color: var(--text);
+    }
+    .badge {
+      display: inline-flex; align-items: center; gap: 5px;
+      font-size: 0.6875rem; font-weight: 600;
+      padding: 3px 10px; border-radius: 999px;
+      text-transform: uppercase; letter-spacing: 0.3px;
+    }
+    .badge.badge-success {
+      background: var(--success-light); color: var(--success-dark);
+    }
+    .badge.badge-success::before {
+      content: ''; width: 5px; height: 5px;
+      border-radius: 50%; background: var(--success);
+    }
+    .store-meta {
+      display: flex; align-items: center; gap: 16px;
+      font-size: 0.8125rem; color: var(--text-muted);
+      flex-wrap: wrap;
+    }
+    .store-meta .meta-item {
+      display: inline-flex; align-items: center; gap: 4px;
+    }
+    .token-pill {
+      font-family: 'SF Mono', Menlo, monospace;
+      font-size: 0.75rem; background: var(--surface-2);
+      padding: 2px 8px; border-radius: 6px;
+      color: var(--primary-dark); font-weight: 500;
+    }
+    .copy-btn {
+      width: 24px; height: 24px; border-radius: 6px;
+      border: 1px solid var(--border); background: var(--surface);
+      display: grid; place-items: center;
+      cursor: pointer; color: var(--text-muted);
+      transition: all 0.15s;
+    }
+    .copy-btn:hover { background: var(--surface-2); color: var(--text); }
+
+    .store-stats {
+      display: grid; grid-template-columns: repeat(4, 1fr);
+      border-bottom: 1px solid var(--border);
+    }
+    @media (max-width: 900px)  {
+      .store-stats { grid-template-columns: repeat(2, 1fr); }
+      .store-stats .store-stat:nth-child(2) { border-right: none; }
+      .store-stats .store-stat:nth-child(1),
+      .store-stats .store-stat:nth-child(2) { border-bottom: 1px solid var(--border); }
+    }
+    @media (max-width: 560px)  {
+      .store-stats { grid-template-columns: 1fr; }
+      .store-stats .store-stat { border-right: none; border-bottom: 1px solid var(--border); }
+      .store-stats .store-stat:last-child { border-bottom: none; }
+    }
+    .store-stat {
+      padding: 20px 24px; border-right: 1px solid var(--border);
+    }
+    .store-stat:last-child { border-right: none; }
+    .store-stat-label {
+      font-size: 0.6875rem; font-weight: 600;
+      text-transform: uppercase; letter-spacing: 0.5px;
+      color: var(--text-muted); margin-bottom: 6px;
+    }
+    .store-stat-value {
+      font-size: 1.25rem; font-weight: 700;
+      letter-spacing: -0.01em; margin-bottom: 2px;
+      color: var(--text);
+    }
+    .store-stat-value.connected { color: var(--success); }
+    .store-stat-sub { font-size: 0.75rem; color: var(--text-muted); }
+    .location-box {
+      display: flex; align-items: center; gap: 6px;
+      margin-top: 6px; font-size: 0.75rem;
+      color: var(--text-muted); background: var(--surface-2);
+      padding: 4px 8px; border-radius: 6px;
+      font-family: 'SF Mono', Menlo, monospace;
+    }
+
+    .catalog-banner {
+      padding: 24px;
+      background: linear-gradient(135deg, #eef2ff 0%, #f3e8ff 100%);
+      border-bottom: 1px solid var(--border);
+      display: flex; align-items: center; gap: 20px;
+      flex-wrap: wrap;
+    }
+    .catalog-icon {
+      width: 44px; height: 44px; border-radius: 12px;
+      background: #fff; display: grid; place-items: center;
+      color: var(--primary); flex-shrink: 0;
+      box-shadow: var(--shadow-sm);
+    }
+    .catalog-content { flex: 1; }
+    .catalog-title { font-size: 1rem; font-weight: 600; margin-bottom: 2px; color: var(--text); }
+    .catalog-desc { font-size: 0.8125rem; color: var(--text-muted); }
+
+    .btn-primary {
+      font-family: inherit; font-size: 0.875rem; font-weight: 600;
+      padding: 10px 20px; border: none;
+      border-radius: 10px; background: var(--primary);
+      color: #fff; cursor: pointer;
+      display: inline-flex; align-items: center; gap: 8px;
+      transition: all 0.15s;
+      box-shadow: 0 2px 4px rgba(99,102,241,0.25);
+      text-decoration: none;
+    }
+    .btn-primary:hover {
+      background: var(--primary-dark);
+      transform: translateY(-1px);
+      box-shadow: 0 4px 8px rgba(99,102,241,0.3);
+    }
+
+    .details-grid {
+      display: grid; grid-template-columns: 1fr 1fr;
+      gap: 24px 48px; padding: 24px;
+    }
+    @media (max-width: 900px)  { .details-grid { grid-template-columns: 1fr; gap: 16px; } }
+    .detail-item { display: flex; flex-direction: column; gap: 4px; }
+    .detail-label {
+      font-size: 0.6875rem; font-weight: 600;
+      text-transform: uppercase; letter-spacing: 0.5px;
+      color: var(--text-muted);
+    }
+    .detail-value {
+      font-size: 0.9375rem; font-weight: 500;
+      display: flex; align-items: center; gap: 8px;
+      color: var(--text);
+    }
+    .detail-value.mono {
+      font-family: 'SF Mono', Menlo, monospace;
+      font-size: 0.8125rem; background: var(--surface-2);
+      padding: 4px 10px; border-radius: 6px; width: fit-content;
+    }
+
+    .success-banner {
+      margin: 20px 24px; padding: 20px;
+      background: var(--success-light);
+      border: 1px solid #a7f3d0;
+      border-radius: var(--radius);
+      display: flex; gap: 14px; align-items: flex-start;
+      flex-wrap: wrap;
+    }
+    .warn-banner {
+      margin: 20px 24px; padding: 20px;
+      background: #fffbeb;
+      border: 1px solid #fde68a;
+      border-radius: var(--radius);
+      display: flex; gap: 14px; align-items: flex-start;
+      flex-wrap: wrap;
+    }
+    .success-icon {
+      width: 32px; height: 32px; border-radius: 8px;
+      background: var(--success); color: #fff;
+      display: grid; place-items: center; flex-shrink: 0;
+    }
+    .warn-icon {
+      width: 32px; height: 32px; border-radius: 8px;
+      background: var(--warning); color: #fff;
+      display: grid; place-items: center; flex-shrink: 0;
+    }
+    .banner-body { flex: 1; }
+    .banner-title { font-weight: 600; font-size: 0.9375rem; margin-bottom: 2px; color: var(--text); }
+    .banner-desc { font-size: 0.8125rem; color: var(--text-muted); line-height: 1.5; }
+    .success-actions, .warn-actions {
+      display: flex; gap: 10px; margin-top: 14px; flex-wrap: wrap;
+    }
+    .btn-secondary {
+      font-family: inherit; font-size: 0.8125rem; font-weight: 600;
+      padding: 8px 14px; border: 1px solid var(--border);
+      border-radius: 8px; background: var(--surface);
+      color: var(--text); cursor: pointer;
+      display: inline-flex; align-items: center; gap: 6px;
+      transition: all 0.15s; text-decoration: none;
+    }
+    .btn-secondary:hover { background: var(--surface-2); border-color: #cbd5e1; }
+    .btn-success {
+      font-family: inherit; font-size: 0.8125rem; font-weight: 600;
+      padding: 8px 14px; border: none;
+      border-radius: 8px; background: var(--success); color: #fff;
+      cursor: pointer; display: inline-flex; align-items: center; gap: 6px;
+      transition: all 0.15s;
+    }
+    .btn-success:hover { background: var(--success-dark); }
+
+    .edit-row { padding: 20px 24px; border-top: 1px solid var(--border); }
+    .btn-edit {
+      font-family: inherit; font-size: 0.875rem; font-weight: 500;
+      padding: 8px 16px; border: 1px solid var(--border);
+      border-radius: 8px; background: var(--surface);
+      color: var(--text); cursor: pointer;
+      display: inline-flex; align-items: center; gap: 6px;
+      transition: all 0.15s;
+    }
+    .btn-edit:hover { background: var(--surface-2); }
+
+    .access-denied { text-align: center; padding: 48px 24px; }
+    .access-denied h2 { margin: 0 0 8px; font-size: 24px; color: #dc2626; }
+    .access-denied p  { margin: 0 0 20px; color: var(--text-muted); }
+
+    .loading, .empty {
+      padding: 48px 24px; text-align: center;
+      color: var(--text-muted); font-size: 14px;
+    }
+    .empty { display: grid; gap: 8px; justify-items: center; }
+    .empty .ico {
+      width: 56px; height: 56px; border-radius: 16px;
+      background: var(--surface-2); color: var(--text-light);
+      display: inline-flex; align-items: center; justify-content: center;
+      font-size: 26px; margin-bottom: 4px;
+    }
+    .empty h4 { margin: 0; font-size: 16px; font-weight: 700; color: var(--text); }
+    .empty p  { margin: 0; font-size: 13px; color: var(--text-muted); max-width: 360px; }
+
+    /* ====== EXISTING (preserved styles: status-badge, chip, row-actions, tables, forms, modals, pagination, toast-stack, bell-wrap) ====== */
     .user-chip {
       display: flex; align-items: center; gap: 12px;
       padding: 8px 14px 8px 8px;
@@ -974,8 +1420,23 @@ interface SseEventShape {
       }
     </div>
 
+    <nav class="topnav">
+      <a class="logo" routerLink="/">
+        <span class="logo-dot">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>
+        </span>
+        Linked-Store
+      </a>
+      <div class="topnav-right">
+        <a class="nav-link" routerLink="/">Explore</a>
+      </div>
+    </nav>
+
     <div class="wrap">
-      <a class="back" routerLink="/">← Back to home</a>
+      <a class="back-link" routerLink="/">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5"/><path d="m12 19-7-7 7-7"/></svg>
+        Back to home
+      </a>
 
       <!-- Floating toasts -->
       <div class="toasts">
@@ -1035,205 +1496,210 @@ interface SseEventShape {
 
         <!-- ============ HERO ============ -->
         <header class="hero">
-          <div class="hero-inner">
-            <div class="hero-left">
-              <span class="hero-greet">
-                @if (isGlobalAdmin()) { 🌐 Global Control Center } @else { 🏪 Your Store Dashboard }
-              </span>
-              <h1 class="hero-title">Welcome back, {{ greetingName() }}</h1>
-              <p class="hero-subtitle">
-                @if (isGlobalAdmin()) {
-                  Oversee every store, manage operators, review payouts, and monitor the network in real time.
-                } @else {
-                  Manage your store, set up Stripe payments, handle your team, and track customer orders — all from one place.
+          <div class="hero-left">
+            <span class="hero-badge">
+              @if (isGlobalAdmin()) { Global Control Center } @else { Your Store Dashboard }
+            </span>
+            <h1>Welcome back, {{ greetingName() }}</h1>
+            <p>
+              @if (isGlobalAdmin()) {
+                Oversee every store, manage operators, review payouts, and monitor the network in real time.
+              } @else {
+                Manage your store, set up Stripe payments, handle your team, and track customer orders — all from one place.
+              }
+            </p>
+          </div>
+          <div class="hero-right">
+            <!-- SSE Notification Bell -->
+            <div class="bell-wrap">
+              <button class="bell-btn"
+                      [class.pulse]="bellPulse()"
+                      (click)="toggleBellPanel()"
+                      [attr.aria-label]="'Notifications · ' + unreadCount() + ' unread'">
+                🔔
+                @if (unreadCount() > 0) {
+                  <span class="bell-badge">{{ unreadCount() > 99 ? '99+' : unreadCount() }}</span>
                 }
-              </p>
-            </div>
-            <div class="hero-right">
-              <!-- SSE Notification Bell -->
-              <div class="bell-wrap">
-                <button class="bell-btn"
-                        [class.pulse]="bellPulse()"
-                        (click)="toggleBellPanel()"
-                        [attr.aria-label]="'Notifications · ' + unreadCount() + ' unread'">
-                  🔔
-                  @if (unreadCount() > 0) {
-                    <span class="bell-badge">{{ unreadCount() > 99 ? '99+' : unreadCount() }}</span>
-                  }
-                </button>
-                @if (bellPanelOpen()) {
-                  <div class="bell-panel" role="dialog" aria-label="Notifications">
-                    <div class="bell-panel-head">
-                      <h3>🔔 Notifications</h3>
-                      <button class="bell-clear" (click)="clearResolvedEvents()" [disabled]="visibleBellEvents().length === 0">Clear all</button>
-                    </div>
-                    <div class="bell-list">
-                      @if (visibleBellEvents().length === 0) {
-                        <div class="bell-empty">
-                          <div class="ico">📭</div>
-                          <div>No notifications yet</div>
-                          <div style="font-size: 11px;">New requests &amp; updates will appear here.</div>
-                        </div>
-                      } @else {
-                        @for (ev of visibleBellEvents(); track ev.eventId || ev.transactionId + '_' + ev.createdAt) {
-                          <button type="button" class="bell-item"
-                                  [class.unread]="!ev._read"
-                                  (click)="onEventClick(ev)">
-                            <div class="bell-thumb">
-                              @if (ev.productImageUrl) {
-                                <img [src]="ev.productImageUrl" alt="" onerror="this.style.display='none'" />
-                              } @else {
-                                {{ toastIcon(ev.type) }}
+              </button>
+              @if (bellPanelOpen()) {
+                <div class="bell-panel" role="dialog" aria-label="Notifications">
+                  <div class="bell-panel-head">
+                    <h3>🔔 Notifications</h3>
+                    <button class="bell-clear" (click)="clearResolvedEvents()" [disabled]="visibleBellEvents().length === 0">Clear all</button>
+                  </div>
+                  <div class="bell-list">
+                    @if (visibleBellEvents().length === 0) {
+                      <div class="bell-empty">
+                        <div class="ico">📭</div>
+                        <div>No notifications yet</div>
+                        <div style="font-size: 11px;">New requests &amp; updates will appear here.</div>
+                      </div>
+                    } @else {
+                      @for (ev of visibleBellEvents(); track ev.eventId || ev.transactionId + '_' + ev.createdAt) {
+                        <button type="button" class="bell-item"
+                                [class.unread]="!ev._read"
+                                (click)="onEventClick(ev)">
+                          <div class="bell-thumb">
+                            @if (ev.productImageUrl) {
+                              <img [src]="ev.productImageUrl" alt="" onerror="this.style.display='none'" />
+                            } @else {
+                              {{ toastIcon(ev.type) }}
+                            }
+                          </div>
+                          <div class="bell-body">
+                            <div class="bell-title">
+                              <span class="ev" [class]="ev.type">{{ ev.type }}</span>
+                              <span>{{ toastTitle(ev) }}</span>
+                            </div>
+                            <div class="bell-sub">
+                              @if (ev.productTitle) { {{ ev.productTitle }} }
+                              @if (ev.sku) { <span class="mono" style="margin-left:6px;">{{ ev.sku }}</span> }
+                              @if (ev.expiresAt && (ev.type === 'RESERVED' || ev.type === 'READY')) {
+                                <div style="margin-top:4px;">⏱ Expires in <b>{{ formatCountdown(ev.expiresAt) }}</b></div>
+                              }
+                              @if (ev.message) { <div style="margin-top:2px;opacity:.85;">{{ ev.message }}</div> }
+                              @if (ev.variantId) {
+                                <div class="bell-stock"
+                                     [class.ok]="evStockAvail(ev)"
+                                     [class.zero]="evStockZero(ev)"
+                                     [class.err]="evStockErr(ev)">
+                                  @if (evStockLoading(ev)) {
+                                    <span class="spinner"></span>
+                                    <span>Checking stock…</span>
+                                  } @else if (evStockErr(ev)) {
+                                    <span>⚠ Unable to load stock</span>
+                                  } @else if (evStockLoaded(ev)) {
+                                    <span>✓ {{ evStockQty(ev) }} item{{ evStockQty(ev) === 1 ? '' : 's' }} still available</span>
+                                  }
+                                </div>
+                              }
+                              @if (((ev.type === 'REQUESTED' && txIsFulfillingScope(ev)) || ev.type === 'RESERVED' || ev.type === 'READY') && !isSupersededBellEvent(ev)) {
+                                <div class="bell-action-row" (click)="$event.stopPropagation()">
+                                  <button type="button"
+                                          class="bell-action-btn btn-primary"
+                                          [disabled]="evAcceptDisabled(ev)"
+                                          (click)="acceptEvent(ev, $event)">
+                                    @if (evAcceptPending(ev)) { ⟳ } @else { ✓ }
+                                    Accept
+                                  </button>
+                                  <button type="button"
+                                          class="bell-action-btn btn-secondary-warn"
+                                          [disabled]="evActionPending(ev)"
+                                          (click)="denyEvent(ev, $event)">
+                                    @if (evDenyPending(ev)) { ⟳ } @else { ✕ }
+                                    Deny
+                                  </button>
+                                  <a type="button"
+                                     class="bell-open-link"
+                                     (click)="$event.stopPropagation(); openRequestDetail(ev, $event)"
+                                     href="javascript:void(0)">
+                                    Open →
+                                  </a>
+                                </div>
                               }
                             </div>
-                            <div class="bell-body">
-                              <div class="bell-title">
-                                <span class="ev" [class]="ev.type">{{ ev.type }}</span>
-                                <span>{{ toastTitle(ev) }}</span>
-                              </div>
-                              <div class="bell-sub">
-                                @if (ev.productTitle) { {{ ev.productTitle }} }
-                                @if (ev.sku) { <span class="mono" style="margin-left:6px;">{{ ev.sku }}</span> }
-                                @if (ev.expiresAt && (ev.type === 'RESERVED' || ev.type === 'READY')) {
-                                  <div style="margin-top:4px;">⏱ Expires in <b>{{ formatCountdown(ev.expiresAt) }}</b></div>
-                                }
-                                @if (ev.message) { <div style="margin-top:2px;opacity:.85;">{{ ev.message }}</div> }
-                                @if (ev.variantId) {
-                                  <div class="bell-stock"
-                                       [class.ok]="evStockAvail(ev)"
-                                       [class.zero]="evStockZero(ev)"
-                                       [class.err]="evStockErr(ev)">
-                                    @if (evStockLoading(ev)) {
-                                      <span class="spinner"></span>
-                                      <span>Checking stock…</span>
-                                    } @else if (evStockErr(ev)) {
-                                      <span>⚠ Unable to load stock</span>
-                                    } @else if (evStockLoaded(ev)) {
-                                      <span>✓ {{ evStockQty(ev) }} item{{ evStockQty(ev) === 1 ? '' : 's' }} still available</span>
-                                    }
-                                  </div>
-                                }
-                                @if (((ev.type === 'REQUESTED' && txIsFulfillingScope(ev)) || ev.type === 'RESERVED' || ev.type === 'READY') && !isSupersededBellEvent(ev)) {
-                                  <div class="bell-action-row" (click)="$event.stopPropagation()">
-                                    <button type="button"
-                                            class="bell-action-btn btn-primary"
-                                            [disabled]="evAcceptDisabled(ev)"
-                                            (click)="acceptEvent(ev, $event)">
-                                      @if (evAcceptPending(ev)) { ⟳ } @else { ✓ }
-                                      Accept
-                                    </button>
-                                    <button type="button"
-                                            class="bell-action-btn btn-secondary-warn"
-                                            [disabled]="evActionPending(ev)"
-                                            (click)="denyEvent(ev, $event)">
-                                      @if (evDenyPending(ev)) { ⟳ } @else { ✕ }
-                                      Deny
-                                    </button>
-                                    <a type="button"
-                                       class="bell-open-link"
-                                       (click)="$event.stopPropagation(); openRequestDetail(ev, $event)"
-                                       href="javascript:void(0)">
-                                      Open →
-                                    </a>
-                                  </div>
-                                }
-                              </div>
-                            </div>
-                            <div class="bell-time">{{ formatRelativeTime(ev.createdAt) }}</div>
-                          </button>
-                        }
+                          </div>
+                          <div class="bell-time">{{ formatRelativeTime(ev.createdAt) }}</div>
+                        </button>
                       }
-                    </div>
-                    <div class="bell-foot">
-                      <button type="button" class="bell-view-all" (click)="gotoNotificationsPage($event)">
-                        View all notifications →
-                      </button>
-                      <div class="bell-live-row">
-                        <span class="dot-live"></span>
-                        @if (sseConnected()) { Live · real-time updates }
-                        @else { Connecting… (will auto-reconnect) }
-                      </div>
+                    }
+                  </div>
+                  <div class="bell-foot">
+                    <button type="button" class="bell-view-all" (click)="gotoNotificationsPage($event)">
+                      View all notifications →
+                    </button>
+                    <div class="bell-live-row">
+                      <span class="dot-live"></span>
+                      @if (sseConnected()) { Live · real-time updates }
+                      @else { Connecting… (will auto-reconnect) }
                     </div>
                   </div>
-                }
-              </div>
-
-              <div class="user-chip">
-                <div class="avatar" [class.purple]="isGlobalAdmin()" [class.cyan]="!isGlobalAdmin()">
-                  {{ avatarInitials(currentUser()) }}
                 </div>
-                <div class="meta">
-                  <span class="name">{{ currentUser()?.name || currentUser()?.email }}</span>
-                  <span class="badge-role">
-                    @if (isGlobalAdmin()) { Global Admin }
-                    @else if (currentUser()?.role === 'OWNER') { Owner }
-                    @else if (currentUser()?.role === 'STORE_ADMIN') { Store Admin }
-                    @else { {{ currentUser()?.role || 'Operator' }} }
-                  </span>
-                </div>
-              </div>
-              <button class="btn btn-secondary"
-                      (click)="onLogout()" [disabled]="loggingOut()">
-                @if (loggingOut()) { Logging out… } @else { Log out }
-              </button>
+              }
             </div>
+
+            <div class="user-chip">
+              <div class="avatar" [class.purple]="isGlobalAdmin()" [class.cyan]="!isGlobalAdmin()">
+                {{ avatarInitials(currentUser()) }}
+              </div>
+              <div class="meta">
+                <span class="name">{{ currentUser()?.name || currentUser()?.email }}</span>
+                <span class="badge-role">
+                  @if (isGlobalAdmin()) { Global Admin }
+                  @else if (currentUser()?.role === 'OWNER') { Owner }
+                  @else if (currentUser()?.role === 'STORE_ADMIN') { Store Admin }
+                  @else { {{ currentUser()?.role || 'Operator' }} }
+                </span>
+              </div>
+            </div>
+            <button class="btn btn-secondary"
+                    (click)="onLogout()" [disabled]="loggingOut()">
+              @if (loggingOut()) { Logging out… } @else { Log out }
+            </button>
           </div>
         </header>
 
         <!-- ============ KPI STAT CARDS ============ -->
         <section class="stat-grid">
           <div class="stat-card stores">
-            <div class="stat-top">
-              <div>
-                <div class="stat-label">Total Stores</div>
-                <div class="stat-value">{{ kpiTotalStores() }}</div>
+            <div class="stat-header">
+              <div class="stat-label">Total Stores</div>
+              <div class="stat-icon">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
               </div>
-              <div class="stat-icon">🏪</div>
             </div>
-            <div class="stat-sub"><span class="dot-ok">●</span> {{ kpiActiveStores() }} active · {{ kpiSuspendedStores() }} suspended</div>
+            <div class="stat-value">{{ kpiTotalStores() }}</div>
+            <div class="stat-sub"><span class="dot"></span> {{ kpiActiveStores() }} active · {{ kpiSuspendedStores() }} suspended</div>
           </div>
           <div class="stat-card onboarded">
-            <div class="stat-top">
-              <div>
-                <div class="stat-label">Stripe Connected</div>
-                <div class="stat-value">{{ kpiOnboarded() }}<span style="font-size:14px;color:#6b7280;font-weight:600;"> / {{ kpiTotalStores() }}</span></div>
+            <div class="stat-header">
+              <div class="stat-label">Stripe Connected</div>
+              <div class="stat-icon">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="20" height="14" x="2" y="5" rx="2"/><line x1="2" x2="22" y1="10" y2="10"/></svg>
               </div>
-              <div class="stat-icon">💳</div>
             </div>
-            <div class="stat-sub"><span [class]="kpiOnboardedPct() >= 80 ? 'dot-ok' : 'dot-warn'">●</span> {{ kpiOnboardedPct() }}% onboarding coverage</div>
+            <div class="stat-value">{{ kpiOnboarded() }}<span style="font-size:14px;color:#6b7280;font-weight:600;"> / {{ kpiTotalStores() }}</span></div>
+            <div class="stat-sub">
+              @if (kpiOnboardedPct() >= 80) { <span class="dot"></span> }
+              @else { <span class="dot" style="background: var(--warning);"></span> }
+              {{ kpiOnboardedPct() }}% onboarding coverage
+            </div>
           </div>
           <div class="stat-card users">
-            <div class="stat-top">
-              <div>
-                <div class="stat-label">Team Members</div>
-                <div class="stat-value">{{ kpiTotalUsers() }}</div>
+            <div class="stat-header">
+              <div class="stat-label">Team Members</div>
+              <div class="stat-icon">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
               </div>
-              <div class="stat-icon">👥</div>
             </div>
-            <div class="stat-sub"><span class="dot-ok">●</span> {{ kpiActiveUsers() }} active · {{ kpiAdminUsers() }} admin</div>
+            <div class="stat-value">{{ kpiTotalUsers() }}</div>
+            <div class="stat-sub"><span class="dot"></span> {{ kpiActiveUsers() }} active · {{ kpiAdminUsers() }} admin</div>
           </div>
           <div class="stat-card tx">
-            <div class="stat-top">
-              <div>
-                <div class="stat-label">Transactions</div>
-                <div class="stat-value">{{ totalTxVolume() }}</div>
+            <div class="stat-header">
+              <div class="stat-label">Transactions</div>
+              <div class="stat-icon">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12V7H5a2 2 0 0 1 0-4h14v4"/><path d="M3 5v14a2 2 0 0 0 2 2h16v-5"/><path d="M18 12a2 2 0 0 0 0 4h4v-4Z"/></svg>
               </div>
-              <div class="stat-icon">📦</div>
             </div>
-            <div class="stat-sub"><span class="dot-ok">●</span> {{ txTotalCount() }} total · {{ activeTab() === 'transactions' ? 'showing below' : 'tab Transactions' }}</div>
+            <div class="stat-value">{{ totalTxVolume() }}</div>
+            <div class="stat-sub"><span class="dot"></span> {{ txTotalCount() }} total · {{ activeTab() === 'transactions' ? 'showing below' : 'tab Transactions' }}</div>
           </div>
         </section>
 
         <!-- ============ TABS ============ -->
         <div class="tabs">
           <button class="tab" [class.active]="activeTab() === 'stores'" (click)="activeTab.set('stores')">
-            <span class="ico">🏪</span> Stores
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+            Stores
           </button>
           <button class="tab" [class.active]="activeTab() === 'users'" (click)="activeTab.set('users')">
-            <span class="ico">👥</span> Users
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+            Users
           </button>
           <button class="tab" [class.active]="activeTab() === 'transactions'" (click)="activeTab.set('transactions')">
-            <span class="ico">📦</span> Transactions
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+            Transactions
           </button>
         </div>
 
@@ -1241,12 +1707,17 @@ interface SseEventShape {
         @if (activeTab() === 'stores') {
           <section class="panel">
             <div class="panel-head">
-              <div>
-                <h2><span class="ico">🏪</span> @if (isGlobalAdmin()) { All Stores } @else { My Store }</h2>
-                <span class="muted">
-                  @if (isGlobalAdmin()) { Manage every location in the network, from onboarding to subscription status. }
-                  @else { Review your store details, complete Stripe onboarding, and manage settings. }
-                </span>
+              <div style="display: flex; align-items: center; gap: 10px;">
+                <div class="section-icon">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+                </div>
+                <div class="section-title-wrap">
+                  <h2>@if (isGlobalAdmin()) { All Stores } @else { My Store }</h2>
+                  <span class="muted">
+                    @if (isGlobalAdmin()) { Manage every location in the network, from onboarding to subscription status. }
+                    @else { Review your store details, complete Stripe onboarding, and manage settings. }
+                  </span>
+                </div>
               </div>
               @if (isGlobalAdmin()) {
                 <button class="btn btn-primary" (click)="showAddStore.set(!showAddStore())">
@@ -1433,195 +1904,193 @@ interface SseEventShape {
               } @else {
                 <!-- STORE ADMIN: My Store pretty card -->
                 @if (myStore()) {
-                  <div>
-                    <div class="store-hero">
-                      <div class="store-hero-inner">
-                        <div class="logo-or-avatar">
-                          @if (myStore()!.logoUrl) { <img [src]="myStore()!.logoUrl" alt="" onerror="this.style.display='none'" /> }
-                          @else { 🏪 }
-                        </div>
-                        <div class="titles">
-                          <h2 class="store-name">{{ myStore()!.businessName || 'Your Store' }}</h2>
-                          <div class="store-meta">
-                            <span class="status-badge"
-                                  [class.ok]="myStore()!.subscriptionStatus === 'ACTIVE'"
-                                  [class.warn]="myStore()!.subscriptionStatus === 'SUSPENDED' || myStore()!.subscriptionStatus === 'PENDING'"
-                                  [class.err]="myStore()!.subscriptionStatus === 'CANCELED'">
-                              {{ myStore()!.subscriptionStatus || '—' }}
-                            </span>
-                            <span>ID: <span style="font-family:ui-monospace;opacity:.95;">{{ myStore()!.id?.slice(0,12) }}…</span></span>
-                            @if (myStore()!.gatewayCode) {
-                              <span style="margin-left:14px;">
-                                Token:
-                                <span style="font-family:ui-monospace;font-weight:700;color:#4f46e5;letter-spacing:0.03em;">
-                                  {{ myStore()!.gatewayCode }}
-                                </span>
-                                <button class="copy-btn" type="button" style="margin-left:4px;transform:translateY(1px);"
-                                        (click)="copyToClipboard(myStore()!.gatewayCode, 'Store token copied.')"
-                                        title="Copy store token">📋</button>
-                              </span>
-                            }
-                          </div>
-                        </div>
-                      </div>
+                  <div class="store-row">
+                    <div class="store-logo">
+                      @if (myStore()!.logoUrl) { <img [src]="myStore()!.logoUrl" alt="" onerror="this.style.display='none'" /> }
+                      @else { 🏪 }
                     </div>
-
-                    <div class="store-quick-grid">
-                      <div class="quick-stat">
-                        <span class="k">Team members</span>
-                        <span class="v">{{ myStore()!.usersCount ?? 0 }}</span>
-                        <span class="sub">across all roles</span>
-                      </div>
-                      <div class="quick-stat">
-                        <span class="k">Transactions</span>
-                        <span class="v">{{ myStore()!.transactionCount ?? 0 }}</span>
-                        <span class="sub">total orders</span>
-                      </div>
-                      <div class="quick-stat">
-                        <span class="k">Stripe status</span>
-                        <span class="v" [style.color]="myStore()!.onboarded ? '#059669' : '#b45309'">
-                          {{ myStore()!.onboarded ? 'Connected' : 'Pending' }}
+                    <div class="store-main">
+                      <div class="store-name-row">
+                        <div class="store-name">{{ myStore()!.businessName || 'Your Store' }}</div>
+                        <span class="status-badge"
+                              [class.ok]="myStore()!.subscriptionStatus === 'ACTIVE'"
+                              [class.warn]="myStore()!.subscriptionStatus === 'SUSPENDED' || myStore()!.subscriptionStatus === 'PENDING'"
+                              [class.err]="myStore()!.subscriptionStatus === 'CANCELED'">
+                          {{ myStore()!.subscriptionStatus || '—' }}
                         </span>
-                        <span class="sub">{{ myStore()!.onboarded ? 'payouts enabled' : 'onboarding required' }}</span>
                       </div>
-                      <div class="quick-stat">
-                        <span class="k">Location</span>
-                        <span class="v" style="font-size:16px;">📍</span>
-                        <span class="sub mono">{{ myStore()!.latitude }}, {{ myStore()!.longitude }}</span>
+                      <div class="store-meta">
+                        <span class="meta-item">ID: <span class="mono">{{ myStore()!.id?.slice(0, 12) }}…</span></span>
+                        @if (myStore()!.gatewayCode) {
+                          <span class="meta-item">Token: <span class="token-pill">{{ myStore()!.gatewayCode }}</span></span>
+                          <button class="copy-btn" type="button" (click)="copyToClipboard(myStore()!.gatewayCode, 'Store token copied.')" title="Copy store token">
+                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg>
+                          </button>
+                        }
                       </div>
                     </div>
+                  </div>
 
-                    <div class="banner info" style="background:#eef2ff;border:1px solid #c7d2fe;">
-                      <div class="banner-ico">🌐</div>
-                      <div class="banner-text">
-                        <div class="banner-title" style="color:#3730a3;">Unified Network Catalog</div>
-                        <div class="banner-msg" style="color:#3730a3;opacity:.9;">
-                          Browse every product across every store in the network in one unified list. Generate QR share
-                          codes for any product.
+                  <div class="store-stats">
+                    <div class="store-stat">
+                      <div class="store-stat-label">Team Members</div>
+                      <div class="store-stat-value">{{ myStore()!.usersCount ?? 0 }}</div>
+                      <div class="store-stat-sub">across all roles</div>
+                    </div>
+                    <div class="store-stat">
+                      <div class="store-stat-label">Transactions</div>
+                      <div class="store-stat-value">{{ myStore()!.transactionCount ?? 0 }}</div>
+                      <div class="store-stat-sub">total orders</div>
+                    </div>
+                    <div class="store-stat">
+                      <div class="store-stat-label">Stripe Status</div>
+                      <div class="store-stat-value" [class.connected]="myStore()!.onboarded" [style.color]="!myStore()!.onboarded ? '#b45309' : undefined">
+                        {{ myStore()!.onboarded ? 'Connected' : 'Pending' }}
+                      </div>
+                      <div class="store-stat-sub">{{ myStore()!.onboarded ? 'payouts enabled' : 'onboarding required' }}</div>
+                    </div>
+                    <div class="store-stat">
+                      <div class="store-stat-label">Location</div>
+                      <div class="store-stat-value" style="font-size:1rem;">📍</div>
+                      <div class="location-box">{{ myStore()!.latitude }}, {{ myStore()!.longitude }}</div>
+                    </div>
+                  </div>
+
+                  <div class="catalog-banner">
+                    <div class="catalog-icon">
+                      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 2a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0-20"/><path d="M2 12h20"/></svg>
+                    </div>
+                    <div class="catalog-content">
+                      <div class="catalog-title">Unified Network Catalog</div>
+                      <div class="catalog-desc">Browse every product across every store in the network in one unified list. Generate QR share codes for any product.</div>
+                    </div>
+                    <a class="btn-primary" routerLink="/admin/products-all">
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+                      View All Products
+                    </a>
+                  </div>
+
+                  <div style="padding: 4px 0;">
+                    <div style="padding: 16px 24px 0; font-weight: 600; font-size: 0.9375rem; color: var(--text);">Store details</div>
+                    <div class="details-grid">
+                      <div class="detail-item">
+                        <div class="detail-label">Store ID</div>
+                        <div class="detail-value mono">{{ myStore()!.id }}</div>
+                      </div>
+                      <div class="detail-item">
+                        <div class="detail-label">Store Token</div>
+                        <div class="detail-value">
+                          <span class="detail-value mono" style="margin-right:6px;">{{ myStore()!.gatewayCode || '—' }}</span>
+                          @if (myStore()!.gatewayCode) {
+                            <button class="copy-btn" type="button" (click)="copyToClipboard(myStore()!.gatewayCode, 'Store token copied.')" title="Copy store token">
+                              <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg>
+                            </button>
+                          }
                         </div>
-                        <div class="banner-actions">
-                          <a class="btn btn-primary" routerLink="/admin/products-all"
-                             style="background:#4338ca;border-color:#4338ca;color:#fff;box-shadow:var(--shadow-sm);">
-                            🌐 View All Products
+                      </div>
+                      <div class="detail-item">
+                        <div class="detail-label">Business Name</div>
+                        <div class="detail-value">{{ myStore()!.businessName || '—' }}</div>
+                      </div>
+                      <div class="detail-item">
+                        <div class="detail-label">Latitude</div>
+                        <div class="detail-value">{{ myStore()!.latitude }}</div>
+                      </div>
+                      <div class="detail-item">
+                        <div class="detail-label">Longitude</div>
+                        <div class="detail-value">{{ myStore()!.longitude }}</div>
+                      </div>
+                    </div>
+                  </div>
+
+                  @if (myStore()!.onboarded) {
+                    <div class="success-banner">
+                      <div class="success-icon">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+                      </div>
+                      <div class="banner-body">
+                        <div class="banner-title">Stripe Connect enabled</div>
+                        <div class="banner-desc">
+                          Your account is fully onboarded. Customers can pay, and settlements will flow directly to your bank.
+                          You can re-visit onboarding any time to update your information or payout settings.
+                        </div>
+                        <div class="success-actions">
+                          <a class="btn btn-primary" [routerLink]="['/admin','stores', myStore()?.id]"
+                             style="background:var(--color-primary);border-color:var(--color-primary);color:#fff;box-shadow:var(--shadow-sm);">
+                            🛍 Manage Products &amp; Inventory
                           </a>
-                        </div>
-                      </div>
-                    </div>
-
-                    <div class="info-section">
-                      <h3 style="font-size:15px;font-weight:700;margin:0;">Store details</h3>
-                      <div class="info-row-grid">
-                        <div class="info-item">
-                          <span class="k">Store ID</span>
-                          <span class="v"><span class="mono">{{ myStore()!.id }}</span></span>
-                        </div>
-                        <div class="info-item">
-                          <span class="k">Store token</span>
-                          <span class="v store-token-row">
-                            <span class="mono token-digits">{{ myStore()!.gatewayCode || '—' }}</span>
-                            @if (myStore()!.gatewayCode) {
-                              <button class="copy-btn" type="button"
-                                      (click)="copyToClipboard(myStore()!.gatewayCode, 'Store token copied.')"
-                                      title="Copy store token">📋</button>
+                          @if (myStore()!.id | can:'payouts') {
+                            <button class="btn btn-ghost" style="background:#fff;color:#047857;border:1px solid #a7f3d0;"
+                                    [disabled]="onboarding['me']" (click)="onboardMyStore()">
+                              🔄 Re-open Stripe Onboarding
+                            </button>
+                            @if (myStore()?._dashboardSafeUrl) {
+                              <a class="btn btn-secondary"
+                                 style="background:#047857;color:#fff;border-color:#047857;"
+                                 [href]="myStore()!._dashboardSafeUrl"
+                                 target="_blank"
+                                 rel="noopener noreferrer"
+                                 (click)="loginLinkMyStore()">
+                                ↗ Open Stripe Dashboard
+                              </a>
+                            } @else {
+                              <button class="btn btn-secondary"
+                                      style="background:#047857;color:#fff;border-color:#047857;"
+                                      [disabled]="loginLinking['me']" (click)="loginLinkMyStore()">
+                                ↗ Open Stripe Dashboard
+                              </button>
                             }
-                          </span>
+                          }
                         </div>
-                        <div class="info-item"><span class="k">Business name</span><span class="v">{{ myStore()!.businessName || '—' }}</span></div>
-                        <div class="info-item"><span class="k">Latitude</span><span class="v">{{ myStore()!.latitude }}</span></div>
-                        <div class="info-item"><span class="k">Longitude</span><span class="v">{{ myStore()!.longitude }}</span></div>
                       </div>
                     </div>
-
-                    <div class="info-section">
-                      @if (myStore()!.onboarded) {
-                        <div class="banner success">
-                          <div class="banner-ico">✅</div>
-                          <div class="banner-text">
-                            <div class="banner-title">Stripe Connect enabled</div>
-                            <div class="banner-msg">
-                              Your account is fully onboarded. Customers can pay, and settlements will flow directly to your bank.
-                              You can re-visit onboarding any time to update your information or payout settings.
-                            </div>
-                            <div class="banner-actions">
-                              <a class="btn btn-primary" [routerLink]="['/admin','stores', myStore()?.id]"
-                                 style="background:var(--color-primary);border-color:var(--color-primary);color:#fff;box-shadow:var(--shadow-sm);">
-                                🛍 Manage Products &amp; Inventory
-                              </a>
-                              @if (myStore()!.id | can:'payouts') {
-                                <button class="btn btn-ghost" style="background:#fff;color:#047857;border:1px solid #a7f3d0;"
-                                        [disabled]="onboarding['me']" (click)="onboardMyStore()">
-                                  🔄 Re-open Stripe Onboarding
-                                </button>
-                                @if (myStore()?._dashboardSafeUrl) {
-                                  <a class="btn btn-secondary"
-                                     style="background:#047857;color:#fff;border-color:#047857;"
-                                     [href]="myStore()!._dashboardSafeUrl"
-                                     target="_blank"
-                                     rel="noopener noreferrer"
-                                     (click)="loginLinkMyStore()">
-                                    ↗ Open Stripe Dashboard
-                                  </a>
-                                } @else {
-                                  <button class="btn btn-secondary"
-                                          style="background:#047857;color:#fff;border-color:#047857;"
-                                          [disabled]="loginLinking['me']" (click)="loginLinkMyStore()">
-                                    ↗ Open Stripe Dashboard
-                                  </button>
-                                }
-                              }
-                            </div>
-                          </div>
+                  } @else {
+                    <div class="warn-banner">
+                      <div class="warn-icon">⚠️</div>
+                      <div class="banner-body">
+                        <div class="banner-title">You need to complete Stripe onboarding</div>
+                        <div class="banner-desc">
+                          Before customers can pay for orders fulfilled by your store, we need to set up your Stripe Express
+                          account. This takes about 3 minutes. You'll need bank account details for payouts.
                         </div>
-                      } @else {
-                        <div class="banner warn">
-                          <div class="banner-ico">⚠️</div>
-                          <div class="banner-text">
-                            <div class="banner-title">You need to complete Stripe onboarding</div>
-                            <div class="banner-msg">
-                              Before customers can pay for orders fulfilled by your store, we need to set up your Stripe Express
-                              account. This takes about 3 minutes. You'll need bank account details for payouts.
-                            </div>
-                            <div class="banner-actions">
-                              <a class="btn btn-primary" [routerLink]="['/admin','stores', myStore()?.id]"
-                                 style="background:var(--color-primary);border-color:var(--color-primary);color:#fff;box-shadow:var(--shadow-sm);">
-                                🛍 Manage Products &amp; Inventory
-                              </a>
-                              @if (myStore()!.id | can:'payouts') {
-                                <button class="btn btn-primary"
-                                        style="background:#b45309;border-color:#b45309;"
-                                        [disabled]="onboarding['me']" (click)="onboardMyStore()">
-                                  💳 Complete Stripe Onboarding →
+                        <div class="warn-actions">
+                          <a class="btn btn-primary" [routerLink]="['/admin','stores', myStore()?.id]"
+                             style="background:var(--color-primary);border-color:var(--color-primary);color:#fff;box-shadow:var(--shadow-sm);">
+                            🛍 Manage Products &amp; Inventory
+                          </a>
+                          @if (myStore()!.id | can:'payouts') {
+                            <button class="btn btn-primary"
+                                    style="background:#b45309;border-color:#b45309;"
+                                    [disabled]="onboarding['me']" (click)="onboardMyStore()">
+                              💳 Complete Stripe Onboarding →
+                            </button>
+                            @if (myStore()?.onboarded) {
+                              @if (myStore()?._dashboardSafeUrl) {
+                                <a class="btn btn-secondary"
+                                   [href]="myStore()!._dashboardSafeUrl"
+                                   target="_blank"
+                                   rel="noopener noreferrer"
+                                   (click)="loginLinkMyStore()">
+                                  ↗ Open Stripe Dashboard
+                                </a>
+                              } @else {
+                                <button class="btn btn-secondary"
+                                        [disabled]="loginLinking['me']" (click)="loginLinkMyStore()">
+                                  ↗ Open Stripe Dashboard
                                 </button>
-                                @if (myStore()?.onboarded) {
-                                  @if (myStore()?._dashboardSafeUrl) {
-                                    <a class="btn btn-secondary"
-                                       [href]="myStore()!._dashboardSafeUrl"
-                                       target="_blank"
-                                       rel="noopener noreferrer"
-                                       (click)="loginLinkMyStore()">
-                                      ↗ Open Stripe Dashboard
-                                    </a>
-                                  } @else {
-                                    <button class="btn btn-secondary"
-                                            [disabled]="loginLinking['me']" (click)="loginLinkMyStore()">
-                                      ↗ Open Stripe Dashboard
-                                    </button>
-                                  }
-                                }
                               }
-                            </div>
-                          </div>
+                            }
+                          }
                         </div>
-                      }
-                    </div>
-
-                    <div class="info-section">
-                      <div class="actions-row">
-                        <button class="btn btn-secondary" (click)="openEditMyStore()">
-                          ✎ Edit store details
-                        </button>
                       </div>
                     </div>
+                  }
+
+                  <div class="edit-row">
+                    <button class="btn-edit" (click)="openEditMyStore()">
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
+                      Edit store details
+                    </button>
                   </div>
                 } @else {
                   <div class="empty">
@@ -1638,12 +2107,17 @@ interface SseEventShape {
         @if (activeTab() === 'users') {
           <section class="panel">
             <div class="panel-head">
-              <div>
-                <h2><span class="ico">👥</span> @if (isGlobalAdmin()) { All Operators } @else { My Team }</h2>
-                <span class="muted">
-                  @if (isGlobalAdmin()) { Invite team members, assign roles, and manage access across every store. }
-                  @else { Manage your in-store team and their permissions. }
-                </span>
+              <div style="display: flex; align-items: center; gap: 10px;">
+                <div class="section-icon">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+                </div>
+                <div class="section-title-wrap">
+                  <h2>@if (isGlobalAdmin()) { All Operators } @else { My Team }</h2>
+                  <span class="muted">
+                    @if (isGlobalAdmin()) { Invite team members, assign roles, and manage access across every store. }
+                    @else { Manage your in-store team and their permissions. }
+                  </span>
+                </div>
               </div>
               @if ((myStore()?.id ?? '') | can:'users') {
                 <button class="btn btn-primary" (click)="showAddUser.set(!showAddUser())" [disabled]="addingUser()">
@@ -1811,9 +2285,14 @@ interface SseEventShape {
         @if (activeTab() === 'transactions') {
           <section class="panel">
             <div class="panel-head">
-              <div>
-                <h2><span class="ico">📦</span> Transactions</h2>
-                <span class="muted">Track every split-ledger order from originating host to fulfilling neighbor store.</span>
+              <div style="display: flex; align-items: center; gap: 10px;">
+                <div class="section-icon">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12V7H5a2 2 0 0 1 0-4h14v4"/><path d="M3 5v14a2 2 0 0 0 2 2h16v-5"/><path d="M18 12a2 2 0 0 0 0 4h4v-4Z"/></svg>
+                </div>
+                <div class="section-title-wrap">
+                  <h2>Transactions</h2>
+                  <span class="muted">Track every split-ledger order from originating host to fulfilling neighbor store.</span>
+                </div>
               </div>
             </div>
 

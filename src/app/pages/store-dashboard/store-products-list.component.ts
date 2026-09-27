@@ -296,8 +296,9 @@ const PILL_CLASS_FROM_KEY: Record<string, string> = {
       padding: 32px 32px 24px;
     }
     .content-header-top {
-      display: flex; align-items: flex-start; gap: 16px;
+      display: flex; align-items: center; gap: 16px;
       margin-bottom: 12px;
+      flex-wrap: wrap;
     }
     .content-title-icon {
       width: 48px; height: 48px;
@@ -777,6 +778,15 @@ const PILL_CLASS_FROM_KEY: Record<string, string> = {
                   @else { Manage your catalog, pricing, and stock levels. }
                 </p>
               </div>
+              @if (mode() !== 'unified') {
+                <a class="btn-primary" [routerLink]="['./new']">
+                  <svg viewBox="0 0 24 24" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                    <line x1="12" y1="5" x2="12" y2="19"></line>
+                    <line x1="5" y1="12" x2="19" y2="12"></line>
+                  </svg>
+                  Add Product
+                </a>
+              }
             </div>
 
             <div class="item-count-badge">

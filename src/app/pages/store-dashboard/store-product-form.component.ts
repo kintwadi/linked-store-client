@@ -1,7 +1,7 @@
-import { Component, OnInit, signal, WritableSignal, inject, ChangeDetectorRef } from '@angular/core';
+import { Component, OnInit, signal, WritableSignal, inject, ChangeDetectorRef, computed } from '@angular/core';
 import { CommonModule, Location } from '@angular/common';
 import { ActivatedRoute, Router } from '@angular/router';
-import { FormsModule, ReactiveFormsModule, FormBuilder, FormGroup, Validators } from '@angular/forms';
+import { FormsModule, ReactiveFormsModule, FormBuilder, FormGroup, FormArray, Validators } from '@angular/forms';
 import { HttpClient } from '@angular/common/http';
 import { firstValueFrom } from 'rxjs';
 import { AuthService } from '../../services/auth.service';
@@ -20,6 +20,7 @@ interface InventoryVariant {
   retailPriceCents: number | null;
   stockQuantity: number | null;
   status: string | null;
+  variantAttributes?: Record<string, any> | null;
 }
 
 interface ImageUploadResult {
@@ -34,6 +35,36 @@ interface GalleryItem {
   url: string;
   uploading: boolean;
   progress: number;
+}
+
+interface VariantCardState {
+  key: string;
+  expanded: WritableSignal<boolean>;
+  coverUploading: WritableSignal<boolean>;
+  coverUploadProgress: WritableSignal<number>;
+  coverDragOver: WritableSignal<boolean>;
+  galleryDragOver: WritableSignal<boolean>;
+  galleryItems: WritableSignal<GalleryItem[]>;
+  galleryUrls: WritableSignal<string[]>;
+}
+
+interface VariantViewRow {
+  index: number;
+  control: FormGroup;
+  expanded: boolean;
+  sku: string;
+  wholesale: string;
+  retail: string;
+  stock: number;
+  hasCover: boolean;
+  coverUrl: string;
+  coverUploading: boolean;
+  coverUploadProgress: number;
+  coverDragOver: boolean;
+  galleryDragOver: boolean;
+  galleryCount: number;
+  galleryItems: GalleryItem[];
+  chips: { key: string; value: string }[];
 }
 
 @Component({
@@ -376,6 +407,252 @@ interface GalleryItem {
     .gallery-dropzone .ico { font-size: 26px; }
     .gallery-dropzone .label { font-size: 11px; font-weight: 600; text-align: center; }
     .gallery-dropzone input[type=file] { display: none; }
+
+    .variants-section {
+      background: #fff;
+      border: 1px solid #e5e7eb;
+      border-radius: 12px;
+      padding: 16px 16px 14px;
+      display: grid;
+      gap: 14px;
+    }
+    .variants-head {
+      display: flex; align-items: center; justify-content: space-between;
+      gap: 12px; flex-wrap: wrap;
+    }
+    .variants-title {
+      font-size: 14px; font-weight: 700; color: #111827;
+      display: inline-flex; align-items: center; gap: 8px;
+    }
+    .variants-title .ico {
+      width: 22px; height: 22px; border-radius: 6px;
+      background: #fef3c7; color: #b45309;
+      display: inline-flex; align-items: center; justify-content: center;
+      font-size: 11px;
+    }
+
+    .variant-card {
+      border: 1px solid #e5e7eb;
+      border-radius: 12px;
+      background: #fafafa;
+      overflow: hidden;
+      transition: border-color .15s ease, box-shadow .15s ease;
+    }
+    .variant-card:hover { border-color: #d1d5db; }
+    .variant-card.open { border-color: #c7d2fe; box-shadow: 0 1px 3px rgba(99,102,241,0.08); }
+
+    .variant-card-head {
+      display: grid;
+      grid-template-columns: auto 1fr auto;
+      gap: 12px;
+      align-items: center;
+      padding: 12px 14px;
+      cursor: pointer;
+      user-select: none;
+    }
+    .variant-card-head:hover { background: #f3f4f6; }
+    .variant-card-badge {
+      width: 32px; height: 32px; border-radius: 9px;
+      display: grid; place-items: center;
+      background: #eef2ff; color: #4338ca;
+      font-weight: 700; font-size: 13px;
+      flex-shrink: 0;
+    }
+    .variant-card-title {
+      display: grid; gap: 2px; min-width: 0;
+    }
+    .variant-card-title .name {
+      font-size: 14px; font-weight: 700; color: #111827;
+      display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+    }
+    .variant-card-title .name .sku-chip {
+      background: #f3f4f6; color: #4b5563;
+      padding: 2px 8px; border-radius: 999px;
+      font-size: 11px; font-weight: 600; letter-spacing: 0.01em;
+    }
+    .variant-card-title .meta {
+      font-size: 12px; color: #6b7280; font-weight: 500;
+      display: flex; align-items: center; gap: 14px; flex-wrap: wrap;
+    }
+    .variant-card-title .meta .sep { color: #d1d5db; }
+    .variant-card-head-actions {
+      display: flex; align-items: center; gap: 8px; flex-shrink: 0;
+    }
+    .chev {
+      width: 28px; height: 28px; border-radius: 8px;
+      display: grid; place-items: center;
+      background: #f3f4f6; color: #6b7280;
+      transition: transform .2s ease, background .15s ease;
+      font-size: 13px;
+    }
+    .variant-card.open .chev { transform: rotate(180deg); background: #eef2ff; color: #4338ca; }
+
+    .variant-card-body {
+      display: grid; gap: 14px;
+      padding: 4px 14px 16px;
+      border-top: 1px solid #e5e7eb;
+      background: #fff;
+    }
+    .variant-card-body.hidden-body { display: none; }
+
+    .variant-quick-grid {
+      display: grid;
+      grid-template-columns: 1.2fr 1fr 1fr 1fr;
+      gap: 10px 12px;
+      padding: 12px 0 4px;
+    }
+    @media (max-width: 860px) { .variant-quick-grid { grid-template-columns: 1fr 1fr; } }
+    @media (max-width: 480px) { .variant-quick-grid { grid-template-columns: 1fr; } }
+    .variant-quick-grid .form-field { gap: 4px; }
+    .variant-quick-grid .form-field label { font-size: 12px; }
+    .variant-quick-grid .form-field input { padding: 9px 11px; font-size: 13px; }
+
+    .variant-subsection {
+      background: #f9fafb; border: 1px solid #e5e7eb;
+      border-radius: 10px; padding: 12px 14px;
+      display: grid; gap: 10px;
+    }
+    .variant-subsection-head {
+      display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap;
+    }
+    .variant-subsection-title {
+      font-size: 13px; font-weight: 700; color: #111827;
+      display: inline-flex; align-items: center; gap: 7px;
+    }
+    .variant-subsection-title .ico {
+      width: 20px; height: 20px; border-radius: 6px;
+      background: #dbeafe; color: #1d4ed8;
+      display: inline-flex; align-items: center; justify-content: center;
+      font-size: 10px;
+    }
+    .variant-subsection-title .ico.green { background: #dcfce7; color: #166534; }
+    .variant-subsection-title .ico.amber { background: #fef3c7; color: #b45309; }
+    .variant-subsection-title .ico.violet { background: #ede9fe; color: #6d28d9; }
+    .variant-subsection-hint { font-size: 11px; color: #6b7280; font-weight: 500; }
+
+    .variant-cover-grid {
+      display: grid; grid-template-columns: 160px 1fr; gap: 12px; align-items: start;
+    }
+    @media (max-width: 640px) { .variant-cover-grid { grid-template-columns: 1fr; } }
+    .variant-cover-preview {
+      width: 160px; height: 160px; border-radius: 10px;
+      background: #f3f4f6; border: 1px solid #e5e7eb;
+      overflow: hidden; position: relative;
+      display: grid; place-items: center;
+    }
+    .variant-cover-preview img { width: 100%; height: 100%; object-fit: cover; display: block; }
+    .variant-cover-preview .ph { color: #9ca3af; font-size: 12px; display: grid; place-items: center; gap: 4px; }
+    .variant-cover-preview .ph .ico { font-size: 28px; }
+    .variant-cover-preview .overlay-up {
+      position: absolute; inset: 0;
+      background: rgba(17, 24, 39, 0.68);
+      color: #fff; display: grid; place-items: center; gap: 6px;
+      font-size: 11px; font-weight: 600;
+    }
+    .variant-cover-preview .overlay-up .bar { width: 80%; height: 5px; background: rgba(255,255,255,0.2); border-radius: 999px; overflow: hidden; }
+    .variant-cover-preview .overlay-up .bar > div { height: 100%; background: #34d399; border-radius: 999px; }
+    .variant-cover-preview .overlay-del {
+      position: absolute; inset: 0;
+      background: linear-gradient(0deg, rgba(0,0,0,0.5) 0%, transparent 60%);
+      opacity: 0; transition: opacity .15s ease;
+      display: grid; align-items: end; padding: 8px;
+    }
+    .variant-cover-preview:hover .overlay-del { opacity: 1; }
+
+    .mini-gallery-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
+      gap: 8px;
+    }
+    .mini-gallery-item {
+      aspect-ratio: 1 / 1; border-radius: 8px; background: #f3f4f6;
+      border: 1px solid #e5e7eb; overflow: hidden; position: relative;
+    }
+    .mini-gallery-item img { width: 100%; height: 100%; object-fit: cover; display: block; }
+    .mini-gallery-item .ph { width: 100%; height: 100%; display: grid; place-items: center; color: #9ca3af; font-size: 20px; }
+    .mini-gallery-item .remove-btn {
+      position: absolute; top: 4px; right: 4px;
+      width: 22px; height: 22px; border-radius: 6px;
+      background: rgba(239,68,68,0.95); color: #fff; border: none;
+      display: grid; place-items: center; cursor: pointer;
+      font-size: 11px; font-weight: 700; opacity: 0; transition: opacity .15s ease;
+      backdrop-filter: blur(3px);
+    }
+    .mini-gallery-item:hover .remove-btn { opacity: 1; }
+    .mini-gallery-item .up-overlay {
+      position: absolute; inset: 0;
+      background: rgba(17,24,39,0.72); color: #fff;
+      display: grid; place-items: center; gap: 4px;
+      font-size: 10px; font-weight: 600;
+    }
+    .mini-gallery-item .up-overlay .bar { width: 80%; height: 4px; background: rgba(255,255,255,0.2); border-radius: 999px; overflow: hidden; }
+    .mini-gallery-item .up-overlay .bar > div { height: 100%; background: #34d399; border-radius: 999px; }
+
+    .mini-gallery-dropzone {
+      aspect-ratio: 1 / 1; border-radius: 8px;
+      border: 2px dashed #cbd5e1; background: #f8fafc;
+      display: grid; place-items: center; gap: 2px;
+      cursor: pointer; color: #6b7280;
+      transition: border-color .15s ease, background .15s ease;
+    }
+    .mini-gallery-dropzone:hover { border-color: var(--color-primary); background: #eef2ff44; color: var(--color-primary); }
+    .mini-gallery-dropzone .ico { font-size: 20px; }
+    .mini-gallery-dropzone .label { font-size: 10px; font-weight: 600; text-align: center; }
+    .mini-gallery-dropzone input[type=file] { display: none; }
+
+    .attr-table { display: grid; gap: 8px; }
+    .attr-row {
+      display: grid; grid-template-columns: 1fr 1.5fr auto;
+      gap: 8px; align-items: center;
+    }
+    @media (max-width: 640px) { .attr-row { grid-template-columns: 1fr; } }
+    .attr-row .form-field { gap: 4px; }
+    .attr-row .form-field label { font-size: 11px; }
+    .attr-row .form-field input { padding: 8px 10px; font-size: 13px; }
+    .btn-add-attr {
+      justify-self: start;
+      background: #eef2ff; color: #4338ca;
+      padding: 8px 12px; border-radius: 8px;
+      font-size: 12px; font-weight: 600;
+      border: 1px solid #c7d2fe;
+      display: inline-flex; align-items: center; gap: 5px;
+      cursor: pointer; transition: background .15s ease;
+    }
+    .btn-add-attr:hover { background: #e0e7ff; }
+
+    .mini-dropzone {
+      border: 2px dashed #cbd5e1; background: #f8fafc;
+      border-radius: 10px; padding: 12px 10px;
+      display: grid; place-items: center; gap: 4px;
+      cursor: pointer;
+      transition: border-color .15s ease, background .15s ease;
+    }
+    .mini-dropzone:hover { border-color: var(--color-primary); background: #eef2ff33; }
+    .mini-dropzone.dragging { border-color: var(--color-primary); background: #eef2ff; }
+    .mini-dropzone .dz-ico { width: 28px; height: 28px; border-radius: 8px; background: #e0f2fe; color: #0369a1; display: grid; place-items: center; font-size: 14px; }
+    .mini-dropzone .dz-title { font-size: 12px; font-weight: 600; color: #111827; }
+    .mini-dropzone .dz-sub { font-size: 10px; color: #6b7280; }
+    .mini-dropzone input[type=file] { display: none; }
+
+    .variants-foot {
+      display: flex; justify-content: space-between; align-items: center;
+      gap: 10px; flex-wrap: wrap;
+      padding-top: 4px;
+    }
+    .variants-count { font-size: 12px; color: #6b7280; font-weight: 500; }
+    .btn-add-variant {
+      background: #eef2ff;
+      color: #4338ca;
+      padding: 10px 16px;
+      border-radius: 8px;
+      font-size: 13px;
+      font-weight: 600;
+      border: 1px solid #c7d2fe;
+      display: inline-flex; align-items: center; gap: 6px;
+      cursor: pointer;
+      transition: background .15s ease;
+    }
+    .btn-add-variant:hover { background: #e0e7ff; }
   `],
   template: `
     <div class="toasts">
@@ -526,40 +803,249 @@ interface GalleryItem {
             </div>
           </div>
 
-          <div class="form-grid-2">
-            <div class="form-field">
-              <label for="p-sku">SKU</label>
-              <input id="p-sku" formControlName="sku" type="text" placeholder="e.g. SKU-TSHIRT-001" />
-            </div>
-            <div class="form-field">
-              <label for="p-status">Status</label>
-              <select id="p-status" formControlName="status">
-                <option value="ACTIVE">🟢 ACTIVE</option>
-                <option value="DRAFT">🟡 DRAFT</option>
-                <option value="ARCHIVED">⚪ ARCHIVED</option>
-              </select>
-            </div>
+          <div class="form-field" style="max-width: 320px;">
+            <label for="p-status">Status</label>
+            <select id="p-status" formControlName="status">
+              <option value="ACTIVE">🟢 ACTIVE</option>
+              <option value="DRAFT">🟡 DRAFT</option>
+              <option value="ARCHIVED">⚪ ARCHIVED</option>
+            </select>
           </div>
 
-          <div class="form-grid-2">
-            <div class="form-field">
-              <label for="p-wholesale">Wholesale price ($) <span class="req">*</span></label>
-              <input id="p-wholesale" formControlName="wholesalePrice" type="number" step="0.01" min="0" placeholder="12.50" />
+          <!-- ===== VARIANTS ===== -->
+          <div class="variants-section">
+            <div class="variants-head">
+              <div class="variants-title">
+                <span class="ico">⎈</span>
+                Variants
+                <span style="font-weight: 500; color: #6b7280; font-size: 12px; margin-left: 6px;">
+                  ({{ variants.length }} configured)
+                </span>
+              </div>
+              <span class="media-hint">Each variant is like its own mini-product with cover, gallery, and traits</span>
             </div>
-            <div class="form-field">
-              <label for="p-retail">Retail price ($) <span class="req">*</span></label>
-              <input id="p-retail" formControlName="retailPrice" type="number" step="0.01" min="0" placeholder="24.99" />
-            </div>
-          </div>
 
-          <div class="form-field">
-            <label for="p-stock">Stock quantity <span class="req">*</span></label>
-            <input id="p-stock" formControlName="stockQuantity" type="number" step="1" min="0" placeholder="100" />
+            <div class="variants-table">
+              <div formArrayName="variants">
+                @for (row of variantViewRows(); track row.index; let i = $index) {
+                  <div
+                    class="variant-card"
+                    [class.open]="row.expanded"
+                    [formGroupName]="row.index"
+                  >
+                    <div class="variant-card-head" (click)="toggleVariantExpand(row.index)">
+                      <div class="variant-card-badge"><span [textContent]="row.index + 1"></span></div>
+                      <div class="variant-card-title">
+                        <div class="name">
+                          Variant
+                          @if (row.sku) { <span class="sku-chip">SKU - <span [textContent]="row.sku"></span></span> }
+                          @for (c of row.chips; track c; let ci = $index) {
+                            <span class="sku-chip"><span [textContent]="c.key"></span>: <span [textContent]="c.value"></span></span>
+                          }
+                        </div>
+                        <div class="meta">
+                          <span>Wholesale $<span [textContent]="row.wholesale"></span></span>
+                          <span class="sep">|</span>
+                          <span>Retail $<span [textContent]="row.retail"></span></span>
+                          <span class="sep">|</span>
+                          <span>Stock <span [textContent]="row.stock"></span></span>
+                          @if (row.hasCover) { <span class="sep">|</span><span>Picture Cover set</span> }
+                          @if (row.galleryCount > 0) { <span class="sep">|</span><span>Picture <span [textContent]="row.galleryCount"></span> gallery</span> }
+                        </div>
+                      </div>
+                      <div class="variant-card-head-actions" (click)="$event.stopPropagation()">
+                        <button
+                          type="button"
+                          class="btn btn-danger-ghost"
+                          (click)="removeVariantRow(row.index)"
+                          [disabled]="variants.length <= 1"
+                          title="Remove variant"
+                        >
+                          X Remove
+                        </button>
+                        <div class="chev">v</div>
+                      </div>
+                    </div>
+
+                    <div class="variant-card-body" [class.hidden-body]="!row.expanded">
+                      <div class="variant-quick-grid">
+                        <div class="form-field">
+                          <label>SKU</label>
+                          <input type="text" formControlName="sku" [placeholder]="'e.g. SKU-00' + (row.index + 1)" />
+                        </div>
+                        <div class="form-field">
+                          <label>Wholesale ($) <span class="req">*</span></label>
+                          <input type="number" formControlName="wholesalePrice" step="0.01" min="0" placeholder="12.50" />
+                        </div>
+                        <div class="form-field">
+                          <label>Retail ($) <span class="req">*</span></label>
+                          <input type="number" formControlName="retailPrice" step="0.01" min="0" placeholder="24.99" />
+                        </div>
+                        <div class="form-field">
+                          <label>Stock Qty <span class="req">*</span></label>
+                          <input type="number" formControlName="stockQuantity" step="1" min="0" placeholder="100" />
+                        </div>
+                      </div>
+
+                      <!-- Description -->
+                      <div class="variant-subsection">
+                        <div class="variant-subsection-head">
+                          <div class="variant-subsection-title">
+                            <span class="ico amber">=</span> Variant description
+                          </div>
+                          <span class="variant-subsection-hint">Optional: specifics shown to customers for this variant only</span>
+                        </div>
+                        <div class="form-field">
+                          <textarea
+                            formControlName="variantDescription"
+                            rows="3"
+                            placeholder="e.g. Limited-edition indigo wash, midweight 280 gsm, pre-shrunk..."
+                          ></textarea>
+                        </div>
+                      </div>
+
+                      <!-- Attributes -->
+                      <div class="variant-subsection">
+                        <div class="variant-subsection-head">
+                          <div class="variant-subsection-title">
+                            <span class="ico violet">+</span> Custom characteristics
+                          </div>
+                          <span class="variant-subsection-hint">Label-value pairs: Size / Color / Material / Edition ...</span>
+                        </div>
+                        <div class="attr-table" formArrayName="attributes">
+                          @for (ag of getVariantAttributes(row.index).controls; track ag; let ai = $index) {
+                            <div class="attr-row" [formGroupName]="ai">
+                              <div class="form-field">
+                                <label>Label</label>
+                                <input type="text" formControlName="key" placeholder="e.g. Size" />
+                              </div>
+                              <div class="form-field">
+                                <label>Value</label>
+                                <input type="text" formControlName="value" placeholder="e.g. XL" />
+                              </div>
+                              <div style="justify-self: end;">
+                                <button
+                                  type="button"
+                                  class="btn btn-danger-ghost"
+                                  (click)="removeVariantAttribute(row.index, ai)"
+                                  title="Remove characteristic"
+                                >
+                                  X
+                                </button>
+                              </div>
+                            </div>
+                          }
+                        </div>
+                        <button type="button" class="btn-add-attr" (click)="addVariantAttribute(row.index)">
+                          + Add characteristic
+                        </button>
+                      </div>
+
+                      <!-- Variant cover -->
+                      <div class="variant-subsection">
+                        <div class="variant-subsection-head">
+                          <div class="variant-subsection-title">
+                            <span class="ico">Image</span> Variant cover image
+                          </div>
+                          <span class="variant-subsection-hint">Overrides the shared product cover for this specific variant</span>
+                        </div>
+                        <div class="variant-cover-grid">
+                          <div class="variant-cover-preview">
+                            @if (row.hasCover) {
+                              <img [src]="row.coverUrl" alt="Variant cover" />
+                            } @else {
+                              <div class="ph"><div class="ico">Image</div><span>No variant cover</span></div>
+                            }
+                            @if (row.coverUploading) {
+                              <div class="overlay-up">
+                                <div>Uploading <span [textContent]="row.coverUploadProgress"></span>%</div>
+                                <div class="bar"><div [style.width.%]="row.coverUploadProgress"></div></div>
+                              </div>
+                            } @else if (row.hasCover) {
+                              <div class="overlay-del">
+                                <button type="button" class="btn btn-danger-ghost" (click)="removeVariantCover(row.index)">Remove cover</button>
+                              </div>
+                            }
+                          </div>
+                          <div style="display: grid; gap: 10px; align-self: stretch;">
+                            <label
+                              class="mini-dropzone"
+                              [class.dragging]="row.coverDragOver"
+                              (dragover)="onVariantCoverDragOver(row.index, $event)"
+                              (dragleave)="onVariantCoverDragLeave(row.index, $event)"
+                              (drop)="onVariantCoverDrop(row.index, $event)"
+                            >
+                              <input type="file" accept="image/*" (change)="onVariantCoverPicked(row.index, $event)" />
+                              <span class="dz-ico">Up</span>
+                              <span class="dz-title">Upload variant cover</span>
+                              <span class="dz-sub">Click to browse, or drag & drop</span>
+                            </label>
+                            <div class="form-field">
+                              <label>...or paste an image URL</label>
+                              <input type="text" formControlName="variantImageUrl" placeholder="https://... (optional)" />
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+
+                      <!-- Variant gallery -->
+                      <div class="variant-subsection">
+                        <div class="variant-subsection-head">
+                          <div class="variant-subsection-title">
+                            <span class="ico green">Image</span> Variant gallery images
+                            <span style="font-weight: 500; color: #6b7280; font-size: 11px; margin-left: 6px;">
+                              (<span [textContent]="row.galleryCount"></span> uploaded)
+                            </span>
+                          </div>
+                          <span class="variant-subsection-hint">Additional photos shown only for this variant</span>
+                        </div>
+                        <div class="mini-gallery-grid">
+                          @for (item of row.galleryItems; track item.id) {
+                            <div class="mini-gallery-item">
+                              @if (item.url) { <img [src]="item.url" alt="Variant gallery" /> }
+                              @else { <div class="ph">Image</div> }
+                              @if (item.uploading) {
+                                <div class="up-overlay">
+                                  <div>Uploading <span [textContent]="item.progress"></span>%</div>
+                                  <div class="bar"><div [style.width.%]="item.progress"></div></div>
+                                </div>
+                              } @else {
+                                <button type="button" class="remove-btn" (click)="removeVariantGalleryItem(row.index, item.id)" title="Remove">X</button>
+                              }
+                            </div>
+                          }
+                          <label
+                            class="mini-gallery-dropzone"
+                            [class.dragging]="row.galleryDragOver"
+                            (dragover)="onVariantGalleryDragOver(row.index, $event)"
+                            (dragleave)="onVariantGalleryDragLeave(row.index, $event)"
+                            (drop)="onVariantGalleryDrop(row.index, $event)"
+                          >
+                            <input type="file" accept="image/*" multiple (change)="onVariantGalleryPicked(row.index, $event)" />
+                            <span class="ico">+</span>
+                            <span class="label">Add images</span>
+                          </label>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                }
+              </div>
+            </div>
+
+            <div class="variants-foot">
+              <span class="variants-count">
+                Tip: Add variants for different sizes, colors, or editions. Each can have its own cover, gallery, and description.
+              </span>
+              <button type="button" class="btn-add-variant" (click)="addVariantRow()">
+                <span>＋</span> Add variant
+              </button>
+            </div>
           </div>
 
           <div class="form-footer">
             <button type="button" class="btn btn-secondary" (click)="navigateBack()">Cancel</button>
-            <button type="submit" class="btn btn-primary" [disabled]="saving() || !form.valid || coverUploading() || anyGalleryUploading()">
+            <button type="submit" class="btn btn-primary" [disabled]="saving() || !form.valid || coverUploading() || anyGalleryUploading() || anyVariantUploading()">
               @if (saving()) { Saving… } @else { {{ isEditMode() ? '✓ Save changes' : '✓ Create product' }} }
             </button>
           </div>
@@ -577,16 +1063,217 @@ export class StoreProductFormComponent implements OnInit {
   private readonly location = inject(Location);
   private readonly fb = inject(FormBuilder);
 
+  private readonly _variantStates = signal<Map<string, VariantCardState>>(new Map());
+
+  private _genStateKey(): string {
+    return 'vs-' + Math.random().toString(36).slice(2, 10) + '-' + Date.now().toString(36).slice(-4);
+  }
+
+  getVariantState(index: number): VariantCardState | undefined {
+    const ctrl = this.variants.at(index);
+    const key = (ctrl as any)?._vk as string | undefined;
+    return key ? this._variantStates().get(key) : undefined;
+  }
+
+  private _attachStateToControl(ctrl: FormGroup): VariantCardState {
+    const key = this._genStateKey();
+    (ctrl as any)._vk = key;
+    const state: VariantCardState = {
+      key,
+      expanded: signal(true),
+      coverUploading: signal(false),
+      coverUploadProgress: signal(0),
+      coverDragOver: signal(false),
+      galleryDragOver: signal(false),
+      galleryItems: signal<GalleryItem[]>([]),
+      galleryUrls: signal<string[]>([]),
+    };
+    this._variantStates.update(m => {
+      const n = new Map(m);
+      n.set(key, state);
+      return n;
+    });
+    return state;
+  }
+
+  private _dropStateForControl(ctrl: FormGroup): void {
+    const key = (ctrl as any)?._vk as string | undefined;
+    if (!key) return;
+    this._variantStates.update(m => {
+      const n = new Map(m);
+      n.delete(key);
+      return n;
+    });
+  }
+
   readonly form: FormGroup = this.fb.group({
     title: ['', [Validators.required]],
     description: [''],
     primaryImageUrl: [''],
-    sku: [''],
-    wholesalePrice: [0, [Validators.required, Validators.min(0)]],
-    retailPrice: [0, [Validators.required, Validators.min(0)]],
-    stockQuantity: [0, [Validators.required, Validators.min(0)]],
     status: ['ACTIVE'],
+    variants: this.fb.array([
+      this.newVariantRow(),
+    ]),
   });
+
+  get variants(): FormArray {
+    return this.form.get('variants') as FormArray;
+  }
+
+  toggleVariantExpand(index: number): void {
+    const st = this.getVariantState(index);
+    if (st) st.expanded.update(v => !v);
+    this.cdr.markForCheck();
+  }
+
+  private newVariantRow(
+    sku?: string, wholesalePrice?: number, retailPrice?: number, stockQuantity?: number,
+    variantImageUrl?: string, variantDescription?: string,
+    initialGalleryUrls?: string[],
+    attributes?: { key: string; value: string }[]
+  ): FormGroup {
+    const ctrl = this.fb.group({
+      sku: [sku ?? ''],
+      wholesalePrice: [wholesalePrice ?? 0, [Validators.required, Validators.min(0)]],
+      retailPrice: [retailPrice ?? 0, [Validators.required, Validators.min(0)]],
+      stockQuantity: [stockQuantity ?? 0, [Validators.required, Validators.min(0)]],
+      variantImageUrl: [variantImageUrl ?? ''],
+      variantDescription: [variantDescription ?? ''],
+      attributes: this.fb.array(
+        (attributes ?? []).map(a => this.fb.group({ key: [a.key ?? ''], value: [a.value ?? ''] }))
+      ),
+    });
+    const st = this._attachStateToControl(ctrl);
+    if (initialGalleryUrls && initialGalleryUrls.length) {
+      const items: GalleryItem[] = initialGalleryUrls.filter(u => u).map(url => ({
+        id: 'vinit-' + Math.random().toString(36).slice(2, 9),
+        url, uploading: false, progress: 100,
+      }));
+      st.galleryItems.set(items);
+      st.galleryUrls.set(items.map(i => i.url));
+    }
+    return ctrl;
+  }
+
+  getVariantAttributes(index: number): FormArray {
+    return (this.variants.at(index) as FormGroup).get('attributes') as FormArray;
+  }
+
+  addVariantAttribute(index: number): void {
+    const arr = this.getVariantAttributes(index);
+    arr.push(this.fb.group({ key: [''], value: [''] }));
+    this.cdr.markForCheck();
+  }
+
+  removeVariantAttribute(variantIndex: number, attrIndex: number): void {
+    const arr = this.getVariantAttributes(variantIndex);
+    arr.removeAt(attrIndex);
+    this.cdr.markForCheck();
+  }
+
+  addVariantRow(): void {
+    this.variants.push(this.newVariantRow());
+    this.cdr.markForCheck();
+  }
+
+  removeVariantRow(index: number): void {
+    if (this.variants.length <= 1) return;
+    const ctrl = this.variants.at(index) as FormGroup;
+    this._dropStateForControl(ctrl);
+    this.variants.removeAt(index);
+    this.cdr.markForCheck();
+  }
+
+  anyVariantUploading(): boolean {
+    for (const st of this._variantStates().values()) {
+      if (st.coverUploading()) return true;
+      if (st.galleryItems().some(g => g.uploading)) return true;
+    }
+    return false;
+  }
+
+  variantState(index: number): VariantCardState | undefined {
+    return this.getVariantState(index);
+  }
+
+  variantRaw(index: number): any {
+    try {
+      return (this.variants.at(index) as FormGroup).getRawValue();
+    } catch {
+      return {};
+    }
+  }
+
+  variantWholesalePrice(index: number): string {
+    const r = this.variantRaw(index);
+    return Number(r?.wholesalePrice ?? 0).toFixed(2);
+  }
+
+  variantRetailPrice(index: number): string {
+    const r = this.variantRaw(index);
+    return Number(r?.retailPrice ?? 0).toFixed(2);
+  }
+
+  variantDisplay(index: number): {
+    sku: string;
+    wholesale: string;
+    retail: string;
+    stock: number;
+    hasCover: boolean;
+    galleryCount: number;
+    chips: { key: string; value: string }[];
+  } {
+    const r = this.variantRaw(index);
+    const chips: { key: string; value: string }[] = [];
+    if (Array.isArray(r?.attributes)) {
+      for (const a of r.attributes) {
+        if (a?.key && a?.value) chips.push({ key: String(a.key), value: String(a.value) });
+      }
+    }
+    return {
+      sku: r?.sku ? String(r.sku) : '',
+      wholesale: Number(r?.wholesalePrice ?? 0).toFixed(2),
+      retail: Number(r?.retailPrice ?? 0).toFixed(2),
+      stock: Number(r?.stockQuantity ?? 0),
+      hasCover: !!(r?.variantImageUrl && String(r.variantImageUrl).length > 0),
+      galleryCount: this.variantGalleryCount(index),
+      chips,
+    };
+  }
+
+  variantSku(index: number): string { return this.variantDisplay(index).sku; }
+  variantDisplayWholesale(index: number): string { return this.variantDisplay(index).wholesale; }
+  variantDisplayRetail(index: number): string { return this.variantDisplay(index).retail; }
+  variantDisplayStock(index: number): number { return this.variantDisplay(index).stock; }
+  variantHasCover(index: number): boolean { return this.variantDisplay(index).hasCover; }
+  variantDisplayGalleryCount(index: number): number { return this.variantDisplay(index).galleryCount; }
+  variantAttributeChips(index: number): { key: string; value: string }[] { return this.variantDisplay(index).chips; }
+
+  variantGalleryCount(index: number): number {
+    return this.getVariantState(index)?.galleryUrls()?.length ?? 0;
+  }
+
+  variantExpanded(index: number): boolean { return this.variantState(index)?.expanded() ?? true; }
+  variantCoverUploading(index: number): boolean { return !!(this.variantState(index)?.coverUploading()); }
+  variantCoverUploadProgress(index: number): number { return this.variantState(index)?.coverUploadProgress() ?? 0; }
+  variantCoverDragOver(index: number): boolean { return !!(this.variantState(index)?.coverDragOver()); }
+  variantGalleryItems(index: number): GalleryItem[] { return this.variantState(index)?.galleryItems() ?? []; }
+  variantGalleryDragOver(index: number): boolean { return !!(this.variantState(index)?.galleryDragOver()); }
+  variantCoverUrl(index: number): string {
+    try {
+      const v = (this.variants.at(index) as FormGroup).getRawValue();
+      return (v?.variantImageUrl as string) ?? '';
+    } catch {
+      return '';
+    }
+  }
+  variantHasCoverUrl(index: number): boolean {
+    const u = this.variantCoverUrl(index);
+    return !!u && String(u).length > 0;
+  }
+  variantAttributesControls(index: number): any {
+    return this.getVariantAttributes(index).controls;
+  }
 
   readonly isEditMode = signal(false);
   readonly loadingVariant = signal(false);
@@ -602,11 +1289,54 @@ export class StoreProductFormComponent implements OnInit {
   readonly _galleryItems = signal<GalleryItem[]>([]);
   readonly galleryUrls = signal<string[]>([]);
 
+  private readonly _variantViewTick = signal(0);
+  readonly variantViewRows = computed<VariantViewRow[]>(() => {
+    this._variantViewTick();
+    const ctrlArr = this.variants;
+    const rows: VariantViewRow[] = [];
+    for (let idx = 0; idx < ctrlArr.length; idx++) {
+      const control = ctrlArr.at(idx) as FormGroup;
+      const raw = control.getRawValue();
+      const state = this.getVariantState(idx);
+      const chips: { key: string; value: string }[] = [];
+      if (Array.isArray(raw?.attributes)) {
+        for (const a of raw.attributes) {
+          if (a?.key && a?.value) chips.push({ key: String(a.key), value: String(a.value) });
+        }
+      }
+      const galleryItems: GalleryItem[] = state ? state.galleryItems() : [];
+      const coverUrl: string = (raw?.variantImageUrl as string) ?? '';
+      rows.push({
+        index: idx,
+        control,
+        expanded: state ? state.expanded() : true,
+        sku: raw?.sku ? String(raw.sku) : '',
+        wholesale: Number(raw?.wholesalePrice ?? 0).toFixed(2),
+        retail: Number(raw?.retailPrice ?? 0).toFixed(2),
+        stock: Number(raw?.stockQuantity ?? 0),
+        hasCover: !!coverUrl && String(coverUrl).length > 0,
+        coverUrl,
+        coverUploading: !!(state?.coverUploading()),
+        coverUploadProgress: state?.coverUploadProgress() ?? 0,
+        coverDragOver: !!(state?.coverDragOver()),
+        galleryDragOver: !!(state?.galleryDragOver()),
+        galleryCount: state ? state.galleryUrls().length : 0,
+        galleryItems,
+        chips,
+      });
+    }
+    return rows;
+  });
+  private bumpVariantView(): void {
+    this._variantViewTick.update(t => (t + 1) % 1_000_000);
+  }
+
   anyGalleryUploading(): boolean {
     return this._galleryItems().some(g => g.uploading);
   }
 
   private variantId: string | null = null;
+  private _vviewTimer: any = null;
 
   ngOnInit(): void {
     this.variantId = this.route.snapshot.paramMap.get('variantId');
@@ -614,6 +1344,11 @@ export class StoreProductFormComponent implements OnInit {
       this.isEditMode.set(true);
       this.loadVariant();
     }
+    this._vviewTimer = setInterval(() => this.bumpVariantView(), 250);
+  }
+
+  ngOnDestroy(): void {
+    if (this._vviewTimer) { clearInterval(this._vviewTimer); this._vviewTimer = null; }
   }
 
   private getStoreIdParam(): { storeId: string; isMe: boolean } {
@@ -639,30 +1374,48 @@ export class StoreProductFormComponent implements OnInit {
       const api = this.authService.resolveApiBasePublic();
       const { storeId, isMe } = this.getStoreIdParam();
       const pathPart = isMe ? 'me' : encodeURIComponent(storeId);
-      const list = await firstValueFrom(
-        this.http.get<InventoryVariant[] | { items?: InventoryVariant[]; data?: InventoryVariant[] }>(
-          `${api}/admin/stores/${pathPart}/inventory`
+      const found = await firstValueFrom(
+        this.http.get<InventoryVariant>(
+          `${api}/admin/stores/${pathPart}/inventory/${encodeURIComponent(this.variantId!)}`
         )
       );
-      const arr = Array.isArray(list) ? list : (list.items ?? list.data ?? []);
-      const found = (arr as InventoryVariant[]).find(v => v.variantId === this.variantId);
       if (found) {
         this.form.patchValue({
           title: found.productTitle ?? '',
           description: found.productDescription ?? '',
           primaryImageUrl: (found.variantImageUrl || found.productImageUrl) ?? '',
-          sku: found.sku ?? '',
-          wholesalePrice: found.wholesalePriceCents != null ? (found.wholesalePriceCents / 100) : 0,
-          retailPrice: found.retailPriceCents != null ? (found.retailPriceCents / 100) : 0,
-          stockQuantity: found.stockQuantity ?? 0,
           status: found.status ?? 'ACTIVE',
         });
 
-        const productGallery = found.productGalleryImageUrls && Array.isArray(found.productGalleryImageUrls)
-          ? found.productGalleryImageUrls
-          : [];
+        this.variants.clear();
         const variantGallery = found.variantGalleryImageUrls && Array.isArray(found.variantGalleryImageUrls)
           ? found.variantGalleryImageUrls
+          : [];
+        const attrsRaw = found.variantAttributes ?? {};
+        let variantDesc = '';
+        const attrPairs: { key: string; value: string }[] = [];
+        if (attrsRaw && typeof attrsRaw === 'object') {
+          for (const [k, v] of Object.entries(attrsRaw as Record<string, any>)) {
+            if (k === 'description' && typeof v === 'string') {
+              variantDesc = v;
+            } else {
+              attrPairs.push({ key: k, value: typeof v === 'string' ? v : String(v ?? '') });
+            }
+          }
+        }
+        this.variants.push(this.newVariantRow(
+          found.sku ?? '',
+          found.wholesalePriceCents != null ? (found.wholesalePriceCents / 100) : 0,
+          found.retailPriceCents != null ? (found.retailPriceCents / 100) : 0,
+          found.stockQuantity ?? 0,
+          found.variantImageUrl ?? '',
+          variantDesc,
+          variantGallery,
+          attrPairs,
+        ));
+
+        const productGallery = found.productGalleryImageUrls && Array.isArray(found.productGalleryImageUrls)
+          ? found.productGalleryImageUrls
           : [];
         const merged = Array.from(new Set([...variantGallery, ...productGallery]));
         this.setInitialGallery(merged);
@@ -830,6 +1583,149 @@ export class StoreProductFormComponent implements OnInit {
     );
   }
 
+  // ---------- Variant helpers ----------
+  onVariantCoverPicked(index: number, ev: Event): void {
+    const st = this.getVariantState(index);
+    const input = ev.target as HTMLInputElement;
+    if (st && input.files && input.files.length > 0) {
+      this.uploadVariantCover(index, st, input.files[0]);
+    }
+    input.value = '';
+  }
+
+  onVariantCoverDragOver(index: number, ev: DragEvent): void {
+    ev.preventDefault();
+    this.getVariantState(index)?.coverDragOver.set(true);
+  }
+  onVariantCoverDragLeave(index: number, _ev: DragEvent): void {
+    this.getVariantState(index)?.coverDragOver.set(false);
+  }
+
+  onVariantCoverDrop(index: number, ev: DragEvent): void {
+    ev.preventDefault();
+    const st = this.getVariantState(index);
+    if (!st) return;
+    st.coverDragOver.set(false);
+    const file = ev.dataTransfer?.files?.[0];
+    if (file && file.type.startsWith('image/')) {
+      this.uploadVariantCover(index, st, file);
+    }
+  }
+
+  private uploadVariantCover(index: number, st: VariantCardState, file: File): void {
+    if (!file.type.startsWith('image/')) {
+      this.showError('Only image files are allowed.');
+      return;
+    }
+    if (file.size > 20 * 1024 * 1024) {
+      this.showError('Image is too large (max 20MB).');
+      return;
+    }
+    st.coverUploading.set(true);
+    st.coverUploadProgress.set(3);
+    this.cdr.markForCheck();
+    this.resolveStoreIdForUpload().then(storeId => {
+      this.uploadImage(file, 'pending_variant', storeId, st.coverUploadProgress)
+        .then(url => {
+          (this.variants.at(index) as FormGroup).get('variantImageUrl')?.setValue(url);
+          this.showSuccess('Variant cover image uploaded.');
+        })
+        .catch(err => {
+          console.error('Variant cover upload failed', err);
+          this.showError(err?.message || 'Failed to upload variant cover.');
+        })
+        .finally(() => {
+          st.coverUploading.set(false);
+          st.coverUploadProgress.set(0);
+          this.cdr.markForCheck();
+        });
+    });
+  }
+
+  removeVariantCover(index: number): void {
+    (this.variants.at(index) as FormGroup).get('variantImageUrl')?.setValue('');
+  }
+
+  onVariantGalleryPicked(index: number, ev: Event): void {
+    const input = ev.target as HTMLInputElement;
+    if (input.files && input.files.length > 0) {
+      const files = Array.from(input.files).filter(f => f.type.startsWith('image/'));
+      files.forEach(f => this.uploadVariantGalleryFile(index, f));
+    }
+    input.value = '';
+  }
+  onVariantGalleryDragOver(index: number, ev: DragEvent): void {
+    ev.preventDefault();
+    this.getVariantState(index)?.galleryDragOver.set(true);
+  }
+  onVariantGalleryDragLeave(index: number, _ev: DragEvent): void {
+    this.getVariantState(index)?.galleryDragOver.set(false);
+  }
+  onVariantGalleryDrop(index: number, ev: DragEvent): void {
+    ev.preventDefault();
+    const st = this.getVariantState(index);
+    if (!st) return;
+    st.galleryDragOver.set(false);
+    const files = ev.dataTransfer?.files;
+    if (files && files.length > 0) {
+      Array.from(files).filter(f => f.type.startsWith('image/')).forEach(f => this.uploadVariantGalleryFile(index, f));
+    }
+  }
+
+  private uploadVariantGalleryFile(index: number, file: File): void {
+    const st = this.getVariantState(index);
+    if (!st) return;
+    if (!file.type.startsWith('image/')) {
+      this.showError('Only image files are allowed.');
+      return;
+    }
+    if (file.size > 20 * 1024 * 1024) {
+      this.showError('Image is too large (max 20MB).');
+      return;
+    }
+    const id = 'vg-' + index + '-' + Math.random().toString(36).slice(2, 10);
+    const preview: GalleryItem = {
+      id, url: URL.createObjectURL(file), uploading: true, progress: 3,
+    };
+    st.galleryItems.update(prev => [...prev, preview]);
+    const progress = signal(3);
+    this.resolveStoreIdForUpload().then(storeId => {
+      this.uploadImage(file, 'pending_variant', storeId, progress)
+        .then(publicUrl => {
+          st.galleryItems.update(arr => arr.map(g => g.id === id
+            ? { ...g, url: publicUrl, uploading: false, progress: 100 }
+            : g));
+          st.galleryUrls.set(
+            st.galleryItems().filter(g => !g.uploading && g.url && !g.url.startsWith('blob:')).map(g => g.url)
+          );
+        })
+        .catch(err => {
+          console.error('Variant gallery upload failed', err);
+          this.showError(err?.message || `Failed to upload ${file.name}.`);
+          st.galleryItems.update(arr => arr.filter(g => g.id !== id));
+        })
+        .finally(() => this.cdr.markForCheck());
+    });
+    const poll = setInterval(() => {
+      st.galleryItems.update(arr => arr.map(g => g.id === id && g.uploading
+        ? { ...g, progress: Math.min(g.progress + 3, progress()) }
+        : g));
+      if (!st.galleryItems().find(g => g.id === id)?.uploading) {
+        clearInterval(poll);
+      }
+      this.cdr.markForCheck();
+    }, 100);
+  }
+
+  removeVariantGalleryItem(index: number, itemId: string): void {
+    const st = this.getVariantState(index);
+    if (!st) return;
+    st.galleryItems.update(arr => arr.filter(g => g.id !== itemId));
+    st.galleryUrls.set(
+      st.galleryItems().filter(g => !g.uploading && g.url && !g.url.startsWith('blob:')).map(g => g.url)
+    );
+  }
+
   // ---------- Upload driver ----------
   private uploadImage(
     file: File,
@@ -889,6 +1785,8 @@ export class StoreProductFormComponent implements OnInit {
   async onSubmit(): Promise<void> {
     if (!this.form.valid || this.saving()) return;
     if (this.coverUploading() || this.anyGalleryUploading()) return;
+    if (this.anyVariantUploading()) return;
+    if (this.variants.length < 1) return;
     this.saving.set(true);
     this.errorMsg.set(null);
     this.successMsg.set(null);
@@ -899,17 +1797,28 @@ export class StoreProductFormComponent implements OnInit {
 
       const raw = this.form.getRawValue();
       const gallery = this.galleryUrls();
-      const payload: any = {
+      const variantRows: any[] = raw.variants ?? [];
+
+      const buildVariantAttributes = (row: any): Record<string, any> | null => {
+        const out: Record<string, any> = {};
+        if (row.variantDescription && typeof row.variantDescription === 'string' && row.variantDescription.trim().length > 0) {
+          out['description'] = row.variantDescription.trim();
+        }
+        if (Array.isArray(row.attributes)) {
+          for (const a of row.attributes) {
+            const k = (a?.key ?? '').toString().trim();
+            const v = (a?.value ?? '').toString().trim();
+            if (k.length > 0) out[k] = v;
+          }
+        }
+        return Object.keys(out).length > 0 ? out : null;
+      };
+
+      const productLevelPayload = {
         title: raw.title || null,
         description: raw.description || null,
         imageUrl: raw.primaryImageUrl || null,
-        variantImageUrl: raw.primaryImageUrl || null,
         productGalleryImageUrls: gallery.length ? gallery : null,
-        variantGalleryImageUrls: gallery.length ? gallery : null,
-        sku: raw.sku || null,
-        wholesalePriceCents: Math.round(Number(raw.wholesalePrice || 0) * 100),
-        retailPriceCents: Math.round(Number(raw.retailPrice || 0) * 100),
-        stockQuantity: Number(raw.stockQuantity || 0),
         status: raw.status || 'ACTIVE',
       };
 
@@ -917,6 +1826,19 @@ export class StoreProductFormComponent implements OnInit {
       let responseVariantId: string | null = null;
 
       if (this.isEditMode() && this.variantId) {
+        const firstRow = variantRows[0] ?? {};
+        const firstState = this.getVariantState(0);
+        const variantGalleryUrls = firstState?.galleryUrls() ?? [];
+        const payload: any = {
+          ...productLevelPayload,
+          sku: firstRow.sku || null,
+          wholesalePriceCents: Math.round(Number(firstRow.wholesalePrice || 0) * 100),
+          retailPriceCents: Math.round(Number(firstRow.retailPrice || 0) * 100),
+          stockQuantity: Number(firstRow.stockQuantity || 0),
+          variantImageUrl: firstRow.variantImageUrl || null,
+          variantGalleryImageUrls: variantGalleryUrls.length ? variantGalleryUrls : null,
+          variantAttributes: buildVariantAttributes(firstRow),
+        };
         const resp = await firstValueFrom(
           this.http.put<any>(`${api}/admin/stores/${pathPart}/inventory/${encodeURIComponent(this.variantId)}`, payload)
         );
@@ -924,12 +1846,60 @@ export class StoreProductFormComponent implements OnInit {
         responseVariantId = resp?.variantId ?? this.variantId;
         this.showSuccess('Product updated successfully.');
       } else {
-        const resp = await firstValueFrom(
-          this.http.post<any>(`${api}/admin/stores/${pathPart}/inventory`, payload)
-        );
-        responseProductId = resp?.productId ?? null;
-        responseVariantId = resp?.variantId ?? null;
-        this.showSuccess('Product created successfully.');
+        for (let i = 0; i < variantRows.length; i++) {
+          const vr = variantRows[i];
+          const vst = this.getVariantState(i);
+          const vGalleryUrls = vst?.galleryUrls() ?? [];
+          const attrs = buildVariantAttributes(vr);
+
+          const isFirstRow = i === 0;
+          const payload: any = isFirstRow
+            ? {
+                ...productLevelPayload,
+                sku: vr.sku || null,
+                wholesalePriceCents: Math.round(Number(vr.wholesalePrice || 0) * 100),
+                retailPriceCents: Math.round(Number(vr.retailPrice || 0) * 100),
+                stockQuantity: Number(vr.stockQuantity || 0),
+                variantImageUrl: vr.variantImageUrl || (raw.primaryImageUrl || null),
+                variantGalleryImageUrls: vGalleryUrls.length ? vGalleryUrls : (gallery.length ? gallery : null),
+                variantAttributes: attrs,
+              }
+            : {
+                title: null,
+                description: null,
+                imageUrl: null,
+                productGalleryImageUrls: null,
+                status: raw.status || 'ACTIVE',
+                productId: responseProductId,
+                sku: vr.sku || null,
+                wholesalePriceCents: Math.round(Number(vr.wholesalePrice || 0) * 100),
+                retailPriceCents: Math.round(Number(vr.retailPrice || 0) * 100),
+                stockQuantity: Number(vr.stockQuantity || 0),
+                variantImageUrl: vr.variantImageUrl || null,
+                variantGalleryImageUrls: vGalleryUrls.length ? vGalleryUrls : null,
+                variantAttributes: attrs,
+              };
+
+          try {
+            const resp = await firstValueFrom(
+              this.http.post<any>(`${api}/admin/stores/${pathPart}/inventory`, payload)
+            );
+            if (isFirstRow) {
+              responseProductId = resp?.productId ?? null;
+              responseVariantId = resp?.variantId ?? null;
+            }
+          } catch (vErr: any) {
+            if (isFirstRow) throw vErr;
+            console.error(`Variant row ${i + 1} failed`, vErr);
+          }
+        }
+
+        const total = variantRows.length;
+        if (responseProductId) {
+          this.showSuccess(`Product created with ${total} variant${total !== 1 ? 's' : ''}.`);
+        } else {
+          this.showSuccess('Product created successfully.');
+        }
       }
 
       const productId = responseProductId ?? responseVariantId;
