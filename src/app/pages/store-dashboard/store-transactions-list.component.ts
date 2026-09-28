@@ -334,7 +334,8 @@ export class StoreTransactionsListComponent implements OnInit, OnDestroy {
         'REQUESTED', 'FULFILLER_ACCEPTED', 'FULFILLER_REJECTED',
         'RESERVED', 'READY', 'UNAVAILABLE',
         'PAID', 'PICKED_UP', 'CANCELLED', 'EXPIRED',
-        'REFUND_COMPLETED', 'REFUND_FAILED'
+        'REFUND_COMPLETED', 'REFUND_FAILED',
+        'RETURN_RECEIVED', 'INSPECTION_PASSED', 'INSPECTION_FAILED'
       ];
       for (const t of types) {
         this.sseSource.addEventListener(t, (e: any) => {

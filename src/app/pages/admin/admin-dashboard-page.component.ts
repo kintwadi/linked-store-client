@@ -1,4 +1,4 @@
-import { Component, OnInit, signal, computed, inject, ChangeDetectorRef, SecurityContext, OnDestroy, WritableSignal } from '@angular/core';
+import { Component, OnInit, signal, computed, inject, ChangeDetectorRef, SecurityContext, OnDestroy, WritableSignal, effect } from '@angular/core';
 import { CommonModule, DatePipe } from '@angular/common';
 import { FormsModule, ReactiveFormsModule, FormBuilder, FormGroup, Validators } from '@angular/forms';
 import { Router, RouterLink } from '@angular/router';
@@ -8,7 +8,7 @@ import { firstValueFrom } from 'rxjs';
 import { AuthService, AuthUser } from '../../services/auth.service';
 import { CanPipe } from '../../pipes/can.pipe';
 
-type TabKey = 'stores' | 'users' | 'transactions';
+type TabKey = 'stores' | 'users' | 'transactions' | 'returns';
 
 interface SseEventShape {
   eventId?: string | null;
@@ -37,6 +37,44 @@ interface SseEventShape {
   _stockLoading?: boolean;
   _stockError?: boolean;
   _actionPending?: 'accept' | 'deny' | null;
+}
+
+interface InspectionRow {
+  id: string;
+  refundId: string;
+  transactionId: string;
+  variantId: string;
+  productId: string;
+  productTitle: string;
+  sku: string;
+  productImageUrl?: string;
+  fulfillingStoreId: string;
+  storeNameFulfilling: string;
+  originatingStoreId: string;
+  storeNameOriginating: string;
+  quantity: number;
+  status: 'UNDER_INSPECTION' | 'PASSED_INSPECTION' | 'REJECTED' | 'RESTOCKED';
+  notes: string | null;
+  createdAt: string;
+  inspectedAt: string | null;
+  inspectedByUserId: string | null;
+  inspectedByStoreId: string | null;
+  canAct: boolean;
+}
+interface InspectionCounts {
+  underInspectionCount: number;
+  passedCount: number;
+  rejectedCount: number;
+  restockedCount: number;
+  totalCount: number;
+}
+interface PaginatedInspections {
+  content: InspectionRow[];
+  page: number;
+  size: number;
+  totalElements: number;
+  totalPages: number;
+  counts: InspectionCounts;
 }
 
 @Component({
@@ -1197,13 +1235,16 @@ interface SseEventShape {
       font-size: 10px; font-weight: 800; padding: 2px 7px; border-radius: 999px;
       text-transform: uppercase; letter-spacing: 0.03em;
     }
-    .ev.RESERVED     { background: #ede9fe; color: #6d28d9; }
-    .ev.READY        { background: #dcfce7; color: #166534; }
-    .ev.UNAVAILABLE  { background: #fee2e2; color: #991b1b; }
-    .ev.PAID         { background: #dbeafe; color: #1e40af; }
-    .ev.PICKED_UP    { background: #d1fae5; color: #065f46; }
-    .ev.CANCELLED    { background: #f3f4f6; color: #4b5563; }
-    .ev.EXPIRED      { background: #fef3c7; color: #92400e; }
+    .ev.RESERVED        { background: #ede9fe; color: #6d28d9; }
+    .ev.READY           { background: #dcfce7; color: #166534; }
+    .ev.UNAVAILABLE     { background: #fee2e2; color: #991b1b; }
+    .ev.PAID            { background: #dbeafe; color: #1e40af; }
+    .ev.PICKED_UP       { background: #d1fae5; color: #065f46; }
+    .ev.CANCELLED       { background: #f3f4f6; color: #4b5563; }
+    .ev.EXPIRED         { background: #fef3c7; color: #92400e; }
+    .ev.RETURN_RECEIVED { background: #fffbeb; color: #b45309; }
+    .ev.INSPECTION_PASSED { background: #ecfdf5; color: #059669; }
+    .ev.INSPECTION_FAILED { background: #fef2f2; color: #dc2626; }
     .bell-sub { font-size: 12px; color: #6b7280; line-height: 1.4; }
     .bell-time {
       font-size: 11px; font-weight: 600; color: #9ca3af; white-space: nowrap;
@@ -1390,6 +1431,26 @@ interface SseEventShape {
       font-weight: 500;
     }
     .chip.refunded { color:#c2410c; background:#fff7ed; border:1px solid #fdba74; font-weight:600; }
+    .chip.warn { background:#fff7ed; color:#c2410c; border:1px solid #fdba74; }
+    .chip.info { background:#eff6ff; color:#1d4ed8; border:1px solid #93c5fd; }
+    .chip.ok { background:#ecfdf5; color:#047857; border:1px solid #6ee7b7; }
+    .chip.err { background:#fef2f2; color:#b91c1c; border:1px solid #fca5a5; }
+    .btn-xs { padding: 4px 10px; font-size: 0.75rem; }
+    .btn-success { background:#047857; color:white; border:none; border-radius:8px; cursor:pointer; }
+    .btn-danger { background:#b91c1c; color:white; border:none; border-radius:8px; cursor:pointer; }
+    .btn-success:hover { background:#065f46; }
+    .btn-danger:hover { background:#991b1b; }
+    .qty-chip { min-width: 28px; text-align: center; font-weight: 600; }
+    .cell-prod { display: flex; align-items: center; gap: 10px; }
+    .cell-prod-title { font-weight: 500; color: var(--text); font-size: 0.85rem; line-height: 1.2; }
+    .cell-mono { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 0.7rem; color: var(--text-muted); margin-top: 2px; }
+    .thumb { width: 38px; height: 38px; border-radius: 8px; object-fit: cover; border: 1px solid var(--border); background: var(--surface-2); flex-shrink: 0; }
+    .thumb-placeholder { display: flex; align-items: center; justify-content: center; color: var(--text-light); }
+    .cell-actions { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+    .cell-loading { color: var(--text-light); font-weight: 600; }
+    .cell-muted { color: var(--text-light); }
+    .link-ghost { color: var(--primary); text-decoration: none; font-size: 0.75rem; font-weight: 500; }
+    .link-ghost:hover { text-decoration: underline; }
   `],
   template: `
     <!-- SSE Toast stack -->
@@ -1703,6 +1764,13 @@ interface SseEventShape {
           <button class="tab" [class.active]="activeTab() === 'transactions'" (click)="activeTab.set('transactions')">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
             Transactions
+          </button>
+          <button class="tab" [class.active]="activeTab() === 'returns'" (click)="activeTab.set('returns')">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/><path d="M12 7v5l3 2"/></svg>
+            Returns
+            @if ((returnsCounts()?.underInspectionCount ?? 0) > 0) {
+              <span class="pill">({{ returnsCounts()?.underInspectionCount ?? 0 }})</span>
+            }
           </button>
         </div>
 
@@ -2441,6 +2509,160 @@ interface SseEventShape {
             </div>
           </section>
         }
+
+        @if (activeTab() === 'returns') {
+          <section class="panel">
+            <div style="display: grid; grid-template-columns: 260px 1fr; gap: 20px;">
+              <aside class="sidebar">
+                <div class="sidebar-section">
+                  <div class="sidebar-title">Filters</div>
+                  <div class="status-pills">
+                    <button
+                      type="button"
+                      class="pill"
+                      [class.active]="returnsFilterStatus() === null"
+                      (click)="returnsFilterStatus.set(null); loadReturns();">
+                      All
+                      <span class="badge">{{ returnsCounts()?.totalCount ?? 0 }}</span>
+                    </button>
+                    <button
+                      type="button"
+                      class="pill warn"
+                      [class.active]="returnsFilterStatus() === 'UNDER_INSPECTION'"
+                      (click)="returnsFilterStatus.set('UNDER_INSPECTION'); loadReturns();">
+                      Under Inspection
+                      <span class="badge">{{ returnsCounts()?.underInspectionCount ?? 0 }}</span>
+                    </button>
+                    <button
+                      type="button"
+                      class="pill info"
+                      [class.active]="returnsFilterStatus() === 'PASSED_INSPECTION'"
+                      (click)="returnsFilterStatus.set('PASSED_INSPECTION'); loadReturns();">
+                      Passed
+                      <span class="badge">{{ returnsCounts()?.passedCount ?? 0 }}</span>
+                    </button>
+                    <button
+                      type="button"
+                      class="pill ok"
+                      [class.active]="returnsFilterStatus() === 'RESTOCKED'"
+                      (click)="returnsFilterStatus.set('RESTOCKED'); loadReturns();">
+                      Restocked
+                      <span class="badge">{{ returnsCounts()?.restockedCount ?? 0 }}</span>
+                    </button>
+                    <button
+                      type="button"
+                      class="pill err"
+                      [class.active]="returnsFilterStatus() === 'REJECTED'"
+                      (click)="returnsFilterStatus.set('REJECTED'); loadReturns();">
+                      Rejected
+                      <span class="badge">{{ returnsCounts()?.rejectedCount ?? 0 }}</span>
+                    </button>
+                  </div>
+                </div>
+                <div class="sidebar-section">
+                  <div class="sidebar-title">Search</div>
+                  <div class="search-row">
+                    <input
+                      #returnSearchInput
+                      type="text"
+                      class="form-control"
+                      [value]="returnsSearch()"
+                      (input)="returnsSearch.set(returnSearchInput.value)"
+                      (keyup.enter)="loadReturns()"
+                      placeholder="SKU, product, store…" />
+                    <button type="button" class="btn btn-secondary" (click)="loadReturns()">Search</button>
+                  </div>
+                </div>
+              </aside>
+
+              <div class="panel-content">
+                <div class="panel-head">
+                  <div style="display: flex; align-items: center; gap: 10px;">
+                    <div class="section-icon">
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/><path d="M12 7v5l3 2"/></svg>
+                    </div>
+                    <div>
+                      <h3>Returns &amp; Inspections</h3>
+                      <div class="panel-sub">All stores network view</div>
+                    </div>
+                  </div>
+                </div>
+
+                @if (returnsSuccess()) {
+                  <div class="banner success">{{ returnsSuccess() }}</div>
+                }
+                @if (returnsError()) {
+                  <div class="banner warn">{{ returnsError() }}</div>
+                }
+
+                @if (returnsLoading()) {
+                  <div class="loading-block">Loading returns…</div>
+                } @else if (returns().length === 0) {
+                  <div class="empty">
+                    <div class="ico">🔄</div>
+                    <h4>No returns or inspections</h4>
+                    <p>Refunded items that arrive for inspection will appear here for approval or rejection.</p>
+                  </div>
+                } @else {
+                  <div class="table-wrap">
+                    <table class="table">
+                      <thead>
+                        <tr>
+                          <th>Product</th>
+                          <th>Origin</th>
+                          <th>Fulfilling</th>
+                          <th>Qty</th>
+                          <th>Refunded at</th>
+                          <th>Status</th>
+                          <th>Actions</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        @for (row of returns(); track row.id) {
+                          <tr>
+                            <td>
+                              <div class="cell-prod">
+                                @if (row.productImageUrl) {
+                                  <img class="thumb" [src]="row.productImageUrl" alt="" />
+                                } @else {
+                                  <div class="thumb thumb-placeholder">
+                                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/></svg>
+                                  </div>
+                                }
+                                <div>
+                                  <div class="cell-prod-title" [textContent]="row.productTitle"></div>
+                                  <div class="cell-mono" [textContent]="row.sku"></div>
+                                </div>
+                              </div>
+                            </td>
+                            <td><span [textContent]="row.storeNameOriginating"></span></td>
+                            <td><span [textContent]="row.storeNameFulfilling"></span></td>
+                            <td><span class="chip qty-chip">{{ row.quantity }}</span></td>
+                            <td><span [textContent]="row.createdAt | date:'short'"></span></td>
+                            <td><span [class]="formatStatusChip(row.status).cls" [textContent]="formatStatusChip(row.status).label"></span></td>
+                            <td>
+                              <div class="cell-actions">
+                                @if (row.status === 'UNDER_INSPECTION' && row.canAct && actingRowId() !== row.id) {
+                                  <button type="button" class="btn-xs btn-success" (click)="onApproveReturn(row)">Approve</button>
+                                  <button type="button" class="btn-xs btn-danger" (click)="onRejectReturn(row)">Reject</button>
+                                } @else if (actingRowId() === row.id) {
+                                  <span class="cell-loading">…</span>
+                                } @else {
+                                  <span class="cell-muted">—</span>
+                                }
+                                <a class="link-ghost" [routerLink]="['/admin', 'refunds', row.refundId]">View Refund</a>
+                              </div>
+                            </td>
+                          </tr>
+                        }
+                      </tbody>
+                    </table>
+                  </div>
+                }
+              </div>
+            </div>
+          </section>
+        }
       }
 
       <!-- Edit Store Modal -->
@@ -2653,6 +2875,17 @@ export class AdminDashboardPageComponent implements OnInit, OnDestroy {
   private readonly sanitizer = inject(DomSanitizer);
   private touch(): void { this.cdr.markForCheck(); }
 
+  readonly returns = signal<InspectionRow[]>([]);
+  readonly returnsLoading = signal(false);
+  readonly returnsCounts = signal<InspectionCounts | null>(null);
+  readonly returnsFilterStatus = signal<string | null>(null);
+  readonly returnsSearch = signal('');
+  readonly returnsPage = signal(0);
+  readonly returnsSize = signal(20);
+  readonly actingRowId = signal<string | null>(null);
+  readonly returnsError = signal<string | null>(null);
+  readonly returnsSuccess = signal<string | null>(null);
+
   readonly isGlobalAdmin = computed(() => {
     const u = this.currentUser();
     return !!(u?.isGlobalAdmin || u?.role === 'GLOBAL_ADMIN');
@@ -2813,8 +3046,15 @@ export class AdminDashboardPageComponent implements OnInit, OnDestroy {
       });
       void this.loadUsers();
       void this.loadTransactions();
+      void this.loadReturns();
     });
   }
+
+  private readonly _tabEffect = effect(() => {
+    if (this.activeTab() === 'returns') {
+      void this.loadReturns();
+    }
+  });
 
   private async refreshMe(): Promise<void> {
     try {
@@ -3435,11 +3675,11 @@ export class AdminDashboardPageComponent implements OnInit, OnDestroy {
   readonly sseConnected = signal(false);
 
   private isTerminalType(type: string): boolean {
-    return type === 'EXPIRED' || type === 'CANCELLED' || type === 'UNAVAILABLE' || type === 'FULFILLER_REJECTED' || type === 'REFUND_FAILED';
+    return type === 'EXPIRED' || type === 'CANCELLED' || type === 'UNAVAILABLE' || type === 'FULFILLER_REJECTED' || type === 'REFUND_FAILED' || type === 'INSPECTION_FAILED';
   }
 
   private isSuccessType(type: string): boolean {
-    return type === 'PAID' || type === 'PICKED_UP' || type === 'REFUND_COMPLETED';
+    return type === 'PAID' || type === 'PICKED_UP' || type === 'REFUND_COMPLETED' || type === 'INSPECTION_PASSED';
   }
 
   private ageMs(ev: SseEventShape, nowMs: number): number {
@@ -3640,6 +3880,10 @@ export class AdminDashboardPageComponent implements OnInit, OnDestroy {
     // Sync live SSE events into the dashboard Transactions table so rows appear/refresh
     // without requiring a browser reload.
     setTimeout(() => this.syncSseEventToTransactionsTable(ev), 0);
+    // Refresh Returns & Inspections list on returns lifecycle events.
+    if (['RETURN_RECEIVED', 'INSPECTION_PASSED', 'INSPECTION_FAILED'].includes(ev.type)) {
+      setTimeout(() => void this.loadReturns(), 50);
+    }
   }
 
   private syncSseEventToTransactionsTable(ev: SseEventShape): void {
@@ -3759,6 +4003,9 @@ export class AdminDashboardPageComponent implements OnInit, OnDestroy {
       case 'EXPIRED':             return 'Reservation expired';
       case 'REFUND_COMPLETED':    return 'Transaction refunded successfully';
       case 'REFUND_FAILED':       return 'Refund failed';
+      case 'RETURN_RECEIVED':     return 'Return received, awaiting inspection';
+      case 'INSPECTION_PASSED':   return 'Inspection passed — item restocked';
+      case 'INSPECTION_FAILED':   return 'Inspection failed — return rejected';
       default:                    return ev.status ? `Status: ${ev.status}` : 'Update';
     }
   }
@@ -4113,7 +4360,8 @@ export class AdminDashboardPageComponent implements OnInit, OnDestroy {
       const types: Array<SseEventShape['type']> = [
         'REQUESTED', 'FULFILLER_ACCEPTED', 'FULFILLER_REJECTED',
         'RESERVED', 'READY', 'UNAVAILABLE',
-        'PAID', 'PICKED_UP', 'CANCELLED', 'EXPIRED'
+        'PAID', 'PICKED_UP', 'CANCELLED', 'EXPIRED',
+        'RETURN_RECEIVED', 'INSPECTION_PASSED', 'INSPECTION_FAILED'
       ];
       for (const t of types) {
         this.sseSource.addEventListener(t as string, (e: any) => {
@@ -4146,6 +4394,93 @@ export class AdminDashboardPageComponent implements OnInit, OnDestroy {
     Object.keys(this.sseDismissTimers).forEach(k => {
       clearTimeout(this.sseDismissTimers[k]); delete this.sseDismissTimers[k];
     });
+  }
+
+  async loadReturns(): Promise<void> {
+    this.returnsLoading.set(true);
+    this.returnsError.set(null);
+    try {
+      const api = this.api();
+      const params: string[] = [];
+      params.push(`page=${encodeURIComponent(String(this.returnsPage()))}`);
+      params.push(`size=${encodeURIComponent(String(this.returnsSize()))}`);
+      if (this.returnsFilterStatus() != null) {
+        params.push(`status=${encodeURIComponent(this.returnsFilterStatus()!)}`);
+      }
+      const search = this.returnsSearch().trim();
+      if (search) {
+        params.push(`search=${encodeURIComponent(search)}`);
+      }
+      const qs = params.length > 0 ? '?' + params.join('&') : '';
+      const res = await firstValueFrom(this.http.get<PaginatedInspections>(`${api}/admin/returns${qs}`));
+      this.returns.set(res?.content ?? []);
+      this.returnsCounts.set(res?.counts ?? null);
+    } catch (err: any) {
+      this.returnsError.set(err?.error?.message ?? err?.message ?? 'Failed to load returns & inspections.');
+    } finally {
+      this.returnsLoading.set(false);
+    }
+  }
+
+  async onApproveReturn(row: InspectionRow): Promise<void> {
+    if (!row.canAct) return;
+    if (row.status !== 'UNDER_INSPECTION') return;
+    if (!window.confirm('Approve this return? Item will be restocked to live inventory.')) return;
+    this.actingRowId.set(row.id);
+    this.returnsError.set(null);
+    this.returnsSuccess.set(null);
+    try {
+      const api = this.api();
+      const updated = await firstValueFrom(this.http.post<InspectionRow>(`${api}/admin/returns/${row.id}/approve`, {}));
+      this.updateReturnsListOptimistic(updated);
+      this.returnsSuccess.set('Return approved & restocked to live inventory.');
+      setTimeout(() => this.returnsSuccess.set(null), 5000);
+    } catch (err: any) {
+      this.returnsError.set(err?.error?.message ?? err?.message ?? 'Failed to approve return.');
+    } finally {
+      this.actingRowId.set(null);
+    }
+  }
+
+  async onRejectReturn(row: InspectionRow): Promise<void> {
+    if (!row.canAct) return;
+    if (row.status !== 'UNDER_INSPECTION') return;
+    const prompt = window.prompt('Enter a rejection reason (required):', 'Product damaged / not returned / wrong item — inspector discretion');
+    if (prompt == null) return;
+    const reason = prompt.trim() || 'No reason provided';
+    this.actingRowId.set(row.id);
+    this.returnsError.set(null);
+    this.returnsSuccess.set(null);
+    try {
+      const api = this.api();
+      const updated = await firstValueFrom(this.http.post<InspectionRow>(`${api}/admin/returns/${row.id}/reject`, { notes: reason }));
+      this.updateReturnsListOptimistic(updated);
+      this.returnsSuccess.set('Return rejected. Not restocked.');
+      setTimeout(() => this.returnsSuccess.set(null), 5000);
+    } catch (err: any) {
+      this.returnsError.set(err?.error?.message ?? err?.message ?? 'Failed to reject return.');
+    } finally {
+      this.actingRowId.set(null);
+    }
+  }
+
+  private updateReturnsListOptimistic(updated: InspectionRow): void {
+    this.returns.update(list => list.map(r => r.id === updated.id ? { ...updated, canAct: false as any } : r));
+    setTimeout(() => void this.loadReturns(), 400);
+  }
+
+  formatStatusChip(status: string): { label: string; cls: string } {
+    switch (status) {
+      case 'UNDER_INSPECTION': return { label: 'Under Inspection', cls: 'chip warn' };
+      case 'PASSED_INSPECTION': return { label: 'Passed', cls: 'chip info' };
+      case 'RESTOCKED': return { label: 'Restocked', cls: 'chip ok' };
+      case 'REJECTED': return { label: 'Rejected', cls: 'chip err' };
+      default: return { label: String(status), cls: 'chip' };
+    }
+  }
+
+  navigateToRefund(txId: string): void {
+    void this.router.navigate(['/admin', 'refunds', txId]);
   }
 
   ngOnDestroy(): void {
