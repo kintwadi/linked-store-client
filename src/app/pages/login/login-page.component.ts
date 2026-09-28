@@ -356,7 +356,6 @@ import { AuthService } from '../../services/auth.service';
           <span class="logo-icon" aria-hidden="true"></span>
           Linked-Store
         </a>
-        <a class="nav-link" routerLink="/">Explore</a>
       </nav>
 
       <div class="login-container">

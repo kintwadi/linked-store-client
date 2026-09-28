@@ -21,9 +21,6 @@ import { AuthService } from '../../services/auth.service';
           </a>
         }
         <nav>
-          @if (showExplore()) {
-            <a routerLink="/" class="muted" style="font-size: 14px; font-weight:500;">Explore</a>
-          }
         </nav>
       </div>
     </header>
@@ -34,7 +31,4 @@ export class NavbarComponent {
 
   readonly isRunner = computed(() => this.authService.currentUser$?.getValue()?.role === 'RUNNER');
   readonly isAuthenticated = computed(() => this.authService.isLoggedIn());
-
-  /** Hide Explore link for RUNNER users (they are not shoppers; they should not browse stores). */
-  readonly showExplore = computed(() => !this.isRunner());
 }

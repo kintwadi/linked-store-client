@@ -572,7 +572,6 @@ interface InvitePreviewResponse {
           <span class="logo-icon"></span>
           Linked-Store
         </a>
-        <a class="nav-link" routerLink="/">Explore</a>
       </nav>
 
       <div class="signup-container">

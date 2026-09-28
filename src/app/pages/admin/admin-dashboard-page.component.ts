@@ -1664,9 +1664,6 @@ interface PaginatedInspections {
         </span>
         Linked-Store
       </a>
-      <div class="topnav-right">
-        <a class="nav-link" routerLink="/">Explore</a>
-      </div>
     </nav>
 
     <div class="wrap">
