@@ -1451,6 +1451,179 @@ interface PaginatedInspections {
     .cell-muted { color: var(--text-light); }
     .link-ghost { color: var(--primary); text-decoration: none; font-size: 0.75rem; font-weight: 500; }
     .link-ghost:hover { text-decoration: underline; }
+
+    /* ============ RETURNS TAB UPGRADE ============ */
+    .return-kpi-grid {
+      display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px;
+    }
+    @media (max-width: 900px) { .return-kpi-grid { grid-template-columns: repeat(2, 1fr); } }
+    @media (max-width: 560px) { .return-kpi-grid { grid-template-columns: 1fr; } }
+    .return-kpi {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 18px 20px;
+      position: relative;
+      overflow: hidden;
+      box-shadow: var(--shadow-sm);
+      transition: all 0.2s;
+    }
+    .return-kpi::before {
+      content: ''; position: absolute; top: 0; left: 0; width: 3px; height: 100%;
+    }
+    .return-kpi.tot::before { background: linear-gradient(180deg, #8b5cf6, #ec4899); }
+    .return-kpi.under::before { background: linear-gradient(180deg, #f59e0b, #ef4444); }
+    .return-kpi.pass::before { background: linear-gradient(180deg, #10b981, #06b6d4); }
+    .return-kpi.rej::before { background: linear-gradient(180deg, #64748b, #334155); }
+    .return-kpi:hover { transform: translateY(-2px); box-shadow: var(--shadow-md); }
+    .return-kpi-top { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; margin-bottom: 10px; }
+    .return-kpi-label { font-size: 0.8125rem; color: var(--text-muted); font-weight: 500; }
+    .return-kpi-icon {
+      width: 38px; height: 38px; border-radius: 10px;
+      display: grid; place-items: center;
+    }
+    .return-kpi.tot .return-kpi-icon { background: #f3e8ff; color: #6d28d9; }
+    .return-kpi.under .return-kpi-icon { background: #fff7ed; color: #c2410c; }
+    .return-kpi.pass .return-kpi-icon { background: #d1fae5; color: #047857; }
+    .return-kpi.rej .return-kpi-icon { background: #f1f5f9; color: #475569; }
+    .return-kpi-val {
+      font-size: 1.75rem; font-weight: 800; letter-spacing: -0.02em;
+      color: var(--text);
+    }
+    .return-kpi-sub { font-size: 0.75rem; color: var(--text-muted); margin-top: 4px; }
+
+    .filter-bar {
+      display: flex; align-items: center; justify-content: space-between; gap: 14px; flex-wrap: wrap;
+    }
+    .filter-seg {
+      display: inline-flex; padding: 4px; gap: 4px;
+      background: var(--surface-2); border: 1px solid var(--border);
+      border-radius: 12px; flex-wrap: wrap;
+    }
+    .filter-seg-btn {
+      display: inline-flex; align-items: center; gap: 8px;
+      padding: 8px 16px; border: 0; background: transparent;
+      border-radius: 8px; cursor: pointer;
+      font-family: inherit; font-size: 0.875rem; font-weight: 600;
+      color: var(--text-muted); transition: all 0.18s ease;
+    }
+    .filter-seg-btn:hover { color: var(--text); background: rgba(255,255,255,0.6); }
+    .filter-seg-btn.active {
+      background: var(--surface); color: var(--text);
+      box-shadow: 0 2px 8px rgba(15,23,42,0.08);
+    }
+    .filter-seg-btn .count {
+      display: inline-grid; place-items: center;
+      min-width: 22px; height: 22px;
+      padding: 0 7px;
+      border-radius: 999px;
+      font-size: 0.72rem; font-weight: 700;
+      background: var(--border); color: var(--text-muted);
+      transition: all 0.18s ease;
+    }
+    .filter-seg-btn.active .count { background: var(--primary-light); color: var(--primary-dark); }
+    .filter-search {
+      display: flex; align-items: center; gap: 8px;
+      padding: 0 12px 0 0;
+      border: 1px solid var(--border);
+      background: var(--surface);
+      border-radius: 10px;
+      transition: border-color 0.15s, box-shadow 0.15s;
+    }
+    .filter-search:focus-within {
+      border-color: var(--primary);
+      box-shadow: 0 0 0 3px rgba(99,102,241,0.15);
+    }
+    .filter-search svg { flex-shrink: 0; margin-left: 12px; color: var(--text-muted); }
+    .filter-search input {
+      border: 0; outline: 0; background: transparent;
+      padding: 10px 0; font-family: inherit; font-size: 0.875rem;
+      color: var(--text); width: 220px;
+    }
+    .filter-search input::placeholder { color: var(--text-light); }
+    .filter-search button {
+      border: 0; padding: 6px 12px; margin-left: 4px;
+      border-radius: 7px; cursor: pointer;
+      background: var(--primary); color: #fff;
+      font-family: inherit; font-size: 0.8125rem; font-weight: 600;
+      transition: background 0.15s;
+    }
+    .filter-search button:hover { background: var(--primary-dark); }
+
+    .ret-empty {
+      padding: 72px 24px;
+      display: grid; gap: 16px; justify-items: center; text-align: center;
+    }
+    .ret-empty-ico {
+      width: 96px; height: 96px; border-radius: 28px;
+      display: grid; place-items: center;
+      background: linear-gradient(135deg, #eef2ff 0%, #f3e8ff 100%);
+      margin-bottom: 4px;
+      position: relative;
+    }
+    .ret-empty-ico svg { color: var(--primary); }
+    .ret-empty h4 {
+      margin: 0; font-size: 1.125rem; font-weight: 700; color: var(--text);
+    }
+    .ret-empty p {
+      margin: 0; font-size: 0.875rem; color: var(--text-muted);
+      max-width: 420px; line-height: 1.6;
+    }
+    .ret-empty-tips {
+      margin-top: 20px; display: flex; gap: 10px; flex-wrap: wrap; justify-content: center;
+    }
+    .ret-empty-tip {
+      display: inline-flex; align-items: center; gap: 6px;
+      padding: 8px 14px;
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: 10px;
+      font-size: 0.8125rem; color: var(--text-muted); font-weight: 500;
+    }
+    .ret-empty-tip svg { color: var(--primary); }
+
+    .loading-block {
+      padding: 64px 24px; text-align: center;
+      color: var(--text-muted); font-size: 0.9375rem;
+    }
+
+    /* Old sidebar classes kept for safety (unused now) */
+    .sidebar { padding: 20px; }
+    .sidebar-section { display: grid; gap: 14px; }
+    .sidebar-section + .sidebar-section { margin-top: 22px; padding-top: 22px; border-top: 1px solid var(--border); }
+    .sidebar-title { font-size: 0.6875rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; color: var(--text-muted); margin-bottom: 10px; }
+    .status-pills { display: grid; gap: 6px; }
+    .pill {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 10px 14px; border: 1px solid var(--border);
+      border-radius: 10px; background: var(--surface);
+      cursor: pointer; font-family: inherit; font-size: 0.875rem; font-weight: 600;
+      color: var(--text); transition: all 0.15s;
+    }
+    .pill:hover { background: var(--surface-2); }
+    .pill.active {
+      border-color: var(--primary);
+      background: var(--primary-light);
+      color: var(--primary-dark);
+      box-shadow: 0 2px 4px rgba(99,102,241,0.12);
+    }
+    .pill.warn { color: #b45309; }
+    .pill.warn.active { background: #fff7ed; border-color: #fed7aa; color: #9a3412; }
+    .pill.info { color: #1d4ed8; }
+    .pill.info.active { background: #eff6ff; border-color: #bfdbfe; color: #1e40af; }
+    .pill.ok { color: #047857; }
+    .pill.ok.active { background: #ecfdf5; border-color: #a7f3d0; color: #065f46; }
+    .pill.err { color: #b91c1c; }
+    .pill.err.active { background: #fef2f2; border-color: #fecaca; color: #991b1b; }
+    .pill .badge {
+      padding: 2px 8px; border-radius: 999px; font-size: 0.6875rem; font-weight: 700; background: var(--surface-2); color: var(--text-muted); }
+    .pill.active .badge { background: #fff; color: var(--primary-dark); }
+    .search-row { display: flex; flex-direction: column; gap: 8px; }
+    .form-control {
+      padding: 10px 12px; border: 1px solid var(--border); border-radius: 10px; background: var(--surface); font-family: inherit; font-size: 0.875rem; color: var(--text); }
+    .form-control:focus {
+      outline: 0; border-color: var(--primary); box-shadow: 0 0 0 3px rgba(99,102,241,0.15); }
+    .panel-content { padding: 0; display: grid; gap: 0; }
+    .panel-sub { font-size: 0.8125rem; color: var(--text-muted); }
   `],
   template: `
     <!-- SSE Toast stack -->
@@ -2511,83 +2684,139 @@ interface PaginatedInspections {
         }
 
         @if (activeTab() === 'returns') {
-          <section class="panel">
-            <div style="display: grid; grid-template-columns: 260px 1fr; gap: 20px;">
-              <aside class="sidebar">
-                <div class="sidebar-section">
-                  <div class="sidebar-title">Filters</div>
-                  <div class="status-pills">
+          <div style="display: grid; gap: 20px;">
+            <section class="return-kpi-grid">
+              <div class="return-kpi tot">
+                <div class="return-kpi-top">
+                  <div class="return-kpi-label">Total Returns</div>
+                  <div class="return-kpi-icon">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/><path d="M12 7v5l3 2"/></svg>
+                  </div>
+                </div>
+                <div class="return-kpi-val">{{ returnsCounts()?.totalCount ?? 0 }}</div>
+                <div class="return-kpi-sub">All inspection records across the network</div>
+              </div>
+              <div class="return-kpi under">
+                <div class="return-kpi-top">
+                  <div class="return-kpi-label">Awaiting Inspection</div>
+                  <div class="return-kpi-icon">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+                  </div>
+                </div>
+                <div class="return-kpi-val">{{ returnsCounts()?.underInspectionCount ?? 0 }}</div>
+                <div class="return-kpi-sub">Items waiting to be reviewed</div>
+              </div>
+              <div class="return-kpi pass">
+                <div class="return-kpi-top">
+                  <div class="return-kpi-label">Passed &amp; Restocked</div>
+                  <div class="return-kpi-icon">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+                  </div>
+                </div>
+                <div class="return-kpi-val">
+                  {{ (returnsCounts()?.passedCount ?? 0) + (returnsCounts()?.restockedCount ?? 0) }}
+                </div>
+                <div class="return-kpi-sub">{{ returnsCounts()?.passedCount ?? 0 }} passed · {{ returnsCounts()?.restockedCount ?? 0 }} restocked</div>
+              </div>
+              <div class="return-kpi rej">
+                <div class="return-kpi-top">
+                  <div class="return-kpi-label">Rejected</div>
+                  <div class="return-kpi-icon">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="15" x2="9" y1="9" y2="15"/><line x1="9" x2="15" y1="9" y2="15"/></svg>
+                  </div>
+                </div>
+                <div class="return-kpi-val">{{ returnsCounts()?.rejectedCount ?? 0 }}</div>
+                <div class="return-kpi-sub">Items that failed quality check</div>
+              </div>
+            </section>
+
+            <section class="panel">
+              <div class="panel-head">
+                <div style="display: flex; align-items: center; gap: 10px;">
+                  <div class="section-icon">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/><path d="M12 7v5l3 2"/></svg>
+                  </div>
+                  <div>
+                    <h2>Returns &amp; Inspections</h2>
+                    <div class="panel-sub">All stores network view · manage returns from receipt through restock</div>
+                  </div>
+                </div>
+              </div>
+
+              <div style="padding: 16px 24px; border-bottom: 1px solid var(--border);">
+                <div class="filter-bar">
+                  <div class="filter-seg" role="tablist">
                     <button
                       type="button"
-                      class="pill"
+                      role="tab"
+                      [attr.aria-selected]="returnsFilterStatus() === null"
+                      class="filter-seg-btn"
                       [class.active]="returnsFilterStatus() === null"
                       (click)="returnsFilterStatus.set(null); loadReturns();">
                       All
-                      <span class="badge">{{ returnsCounts()?.totalCount ?? 0 }}</span>
+                      <span class="count">{{ returnsCounts()?.totalCount ?? 0 }}</span>
                     </button>
                     <button
                       type="button"
-                      class="pill warn"
+                      role="tab"
+                      [attr.aria-selected]="returnsFilterStatus() === 'UNDER_INSPECTION'"
+                      class="filter-seg-btn"
                       [class.active]="returnsFilterStatus() === 'UNDER_INSPECTION'"
                       (click)="returnsFilterStatus.set('UNDER_INSPECTION'); loadReturns();">
+                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
                       Under Inspection
-                      <span class="badge">{{ returnsCounts()?.underInspectionCount ?? 0 }}</span>
+                      <span class="count">{{ returnsCounts()?.underInspectionCount ?? 0 }}</span>
                     </button>
                     <button
                       type="button"
-                      class="pill info"
+                      role="tab"
+                      [attr.aria-selected]="returnsFilterStatus() === 'PASSED_INSPECTION'"
+                      class="filter-seg-btn"
                       [class.active]="returnsFilterStatus() === 'PASSED_INSPECTION'"
                       (click)="returnsFilterStatus.set('PASSED_INSPECTION'); loadReturns();">
+                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
                       Passed
-                      <span class="badge">{{ returnsCounts()?.passedCount ?? 0 }}</span>
+                      <span class="count">{{ returnsCounts()?.passedCount ?? 0 }}</span>
                     </button>
                     <button
                       type="button"
-                      class="pill ok"
+                      role="tab"
+                      [attr.aria-selected]="returnsFilterStatus() === 'RESTOCKED'"
+                      class="filter-seg-btn"
                       [class.active]="returnsFilterStatus() === 'RESTOCKED'"
                       (click)="returnsFilterStatus.set('RESTOCKED'); loadReturns();">
+                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/></svg>
                       Restocked
-                      <span class="badge">{{ returnsCounts()?.restockedCount ?? 0 }}</span>
+                      <span class="count">{{ returnsCounts()?.restockedCount ?? 0 }}</span>
                     </button>
                     <button
                       type="button"
-                      class="pill err"
+                      role="tab"
+                      [attr.aria-selected]="returnsFilterStatus() === 'REJECTED'"
+                      class="filter-seg-btn"
                       [class.active]="returnsFilterStatus() === 'REJECTED'"
                       (click)="returnsFilterStatus.set('REJECTED'); loadReturns();">
+                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="15" x2="9" y1="9" y2="15"/><line x1="9" x2="15" y1="9" y2="15"/></svg>
                       Rejected
-                      <span class="badge">{{ returnsCounts()?.rejectedCount ?? 0 }}</span>
+                      <span class="count">{{ returnsCounts()?.rejectedCount ?? 0 }}</span>
                     </button>
                   </div>
-                </div>
-                <div class="sidebar-section">
-                  <div class="sidebar-title">Search</div>
-                  <div class="search-row">
+
+                  <div class="filter-search">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
                     <input
                       #returnSearchInput
                       type="text"
-                      class="form-control"
                       [value]="returnsSearch()"
                       (input)="returnsSearch.set(returnSearchInput.value)"
                       (keyup.enter)="loadReturns()"
-                      placeholder="SKU, product, store…" />
-                    <button type="button" class="btn btn-secondary" (click)="loadReturns()">Search</button>
+                      placeholder="Search SKU, product, store…" />
+                    <button type="button" (click)="loadReturns()">Search</button>
                   </div>
                 </div>
-              </aside>
+              </div>
 
-              <div class="panel-content">
-                <div class="panel-head">
-                  <div style="display: flex; align-items: center; gap: 10px;">
-                    <div class="section-icon">
-                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/><path d="M12 7v5l3 2"/></svg>
-                    </div>
-                    <div>
-                      <h3>Returns &amp; Inspections</h3>
-                      <div class="panel-sub">All stores network view</div>
-                    </div>
-                  </div>
-                </div>
-
+              <div class="panel-body" style="padding: 0;">
                 @if (returnsSuccess()) {
                   <div class="banner success">{{ returnsSuccess() }}</div>
                 }
@@ -2596,25 +2825,54 @@ interface PaginatedInspections {
                 }
 
                 @if (returnsLoading()) {
-                  <div class="loading-block">Loading returns…</div>
+                  <div class="loading-block">
+                    <div style="display: inline-flex; align-items: center; gap: 10px;">
+                      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="animation: spin 0.8s linear infinite; color: var(--primary);"><path d="M21 12a9 9 0 1 1-6.219-8.56"/></svg>
+                      Loading returns and inspections…
+                    </div>
+                  </div>
                 } @else if (returns().length === 0) {
-                  <div class="empty">
-                    <div class="ico">🔄</div>
-                    <h4>No returns or inspections</h4>
-                    <p>Refunded items that arrive for inspection will appear here for approval or rejection.</p>
+                  <div class="ret-empty">
+                    <div class="ret-empty-ico">
+                      <svg width="44" height="44" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/><path d="M12 7v5l3 2"/></svg>
+                    </div>
+                    <h4>@if (returnsFilterStatus() === null) { No returns or inspections yet } @else if (returnsFilterStatus() === 'UNDER_INSPECTION') { No under inspection records } @else if (returnsFilterStatus() === 'PASSED_INSPECTION') { No passed inspection records } @else if (returnsFilterStatus() === 'RESTOCKED') { No restocked records } @else { No rejected records }</h4>
+                    <p>
+                      @if (returnsFilterStatus() === null) {
+                        Refunded items that arrive for physical inspection will appear here. Approve items for restock to re-activate inventory, or reject if the condition does not meet resale standards.
+                      } @else {
+                        Try switching filters or adjusting your search query.
+                      }
+                    </p>
+                    @if (returnsFilterStatus() === null) {
+                      <div class="ret-empty-tips">
+                        <div class="ret-empty-tip">
+                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 7h-9"/><path d="M14 17H5"/><circle cx="17" cy="17" r="3"/><circle cx="7" cy="7" r="3"/></svg>
+                          Approve &amp; restock to return inventory
+                        </div>
+                        <div class="ret-empty-tip">
+                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10"/></svg>
+                          Reject to write off damaged items
+                        </div>
+                        <div class="ret-empty-tip">
+                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></svg>
+                          Only Fulfilling Stores may act on items
+                        </div>
+                      </div>
+                    }
                   </div>
                 } @else {
                   <div class="table-wrap">
                     <table class="table">
                       <thead>
                         <tr>
-                          <th>Product</th>
-                          <th>Origin</th>
-                          <th>Fulfilling</th>
+                          <th style="min-width: 240px;">Product</th>
+                          <th>Origin Store</th>
+                          <th>Fulfilling Store</th>
                           <th>Qty</th>
-                          <th>Refunded at</th>
+                          <th>Received</th>
                           <th>Status</th>
-                          <th>Actions</th>
+                          <th style="min-width: 220px;">Actions</th>
                         </tr>
                       </thead>
                       <tbody>
@@ -2623,7 +2881,7 @@ interface PaginatedInspections {
                             <td>
                               <div class="cell-prod">
                                 @if (row.productImageUrl) {
-                                  <img class="thumb" [src]="row.productImageUrl" alt="" />
+                                  <img class="thumb" [src]="row.productImageUrl" alt="" onerror="this.style.display='none'" />
                                 } @else {
                                   <div class="thumb thumb-placeholder">
                                     <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/></svg>
@@ -2643,14 +2901,20 @@ interface PaginatedInspections {
                             <td>
                               <div class="cell-actions">
                                 @if (row.status === 'UNDER_INSPECTION' && row.canAct && actingRowId() !== row.id) {
-                                  <button type="button" class="btn-xs btn-success" (click)="onApproveReturn(row)">Approve</button>
-                                  <button type="button" class="btn-xs btn-danger" (click)="onRejectReturn(row)">Reject</button>
+                                  <button type="button" class="btn-xs btn-success" (click)="onApproveReturn(row)">
+                                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="vertical-align: middle; margin-right: 4px;"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+                                    Approve
+                                  </button>
+                                  <button type="button" class="btn-xs btn-danger" (click)="onRejectReturn(row)">
+                                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="vertical-align: middle; margin-right: 4px;"><circle cx="12" cy="12" r="10"/><line x1="15" x2="9" y1="9" y2="15"/><line x1="9" x2="15" y1="9" y2="15"/></svg>
+                                    Reject
+                                  </button>
                                 } @else if (actingRowId() === row.id) {
-                                  <span class="cell-loading">…</span>
+                                  <span class="cell-loading">Processing…</span>
                                 } @else {
                                   <span class="cell-muted">—</span>
                                 }
-                                <a class="link-ghost" [routerLink]="['/admin', 'refunds', row.refundId]">View Refund</a>
+                                <a class="link-ghost" [routerLink]="['/admin', 'refunds', row.refundId]">View Refund →</a>
                               </div>
                             </td>
                           </tr>
@@ -2660,8 +2924,8 @@ interface PaginatedInspections {
                   </div>
                 }
               </div>
-            </div>
-          </section>
+            </section>
+          </div>
         }
       }
 

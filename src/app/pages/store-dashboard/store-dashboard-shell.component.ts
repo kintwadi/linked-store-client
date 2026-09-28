@@ -351,6 +351,132 @@ interface PaginatedInspections {
     }
     .empty h4 { margin: 0; font-size: 15px; font-weight: 700; color: #111827; }
     .empty p  { margin: 0; font-size: 12px; color: #6b7280; max-width: 340px; }
+
+    /* ============ RETURNS TAB UPGRADE ============ */
+    .ret-kpi-grid {
+      display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px;
+    }
+    @media (max-width: 900px) { .ret-kpi-grid { grid-template-columns: repeat(2, 1fr); } }
+    @media (max-width: 560px) { .ret-kpi-grid { grid-template-columns: 1fr; } }
+    .ret-kpi {
+      background: #fff;
+      border: 1px solid #f3f4f6;
+      border-radius: 16px;
+      padding: 18px 20px;
+      position: relative;
+      overflow: hidden;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+      transition: all 0.2s;
+    }
+    .ret-kpi::before {
+      content: ''; position: absolute; top: 0; left: 0; width: 3px; height: 100%;
+    }
+    .ret-kpi.tot::before { background: linear-gradient(180deg, #8b5cf6, #ec4899); }
+    .ret-kpi.under::before { background: linear-gradient(180deg, #f59e0b, #ef4444); }
+    .ret-kpi.pass::before { background: linear-gradient(180deg, #10b981, #06b6d4); }
+    .ret-kpi.rej::before { background: linear-gradient(180deg, #64748b, #334155); }
+    .ret-kpi:hover { transform: translateY(-2px); box-shadow: 0 12px 28px -14px rgba(0,0,0,0.18); }
+    .ret-kpi-top { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; margin-bottom: 10px; }
+    .ret-kpi-label { font-size: 13px; color: #6b7280; font-weight: 500; }
+    .ret-kpi-icon {
+      width: 38px; height: 38px; border-radius: 10px;
+      display: grid; place-items: center;
+    }
+    .ret-kpi.tot .ret-kpi-icon { background: #f3e8ff; color: #6d28d9; }
+    .ret-kpi.under .ret-kpi-icon { background: #fff7ed; color: #c2410c; }
+    .ret-kpi.pass .ret-kpi-icon { background: #d1fae5; color: #047857; }
+    .ret-kpi.rej .ret-kpi-icon { background: #f1f5f9; color: #475569; }
+    .ret-kpi-val { font-size: 28px; font-weight: 800; letter-spacing: -0.02em; color: #111827; }
+    .ret-kpi-sub { font-size: 12px; color: #6b7280; margin-top: 4px; }
+
+    .filter-bar {
+      display: flex; align-items: center; justify-content: space-between; gap: 14px; flex-wrap: wrap;
+    }
+    .filter-seg {
+      display: inline-flex; padding: 4px; gap: 4px;
+      background: #f3f4f6; border: 1px solid #e5e7eb;
+      border-radius: 12px; flex-wrap: wrap;
+    }
+    .filter-seg-btn {
+      display: inline-flex; align-items: center; gap: 8px;
+      padding: 8px 16px; border: 0; background: transparent;
+      border-radius: 8px; cursor: pointer;
+      font-family: inherit; font-size: 13px; font-weight: 600;
+      color: #6b7280; transition: all 0.18s ease;
+    }
+    .filter-seg-btn:hover { color: #111827; background: rgba(255,255,255,0.6); }
+    .filter-seg-btn.active {
+      background: #fff; color: #111827;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+    }
+    .filter-seg-btn .cnt {
+      display: inline-grid; place-items: center;
+      min-width: 22px; height: 22px; padding: 0 7px;
+      border-radius: 999px;
+      font-size: 11px; font-weight: 700;
+      background: #e5e7eb; color: #4b5563;
+      transition: all 0.18s ease;
+    }
+    .filter-seg-btn.active .cnt { background: #eef2ff; color: #4338ca; }
+    .filter-search {
+      display: flex; align-items: center; gap: 8px;
+      padding: 0 12px 0 0;
+      border: 1px solid #e5e7eb;
+      background: #fff;
+      border-radius: 10px;
+      transition: border-color 0.15s, box-shadow 0.15s;
+    }
+    .filter-search:focus-within {
+      border-color: #6366f1;
+      box-shadow: 0 0 0 3px rgba(99,102,241,0.15);
+    }
+    .filter-search svg { flex-shrink: 0; margin-left: 12px; color: #6b7280; }
+    .filter-search input {
+      border: 0; outline: 0; background: transparent;
+      padding: 10px 0; font-family: inherit; font-size: 13px;
+      color: #111827; width: 220px;
+    }
+    .filter-search input::placeholder { color: #9ca3af; }
+    .filter-search button {
+      border: 0; padding: 6px 12px; margin-left: 4px;
+      border-radius: 7px; cursor: pointer;
+      background: #6366f1; color: #fff;
+      font-family: inherit; font-size: 12px; font-weight: 600;
+      transition: background 0.15s;
+    }
+    .filter-search button:hover { background: #4f46e5; }
+
+    .ret-empty {
+      padding: 72px 24px;
+      display: grid; gap: 16px; justify-items: center; text-align: center;
+    }
+    .ret-empty-ico {
+      width: 96px; height: 96px; border-radius: 28px;
+      display: grid; place-items: center;
+      background: linear-gradient(135deg, #eef2ff 0%, #f3e8ff 100%);
+      margin-bottom: 4px;
+      position: relative;
+    }
+    .ret-empty-ico svg { color: #6366f1; }
+    .ret-empty h4 { margin: 0; font-size: 18px; font-weight: 700; color: #111827; }
+    .ret-empty p { margin: 0; font-size: 13px; color: #6b7280; max-width: 420px; line-height: 1.6; }
+    .ret-empty-tips {
+      margin-top: 20px; display: flex; gap: 10px; flex-wrap: wrap; justify-content: center;
+    }
+    .ret-empty-tip {
+      display: inline-flex; align-items: center; gap: 6px;
+      padding: 8px 14px;
+      background: #fff; border: 1px solid #f3f4f6;
+      border-radius: 10px;
+      font-size: 12px; color: #6b7280; font-weight: 500;
+    }
+    .ret-empty-tip svg { color: #6366f1; }
+
+    .loading-block {
+      padding: 64px 24px; text-align: center;
+      color: #6b7280; font-size: 14px;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
   `],
   template: `
     <div class="wrap">
@@ -409,61 +535,275 @@ interface PaginatedInspections {
 
         @switch (activeTab()) {
           @case ('returns') {
-            @if (returnsSuccess()) {
-              <div class="banner success">
-                <span class="banner-ico">✅</span>
-                <div class="banner-text">
-                  <div class="banner-title">Success</div>
-                  <div class="banner-msg">{{ returnsSuccess() }}</div>
-                </div>
-              </div>
-            }
-            @if (returnsError()) {
-              <div class="banner danger">
-                <span class="banner-ico">⚠️</span>
-                <div class="banner-text">
-                  <div class="banner-title">Error</div>
-                  <div class="banner-msg">{{ returnsError() }}</div>
-                </div>
-              </div>
-            }
-            <div class="two-col">
-              <aside class="side-col">
-                <div class="panel">
-                  <div class="panel-head">
-                    <h2><span class="ico">🔍</span> Filters</h2>
+            <div style="display: grid; gap: 20px;">
+              <section class="ret-kpi-grid">
+                <div class="ret-kpi tot">
+                  <div class="ret-kpi-top">
+                    <div class="ret-kpi-label">Total Returns</div>
+                    <div class="ret-kpi-icon">
+                      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/><path d="M12 7v5l3 2"/></svg>
+                    </div>
                   </div>
-                  <div class="panel-body">
-                    <div class="filter-section">
-                      <div class="filter-title">Status</div>
-                      <div class="chip-list">
-                        <button class="chip" [class.ok]="!returnsFilterStatus()" (click)="returnsFilterStatus.set(null); loadReturns()">
-                          All <span class="chip-count">{{ returnsCounts()?.totalCount ?? 0 }}</span>
-                        </button>
-                        <button class="chip warn" [class.active]="returnsFilterStatus() === 'UNDER_INSPECTION'" (click)="returnsFilterStatus.set('UNDER_INSPECTION'); loadReturns()">
-                          Under Inspection <span class="chip-count">{{ returnsCounts()?.underInspectionCount ?? 0 }}</span>
-                        </button>
-                        <button class="chip ok" [class.active]="returnsFilterStatus() === 'RESTOCKED'" (click)="returnsFilterStatus.set('RESTOCKED'); loadReturns()">
-                          Restocked <span class="chip-count">{{ returnsCounts()?.restockedCount ?? 0 }}</span>
-                        </button>
-                        <button class="chip err" [class.active]="returnsFilterStatus() === 'REJECTED'" (click)="returnsFilterStatus.set('REJECTED'); loadReturns()">
-                          Rejected <span class="chip-count">{{ returnsCounts()?.rejectedCount ?? 0 }}</span>
-                        </button>
+                  <div class="ret-kpi-val">{{ returnsCounts()?.totalCount ?? 0 }}</div>
+                  <div class="ret-kpi-sub">All inspection records for this store</div>
+                </div>
+                <div class="ret-kpi under">
+                  <div class="ret-kpi-top">
+                    <div class="ret-kpi-label">Awaiting Action</div>
+                    <div class="ret-kpi-icon">
+                      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+                    </div>
+                  </div>
+                  <div class="ret-kpi-val">{{ returnsCounts()?.underInspectionCount ?? 0 }}</div>
+                  <div class="ret-kpi-sub">Items awaiting your inspection</div>
+                </div>
+                <div class="ret-kpi pass">
+                  <div class="ret-kpi-top">
+                    <div class="ret-kpi-label">Passed &amp; Restocked</div>
+                    <div class="ret-kpi-icon">
+                      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+                    </div>
+                  </div>
+                  <div class="ret-kpi-val">
+                    {{ (returnsCounts()?.passedCount ?? 0) + (returnsCounts()?.restockedCount ?? 0) }}
+                  </div>
+                  <div class="ret-kpi-sub">{{ returnsCounts()?.passedCount ?? 0 }} passed · {{ returnsCounts()?.restockedCount ?? 0 }} restocked</div>
+                </div>
+                <div class="ret-kpi rej">
+                  <div class="ret-kpi-top">
+                    <div class="ret-kpi-label">Rejected</div>
+                    <div class="ret-kpi-icon">
+                      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="15" x2="9" y1="9" y2="15"/><line x1="9" x2="15" y1="9" y2="15"/></svg>
+                    </div>
+                  </div>
+                  <div class="ret-kpi-val">{{ returnsCounts()?.rejectedCount ?? 0 }}</div>
+                  <div class="ret-kpi-sub">Items that failed quality check</div>
+                </div>
+              </section>
+
+              @if (returnsSuccess()) {
+                <div class="banner success" style="margin-bottom: 0;">
+                  <span class="banner-ico">✅</span>
+                  <div class="banner-text">
+                    <div class="banner-title">Success</div>
+                    <div class="banner-msg">{{ returnsSuccess() }}</div>
+                  </div>
+                </div>
+              }
+              @if (returnsError()) {
+                <div class="banner danger" style="margin-bottom: 0;">
+                  <span class="banner-ico">⚠️</span>
+                  <div class="banner-text">
+                    <div class="banner-title">Error</div>
+                    <div class="banner-msg">{{ returnsError() }}</div>
+                  </div>
+                </div>
+              }
+
+              <section class="panel">
+                <div class="panel-head">
+                  <div style="display: flex; align-items: center; gap: 10px;">
+                    <h2>
+                      <span class="ico">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/><path d="M12 7v5l3 2"/></svg>
+                      </span>
+                      Returns &amp; Inspections
+                    </h2>
+                    <span class="muted">Store-scoped view · partner actions only</span>
+                  </div>
+                </div>
+
+                <div style="padding: 16px 22px; border-bottom: 1px solid #f3f4f6;">
+                  <div class="filter-bar">
+                    <div class="filter-seg" role="tablist">
+                      <button
+                        type="button"
+                        role="tab"
+                        [attr.aria-selected]="returnsFilterStatus() === null"
+                        class="filter-seg-btn"
+                        [class.active]="returnsFilterStatus() === null"
+                        (click)="returnsFilterStatus.set(null); loadReturns()">
+                        All
+                        <span class="cnt">{{ returnsCounts()?.totalCount ?? 0 }}</span>
+                      </button>
+                      <button
+                        type="button"
+                        role="tab"
+                        [attr.aria-selected]="returnsFilterStatus() === 'UNDER_INSPECTION'"
+                        class="filter-seg-btn"
+                        [class.active]="returnsFilterStatus() === 'UNDER_INSPECTION'"
+                        (click)="returnsFilterStatus.set('UNDER_INSPECTION'); loadReturns()">
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+                        Under Inspection
+                        <span class="cnt">{{ returnsCounts()?.underInspectionCount ?? 0 }}</span>
+                      </button>
+                      <button
+                        type="button"
+                        role="tab"
+                        [attr.aria-selected]="returnsFilterStatus() === 'RESTOCKED'"
+                        class="filter-seg-btn"
+                        [class.active]="returnsFilterStatus() === 'RESTOCKED'"
+                        (click)="returnsFilterStatus.set('RESTOCKED'); loadReturns()">
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/></svg>
+                        Restocked
+                        <span class="cnt">{{ returnsCounts()?.restockedCount ?? 0 }}</span>
+                      </button>
+                      <button
+                        type="button"
+                        role="tab"
+                        [attr.aria-selected]="returnsFilterStatus() === 'REJECTED'"
+                        class="filter-seg-btn"
+                        [class.active]="returnsFilterStatus() === 'REJECTED'"
+                        (click)="returnsFilterStatus.set('REJECTED'); loadReturns()">
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="15" x2="9" y1="9" y2="15"/><line x1="9" x2="15" y1="9" y2="15"/></svg>
+                        Rejected
+                        <span class="cnt">{{ returnsCounts()?.rejectedCount ?? 0 }}</span>
+                      </button>
+                    </div>
+
+                    <div class="filter-search">
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+                      <input
+                        type="text"
+                        placeholder="Search SKU or product…"
+                        [value]="returnsSearch()"
+                        (keyup.enter)="onSearchEnter($event)"
+                      />
+                      <button type="button" (click)="loadReturns()">Search</button>
+                    </div>
+                  </div>
+                </div>
+
+                <div class="panel-body" style="padding: 0;">
+                  @if (returnsLoading()) {
+                    <div class="loading-block">
+                      <div style="display: inline-flex; align-items: center; gap: 10px;">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="animation: spin 0.8s linear infinite; color: #6366f1;"><path d="M21 12a9 9 0 1 1-6.219-8.56"/></svg>
+                        Loading returns and inspections…
                       </div>
                     </div>
-                    <div class="filter-section">
-                      <div class="filter-title">Search</div>
-                      <div class="search-wrap">
-                        <input
-                          class="form-input"
-                          type="text"
-                          placeholder="Search SKU or product…"
-                          [value]="returnsSearch()"
-                          (keyup.enter)="onSearchEnter($event)"
-                        />
+                  } @else if (returns().length === 0) {
+                    <div class="ret-empty">
+                      <div class="ret-empty-ico">
+                        <svg width="44" height="44" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/><path d="M12 7v5l3 2"/></svg>
                       </div>
+                      <h4>@if (returnsFilterStatus() === null) { No returns found } @else if (returnsFilterStatus() === 'UNDER_INSPECTION') { No under inspection records } @else if (returnsFilterStatus() === 'RESTOCKED') { No restocked records } @else { No rejected records }</h4>
+                      <p>
+                        @if (returnsFilterStatus() === null) {
+                          Returns for this store will appear here once refunds complete and items are queued for physical inspection. Approve items to restock inventory back to the shelf.
+                        } @else {
+                          Try switching filters or adjusting your search query to find what you need.
+                        }
+                      </p>
+                      @if (returnsFilterStatus() === null) {
+                        <div class="ret-empty-tips">
+                          <div class="ret-empty-tip">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 7h-9"/><path d="M14 17H5"/><circle cx="17" cy="17" r="3"/><circle cx="7" cy="7" r="3"/></svg>
+                            Approve to return stock to inventory
+                          </div>
+                          <div class="ret-empty-tip">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></svg>
+                            Only the fulfilling store approves/rejects
+                          </div>
+                          <div class="ret-empty-tip">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+                            All actions are audited in refund records
+                          </div>
+                        </div>
+                      }
                     </div>
-                    <div class="pagination">
+                  } @else {
+                    <div class="table-wrap">
+                      <table>
+                        <thead>
+                          <tr>
+                            <th style="min-width: 220px;">Product</th>
+                            <th>Partner Store</th>
+                            <th>Qty</th>
+                            <th>Received</th>
+                            <th>Status</th>
+                            <th style="min-width: 220px;">Actions</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          @for (row of returns(); track row.id) {
+                            <tr>
+                              <td>
+                                <div class="cell-identity">
+                                  <div class="logo-or-avatar" style="width:40px;height:40px;border-radius:10px;font-size:16px;">
+                                    @if (row.productImageUrl) { <img [src]="row.productImageUrl" alt="" onerror="this.style.display='none'" /> }
+                                    @else {
+                                      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/></svg>
+                                    }
+                                  </div>
+                                  <div class="cell-text">
+                                    <div class="cell-title">{{ row.productTitle || '—' }}</div>
+                                    <div class="cell-meta"><span class="mono">{{ row.sku || 'N/A' }}</span></div>
+                                  </div>
+                                </div>
+                              </td>
+                              <td>
+                                <div class="cell-text">
+                                  @if (store() && store()!.id === row.fulfillingStoreId) {
+                                    <div class="cell-title">{{ row.originatingStoreName || '—' }}</div>
+                                    <div class="cell-meta">Partner (origin)</div>
+                                  } @else {
+                                    <div class="cell-title">{{ row.fulfillingStoreName || '—' }}</div>
+                                    <div class="cell-meta">Partner (fulfilling)</div>
+                                  }
+                                </div>
+                              </td>
+                              <td><span class="cell-title" style="font-weight: 700;">{{ row.quantity ?? 1 }}</span></td>
+                              <td>
+                                <div class="cell-text">
+                                  <div class="cell-title">{{ row.createdAt ? (row.createdAt | slice:0:10) : '—' }}</div>
+                                  <div class="cell-meta">{{ row.createdAt ? (row.createdAt | slice:11:16) : '' }}</div>
+                                </div>
+                              </td>
+                              <td>
+                                <span [class]="formatStatusChip(row.status).cls">{{ formatStatusChip(row.status).label }}</span>
+                              </td>
+                              <td>
+                                <div class="row-actions">
+                                  @if (row.canAct && row.status === 'UNDER_INSPECTION') {
+                                    <button
+                                      class="btn btn-success btn-xs"
+                                      [disabled]="actingRowId() === row.id"
+                                      (click)="onApproveReturn(row)">
+                                      @if (actingRowId() === row.id) { ⏳ } @else {
+                                        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="vertical-align: middle; margin-right: 3px;"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+                                      }
+                                      Approve
+                                    </button>
+                                    <button
+                                      class="btn btn-danger btn-xs"
+                                      [disabled]="actingRowId() === row.id"
+                                      (click)="onRejectReturn(row)">
+                                      @if (actingRowId() === row.id) { ⏳ } @else {
+                                        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="vertical-align: middle; margin-right: 3px;"><circle cx="12" cy="12" r="10"/><line x1="15" x2="9" y1="9" y2="15"/><line x1="9" x2="15" y1="9" y2="15"/></svg>
+                                      }
+                                      Reject
+                                    </button>
+                                  } @else if (!row.canAct && row.status === 'UNDER_INSPECTION') {
+                                    <span class="chip info">
+                                      Inspection pending at {{ store()!.id === row.fulfillingStoreId ? row.originatingStoreName : row.fulfillingStoreName }}
+                                    </span>
+                                  } @else if (row.transactionId) {
+                                    <button class="btn btn-ghost btn-xs" (click)="navigateToRefund(row.transactionId)">
+                                      View Refund →
+                                    </button>
+                                  }
+                                </div>
+                              </td>
+                            </tr>
+                          }
+                        </tbody>
+                      </table>
+                    </div>
+                  }
+
+                  @if (returns().length > 0) {
+                    <div class="pagination" style="border-top: 1px solid #f3f4f6;">
                       <div class="pagination-info">
                         Page {{ returnsPage() + 1 }} · size {{ returnsSize() }}
                       </div>
@@ -472,111 +812,7 @@ interface PaginatedInspections {
                         <button class="btn-ghost btn-xs" [disabled]="returns().length < returnsSize()" (click)="nextPage()">Next →</button>
                       </div>
                     </div>
-                  </div>
-                </div>
-              </aside>
-
-              <section class="main-col">
-                <div class="panel">
-                  <div class="panel-head">
-                    <div class="section-title-wrap">
-                      <h2><span class="ico">🔄</span> Returns &amp; Inspections</h2>
-                      <span class="muted">Store-scoped view · partner actions only</span>
-                    </div>
-                  </div>
-                  <div class="panel-body">
-                    @if (returnsLoading()) {
-                      <div class="loading">Loading returns…</div>
-                    } @else if (returns().length === 0) {
-                      <div class="empty">
-                        <span class="ico">📭</span>
-                        <h4>No returns found</h4>
-                        <p>Returns for this store will appear here once refunds complete and items are queued for inspection.</p>
-                      </div>
-                    } @else {
-                      <div class="table-wrap">
-                        <table>
-                          <thead>
-                            <tr>
-                              <th>Product</th>
-                              <th>Partner Store</th>
-                              <th>Qty</th>
-                              <th>Refunded at</th>
-                              <th>Status</th>
-                              <th>Actions</th>
-                            </tr>
-                          </thead>
-                          <tbody>
-                            @for (row of returns(); track row.id) {
-                              <tr>
-                                <td>
-                                  <div class="cell-identity">
-                                    <div class="logo-or-avatar" style="width:40px;height:40px;border-radius:10px;font-size:16px;">
-                                      @if (row.productImageUrl) { <img [src]="row.productImageUrl" alt="" onerror="this.style.display='none'" /> }
-                                      @else { 📦 }
-                                    </div>
-                                    <div class="cell-text">
-                                      <div class="cell-title">{{ row.productTitle || '—' }}</div>
-                                      <div class="cell-meta"><span class="mono">{{ row.sku || 'N/A' }}</span></div>
-                                    </div>
-                                  </div>
-                                </td>
-                                <td>
-                                  <div class="cell-text">
-                                    @if (store() && store()!.id === row.fulfillingStoreId) {
-                                      <div class="cell-title">{{ row.originatingStoreName || '—' }}</div>
-                                      <div class="cell-meta">Partner (origin)</div>
-                                    } @else {
-                                      <div class="cell-title">{{ row.fulfillingStoreName || '—' }}</div>
-                                      <div class="cell-meta">Partner (fulfilling)</div>
-                                    }
-                                  </div>
-                                </td>
-                                <td><span class="cell-title">{{ row.quantity ?? 1 }}</span></td>
-                                <td>
-                                  <div class="cell-text">
-                                    <div class="cell-title">{{ row.createdAt ? (row.createdAt | slice:0:10) : '—' }}</div>
-                                    <div class="cell-meta">{{ row.createdAt ? (row.createdAt | slice:11:16) : '' }}</div>
-                                  </div>
-                                </td>
-                                <td>
-                                  <span [class]="formatStatusChip(row.status).cls">{{ formatStatusChip(row.status).label }}</span>
-                                </td>
-                                <td>
-                                  <div class="row-actions">
-                                    @if (row.canAct && row.status === 'UNDER_INSPECTION') {
-                                      <button
-                                        class="btn btn-success btn-xs"
-                                        [disabled]="actingRowId() === row.id"
-                                        (click)="onApproveReturn(row)">
-                                        @if (actingRowId() === row.id) { ⏳ } @else { ✓ }
-                                        Approve
-                                      </button>
-                                      <button
-                                        class="btn btn-danger btn-xs"
-                                        [disabled]="actingRowId() === row.id"
-                                        (click)="onRejectReturn(row)">
-                                        @if (actingRowId() === row.id) { ⏳ } @else { ✕ }
-                                        Reject
-                                      </button>
-                                    } @else if (!row.canAct && row.status === 'UNDER_INSPECTION') {
-                                      <span class="chip info">
-                                        Inspection pending at {{ store()!.id === row.fulfillingStoreId ? row.originatingStoreName : row.fulfillingStoreName }}
-                                      </span>
-                                    } @else if (row.transactionId) {
-                                      <button class="btn btn-ghost btn-xs" (click)="navigateToRefund(row.transactionId)">
-                                        View Refund
-                                      </button>
-                                    }
-                                  </div>
-                                </td>
-                              </tr>
-                            }
-                          </tbody>
-                        </table>
-                      </div>
-                    }
-                  </div>
+                  }
                 </div>
               </section>
             </div>
