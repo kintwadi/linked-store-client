@@ -19,8 +19,10 @@ import { StoreProductsListComponent } from './pages/store-dashboard/store-produc
 import { StoreProductFormComponent } from './pages/store-dashboard/store-product-form.component';
 import { StoreTransactionsListComponent } from './pages/store-dashboard/store-transactions-list.component';
 import { AdminRefundPageComponent } from './pages/admin/admin-refund-page.component';
+import { PricingPageComponent } from './pages/pricing/pricing-page.component';
 
 export const routes: Routes = [
+  { path: 'pricing',                 component: PricingPageComponent,           title: 'Pricing | Linked-Store' },
   { path: '',                        component: HomePageComponent,              title: 'Linked-Store' },
   { path: 'p/:productId',            component: ProductDetailPageComponent,     title: 'Product' },
   { path: 'p/:productId/qr',         component: ProductQrSharePageComponent,    title: 'Product QR · Share' },
