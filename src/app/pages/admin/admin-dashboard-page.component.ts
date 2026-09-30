@@ -7,8 +7,9 @@ import { DomSanitizer, SafeUrl } from '@angular/platform-browser';
 import { firstValueFrom } from 'rxjs';
 import { AuthService, AuthUser } from '../../services/auth.service';
 import { CanPipe } from '../../pipes/can.pipe';
+import { PermissionService } from '../../services/permission.service';
 
-type TabKey = 'stores' | 'users' | 'transactions' | 'returns';
+type TabKey = 'stores' | 'users' | 'transactions' | 'returns' | 'subscription';
 
 interface SseEventShape {
   eventId?: string | null;
@@ -1942,6 +1943,12 @@ interface PaginatedInspections {
               <span class="pill">({{ returnsCounts()?.underInspectionCount ?? 0 }})</span>
             }
           </button>
+          @if (canAccessSubscription()) {
+            <a class="tab" routerLink="/pricing" queryParamsHandling="merge">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 12V8H6a2 2 0 0 1-2-2c0-1.1.9-2 2-2h12v4"/><path d="M4 6v12c0 1.1.9 2 2 2h14v-4"/><path d="M18 12a2 2 0 0 0 0 4h4v-4z"/><line x1="8" y1="12" x2="14" y2="12"/></svg>
+              Subscription
+            </a>
+          }
         </div>
 
         <!-- ============ STORES TAB ============ -->
@@ -3073,6 +3080,7 @@ export class AdminDashboardPageComponent implements OnInit, OnDestroy {
   readonly http = inject(HttpClient);
   readonly authService = inject(AuthService);
   readonly router = inject(Router);
+  readonly permissionService = inject(PermissionService);
 
   readonly activeTab = signal<TabKey>('stores');
   readonly currentUser = signal<AuthUser | null>(null);
@@ -3167,6 +3175,18 @@ export class AdminDashboardPageComponent implements OnInit, OnDestroy {
 
   /** true if current user is RUNNER role: should redirect to pickup queue rather than stay on admin. */
   readonly isRunnerRole = computed(() => this.currentUser()?.role === 'RUNNER');
+
+  /**
+   * Subscription tab visibility & link access:
+   *   - Global Admin: always allowed
+   *   - STORE_ADMIN / OWNER: allowed only on their own store scope (currentUser.storeId passed through)
+   *   - STORE_REPRESENTATIVE / CLERK / RUNNER: never allowed
+   */
+  readonly canAccessSubscription = computed(() => {
+    const u = this.currentUser();
+    if (!u) return false;
+    return this.permissionService.canAccessSubscription(u.storeId || undefined);
+  });
 
   readonly pagedTransactions = computed(() => {
     const start = this.txPage() * this.txPageSize;

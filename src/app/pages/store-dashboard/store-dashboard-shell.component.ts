@@ -1,9 +1,15 @@
-import { Component, OnInit, OnDestroy, signal, inject, ChangeDetectorRef } from '@angular/core';
+import { Component, OnInit, OnDestroy, signal, inject, ChangeDetectorRef, computed } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { RouterLink, RouterOutlet, ActivatedRoute, Router, NavigationEnd } from '@angular/router';
 import { HttpClient } from '@angular/common/http';
 import { firstValueFrom, Subscription } from 'rxjs';
 import { AuthService } from '../../services/auth.service';
+import { PermissionService } from '../../services/permission.service';
+import {
+  SubscriptionPlanService,
+  StoreSubscriptionState,
+  StoreSubscriptionCancelResult
+} from '../../services/subscription-plan.service';
 
 interface Store {
   id: string;
@@ -17,7 +23,7 @@ interface Store {
   transactionCount?: number;
 }
 
-type TabKey = 'products' | 'transactions' | 'returns' | 'settings';
+type TabKey = 'products' | 'transactions' | 'returns' | 'subscription' | 'settings';
 
 interface InspectionRow {
   id: string;
@@ -297,8 +303,8 @@ interface PaginatedInspections {
     .banner .banner-msg   { font-size: 12px; color: #4b5563; line-height: 1.5; }
     .banner.info    { background: #eff6ff; border: 1px solid #bfdbfe; }
     .banner.info    .banner-ico { background: #dbeafe; color: #1d4ed8; }
-    .banner.success { background: #ecfdf5; border: 1px solid #a7f3d0; }
-    .banner.success .banner-ico { background: #d1fae5; color: #047857; }
+    .banner.success, .banner.ok { background: #ecfdf5; border: 1px solid #a7f3d0; }
+    .banner.success .banner-ico, .banner.ok .banner-ico { background: #d1fae5; color: #047857; }
     .banner.warn    { background: #fffbeb; border: 1px solid #fde68a; }
     .banner.warn    .banner-ico { background: #fef3c7; color: #b45309; }
     .banner.danger  { background: #fef2f2; border: 1px solid #fecaca; }
@@ -477,6 +483,144 @@ interface PaginatedInspections {
       color: #6b7280; font-size: 14px;
     }
     @keyframes spin { to { transform: rotate(360deg); } }
+
+    .sub-panel-head {
+      display: flex; align-items: flex-start; justify-content: space-between; gap: 12px;
+      padding: 4px 2px;
+    }
+    .sub-title-main { font-size: 22px; font-weight: 700; color: #0f172a; letter-spacing: -0.01em; }
+    .sub-subtitle { font-size: 13px; color: #6b7280; margin-top: 2px; }
+
+    .sub-card {
+      background: #fff;
+      border: 1px solid #eef2f7;
+      border-radius: 18px;
+      box-shadow: 0 1px 2px rgba(15,23,42,0.04), 0 8px 30px -10px rgba(15,23,42,0.08);
+      padding: 24px;
+      display: grid;
+      gap: 20px;
+    }
+    .sub-summary {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+      gap: 16px 28px;
+    }
+    .sub-plan-label {
+      font-size: 11px; font-weight: 600; text-transform: uppercase;
+      letter-spacing: 0.08em; color: #94a3b8;
+    }
+    .sub-plan-name { font-size: 18px; font-weight: 700; color: #0f172a; margin-top: 4px; display: flex; align-items: center; gap: 8px; }
+    .sub-status-row { display: flex; align-items: center; gap: 10px; margin-top: 4px; flex-wrap: wrap; }
+    .sub-period-val { font-size: 14px; color: #0f172a; font-weight: 600; margin-top: 4px; }
+    .sub-note { font-size: 12px; color: #b45309; }
+
+    .status-pill {
+      display: inline-flex; align-items: center; padding: 4px 10px; border-radius: 999px;
+      font-size: 12px; font-weight: 600;
+    }
+    .status-pill.ok { background: #ecfdf5; color: #065f46; }
+    .status-pill.warn { background: #fff7ed; color: #9a3412; }
+    .status-pill.err { background: #fef2f2; color: #991b1b; }
+
+    .chip {
+      display: inline-flex; align-items: center; padding: 3px 9px; border-radius: 999px;
+      font-size: 11px; font-weight: 600;
+    }
+    .chip.warn { background: #fff7ed; color: #9a3412; }
+
+    .sub-actions {
+      display: flex; gap: 10px; flex-wrap: wrap; padding-top: 6px; border-top: 1px dashed #e2e8f0;
+    }
+    .btn, .btn-primary, .btn-danger, .btn-ghost {
+      display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+      padding: 10px 16px; border-radius: 12px; font-size: 14px; font-weight: 600;
+      border: 1px solid transparent; cursor: pointer; text-decoration: none;
+      transition: transform .06s ease, box-shadow .15s ease, background .15s ease, border-color .15s ease;
+      white-space: nowrap;
+    }
+    .btn:disabled, .btn-primary:disabled, .btn-danger:disabled { opacity: 0.65; cursor: progress; }
+    .btn-primary {
+      background: linear-gradient(135deg, #6366f1, #a855f7);
+      color: #fff;
+      box-shadow: 0 10px 24px -12px rgba(99,102,241,0.7);
+    }
+    .btn-primary:hover { transform: translateY(-1px); }
+    .btn-danger {
+      background: linear-gradient(135deg, #ef4444, #dc2626);
+      color: #fff;
+      box-shadow: 0 10px 24px -12px rgba(239,68,68,0.7);
+    }
+    .btn-danger:hover { transform: translateY(-1px); }
+    .btn-ghost {
+      background: #f8fafc; color: #0f172a; border-color: #e2e8f0;
+    }
+    .btn-ghost:hover { background: #f1f5f9; }
+
+    .btn svg { width: 16px; height: 16px; flex: 0 0 auto; }
+    .btn-primary svg, .btn-danger svg { stroke: currentColor; fill: none; }
+    .btn-danger svg:nth-child(1) { animation: spin 1s linear infinite; }
+
+    .alert {
+      padding: 12px 14px; border-radius: 14px; font-size: 13px;
+      border: 1px solid transparent;
+    }
+    .alert.ok { background: #ecfdf5; border-color: #a7f3d0; color: #065f46; }
+    .alert.danger { background: #fef2f2; border-color: #fecaca; color: #991b1b; }
+
+    .modal-overlay {
+      position: fixed; inset: 0; background: rgba(15, 23, 42, 0.55);
+      display: grid; place-items: center; z-index: 9999;
+      padding: 24px; backdrop-filter: blur(2px);
+    }
+    .modal {
+      width: 100%; max-width: 440px;
+      background: #fff; border-radius: 20px;
+      box-shadow: 0 30px 80px -20px rgba(15, 23, 42, 0.35);
+      padding: 28px;
+      display: grid; gap: 18px;
+      animation: modalPop .18s ease-out;
+    }
+    @keyframes modalPop {
+      from { opacity: 0; transform: translateY(8px) scale(.98); }
+      to   { opacity: 1; transform: translateY(0)   scale(1);   }
+    }
+    .modal-title {
+      font-size: 18px; font-weight: 700; color: #0f172a; letter-spacing: -0.01em;
+      display: flex; align-items: center; gap: 10px;
+    }
+    .modal-title-icon {
+      width: 34px; height: 34px; border-radius: 10px;
+      background: linear-gradient(135deg, #fef2f2, #fee2e2);
+      color: #dc2626; font-size: 18px;
+      display: grid; place-items: center; flex: 0 0 auto;
+    }
+    .modal-body {
+      font-size: 14px; line-height: 1.55; color: #475569;
+      display: grid; gap: 12px;
+    }
+    .modal-summary {
+      background: #fff7ed; border: 1px solid #fed7aa;
+      padding: 12px 14px; border-radius: 14px;
+      color: #9a3412; font-size: 13px;
+      display: grid; gap: 4px;
+    }
+    .modal-summary strong { color: #7c2d12; }
+    .modal-actions {
+      display: flex; gap: 10px; justify-content: flex-end; flex-wrap: wrap;
+      padding-top: 4px;
+    }
+
+    .sub-summary.sub-empty {
+      display: grid; grid-template-columns: 48px 1fr; gap: 14px;
+      padding: 8px 2px 4px;
+    }
+    .sub-empty-icon {
+      width: 44px; height: 44px; border-radius: 12px;
+      background: linear-gradient(135deg, #eef2ff, #f0abfc33);
+      display: grid; place-items: center; font-size: 22px;
+    }
+    .sub-empty-title { font-size: 16px; font-weight: 700; color: #0f172a; }
+    .sub-empty-sub { font-size: 13px; color: #6b7280; margin-top: 2px; }
   `],
   template: `
     <div class="wrap">
@@ -526,12 +670,33 @@ interface PaginatedInspections {
                   <span class="tab-badge warn">{{ returnsCounts()!.underInspectionCount }}</span>
                 }
               </a>
+              @if (canAccessSubscription()) {
+                <a class="tab" [class.active]="activeTab() === 'subscription'" (click)="activeTab.set('subscription')">
+                  Subscription
+                </a>
+              }
               <a class="tab" style="opacity:0.6;pointer-events:none;">
                 <span class="ico">⚙️</span> Settings
               </a>
             </div>
           </div>
         </header>
+
+        @if (stripeReturnBanner().kind === 'success') {
+          <div class="banner ok" style="margin-bottom: 20px;">
+            <div class="banner-text">
+              <div class="banner-title">Subscription started</div>
+              <div class="banner-msg">Your subscription has been activated. You can manage it from the Subscription tab below.</div>
+            </div>
+          </div>
+        } @else if (stripeReturnBanner().kind === 'canceled') {
+          <div class="banner warn" style="margin-bottom: 20px;">
+            <div class="banner-text">
+              <div class="banner-title">Subscription setup canceled</div>
+              <div class="banner-msg">You returned before completing checkout. No charges were made. You can restart the subscription process from the onboarding page any time.</div>
+            </div>
+          </div>
+        }
 
         @switch (activeTab()) {
           @case ('returns') {
@@ -817,10 +982,173 @@ interface PaginatedInspections {
               </section>
             </div>
           }
+          @case ('subscription') {
+            <section class="sub-panel" style="display: grid; gap: 20px;">
+              <header class="sub-panel-head">
+                <div class="sub-title">
+                  <div class="sub-title-main">Subscription</div>
+                  <div class="sub-subtitle">Manage your plan and recurring billing for this store.</div>
+                </div>
+                @if (storeSubscriptionLoading()) {
+                  <span class="status-badge info">Loading…</span>
+                } @else if (subState()?.isSubscribed) {
+                  <span class="status-badge ok" [class.warn]="subState()?.cancelAtPeriodEnd">
+                    {{ subState()?.cancelAtPeriodEnd ? 'Cancels at period end' : (subState()?.status ?? 'Active') }}
+                  </span>
+                } @else {
+                  <span class="status-badge warn">Not subscribed</span>
+                }
+              </header>
+
+              <div class="sub-card">
+                @if (storeSubscriptionLoading()) {
+                  <div class="loading-block">Loading subscription…</div>
+                } @else if (subIsOnlyApiError()) {
+                  <div class="alert danger">
+                    <span>Could not load subscription details: {{ subStateErrorMessage() }}</span>
+                  </div>
+                } @else if (subState()?.isSubscribed || (subState()?.cancelAtPeriodEnd ?? false)) {
+                  <div class="sub-summary">
+                    <div class="sub-plan">
+                      <div class="sub-plan-label">Current plan</div>
+                      <div class="sub-plan-name">
+                        {{ planDisplayName() }}
+                        @if (subState()?.cancelAtPeriodEnd) {
+                          <span class="chip warn">Cancels soon</span>
+                        }
+                      </div>
+                    </div>
+                    <div class="sub-status">
+                      <div class="sub-plan-label">Status</div>
+                      <div class="sub-status-row">
+                        <span class="status-pill"
+                              [class.ok]="subState()?.status === 'ACTIVE' || subState()?.status === 'TRIALING'"
+                              [class.warn]="subState()?.status === 'PAST_DUE' || (subState()?.cancelAtPeriodEnd ?? false)"
+                              [class.err]="subState()?.status === 'CANCELED' || subState()?.status === 'SUSPENDED'">
+                          {{ subState()?.status ?? '—' }}
+                        </span>
+                        @if (subState()?.cancelAtPeriodEnd) {
+                          <span class="sub-note">Access remains enabled until the end of the paid period.</span>
+                        }
+                      </div>
+                    </div>
+                    @if (subState()?.currentPeriodEnd) {
+                      <div class="sub-period">
+                        <div class="sub-plan-label">Current period ends</div>
+                        <div class="sub-period-val">{{ formatIsoDate(subState()!.currentPeriodEnd!) }}</div>
+                      </div>
+                    }
+                    @if (subState()?.trialEnd && (subState()?.status === 'TRIALING')) {
+                      <div class="sub-period">
+                        <div class="sub-plan-label">Trial ends</div>
+                        <div class="sub-period-val">{{ formatIsoDate(subState()!.trialEnd!) }}</div>
+                      </div>
+                    }
+                    @if (subState()?.canceledAt && (subState()?.cancelAtPeriodEnd ?? false)) {
+                      <div class="sub-period">
+                        <div class="sub-plan-label">Canceled at</div>
+                        <div class="sub-period-val">{{ formatIsoDate(subState()!.canceledAt!) }}</div>
+                      </div>
+                    }
+                  </div>
+
+                  @if (subError()) {
+                    <div class="alert danger">
+                      <span>{{ subError() }}</span>
+                    </div>
+                  }
+                  @if (subSuccess()) {
+                    <div class="alert ok">
+                      <span>{{ subSuccess() }}</span>
+                    </div>
+                  }
+
+                  <div class="sub-actions">
+                    @if (!(subState()?.cancelAtPeriodEnd ?? false)) {
+                      <button class="btn btn-danger" [disabled]="subUnsubscribing()" (click)="onUnsubscribe()">
+                        @if (subUnsubscribing()) {
+                          Canceling subscription…
+                        } @else {
+                          Unsubscribe
+                        }
+                      </button>
+                    } @else {
+                      <button class="btn btn-ghost" style="opacity: 0.7; pointer-events: none;">
+                        Already marked to cancel
+                      </button>
+                    }
+                  </div>
+                } @else {
+                  <div class="sub-summary sub-empty">
+                    <div class="sub-empty-icon">💡</div>
+                    <div class="sub-empty-title">This store is not currently subscribed.</div>
+                    <div class="sub-empty-sub">Pick a plan to unlock full platform features, order volume, and Stripe billing.</div>
+                    <div class="sub-actions" style="margin-top: 8px;">
+                      <a class="btn btn-primary" [routerLink]="['/pricing']" [queryParams]="{ store: store()?.id ?? null }" queryParamsHandling="merge">
+                        View subscription plans
+                      </a>
+                      <a class="btn btn-ghost" [routerLink]="['/onboarding']">
+                        Go to onboarding
+                      </a>
+                    </div>
+                  </div>
+                }
+              </div>
+            </section>
+          }
           @default {
             <router-outlet />
           }
         }
+      }
+
+      @if (subConfirmVisible()) {
+        <div class="modal-overlay" (click)="onCancelUnsubscribe()">
+          <div class="modal" (click)="$event.stopPropagation()">
+            <div class="modal-title">
+              <div class="modal-title-icon">⚠</div>
+              Cancel subscription for <strong>{{ store()?.businessName ?? 'this store' }}</strong>?
+            </div>
+            <div class="modal-body">
+              <div>
+                @if (subConfirmIsTrial()) {
+                  You are currently on a <strong>free trial</strong>.
+                  @if (subConfirmTrialEnds()) {
+                    Your trial ends on <strong>{{ subConfirmTrialEnds() }}</strong>.
+                  }
+                  If you cancel now, you will lose access immediately when the trial ends — no charges will be made to your card.
+                } @else {
+                  This is <strong>not</strong> an immediate cancellation. Your subscription stays active and fully usable until the end of the billing period you have already paid for. No further charges will be made after that date.
+                }
+              </div>
+              <div class="modal-summary">
+                @if (subConfirmIsTrial()) {
+                  <div><strong>What happens next</strong></div>
+                  <div>• Free trial continues with full access until <strong>{{ subConfirmPeriodEnd() }}</strong></div>
+                  <div>• <strong>No charge</strong> will be made to your card on that date</div>
+                  <div>• You can reactivate at any time to start a paid subscription before or after the trial ends</div>
+                } @else {
+                  <div><strong>What happens next</strong></div>
+                  <div>• Access remains fully enabled until <strong>{{ subConfirmPeriodEnd() }}</strong> (already paid)</div>
+                  <div>• You will <strong>not</strong> be charged again on the next renewal date</div>
+                  <div>• You can reactivate any time before that date to continue uninterrupted</div>
+                }
+              </div>
+            </div>
+            <div class="modal-actions">
+              <button class="btn btn-ghost" (click)="onCancelUnsubscribe()" [disabled]="subUnsubscribing()">
+                Keep subscription
+              </button>
+              <button class="btn btn-danger" (click)="onConfirmUnsubscribe()" [disabled]="subUnsubscribing()">
+                @if (subUnsubscribing()) {
+                  Canceling…
+                } @else {
+                  Yes, cancel at period end
+                }
+              </button>
+            </div>
+          </div>
+        </div>
       }
     </div>
   `,
@@ -831,10 +1159,70 @@ export class StoreDashboardShellComponent implements OnInit, OnDestroy {
   private readonly cdr = inject(ChangeDetectorRef);
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
+  private readonly permissionService = inject(PermissionService);
+  private readonly subscriptionPlanService = inject(SubscriptionPlanService);
 
   readonly store = signal<Store | null>(null);
   readonly storeLoading = signal(true);
   readonly activeTab = signal<TabKey>('products');
+
+  readonly subState = signal<StoreSubscriptionState | null>(null);
+  readonly storeSubscriptionLoading = signal(false);
+  readonly subUnsubscribing = signal(false);
+  readonly subError = signal<string | null>(null);
+  readonly subSuccess = signal<string | null>(null);
+  readonly subConfirmVisible = signal(false);
+  readonly subConfirmPeriodEnd = computed<string>(() => {
+    const s = this.subState();
+    if (!s) return 'the end of your current access window';
+    // Trial access ends at trial end, not at (potentially-fallback) period end
+    if (s.status === 'TRIALING' && s.trialEnd) {
+      try { return this.formatIsoDate(s.trialEnd); } catch { /* fall through */ }
+    }
+    if (s.currentPeriodEnd) {
+      try { return this.formatIsoDate(s.currentPeriodEnd); } catch { /* fall through */ }
+    }
+    if (s.status === 'TRIALING' && s.trialEnd) {
+      try { return this.formatIsoDate(s.trialEnd); } catch { /* ignore */ }
+    }
+    return s.status === 'TRIALING'
+      ? 'your free trial end date'
+      : 'the end of your current paid period';
+  });
+  readonly subConfirmIsTrial = computed<boolean>(() => {
+    const s = this.subState();
+    return !!s && s.status === 'TRIALING';
+  });
+  readonly subConfirmTrialEnds = computed<string>(() => {
+    const s = this.subState();
+    if (!s || !s.trialEnd) return '';
+    try { return this.formatIsoDate(s.trialEnd); } catch { return ''; }
+  });
+
+  readonly subStateErrorMessage = computed<string | null>(() => {
+    const s = this.subState() as any;
+    if (s && typeof s?.error === 'string' && s.error) return String(s.error);
+    return null;
+  });
+  readonly subIsOnlyApiError = computed<boolean>(() => {
+    const err = this.subStateErrorMessage();
+    if (!err) return false;
+    const s = this.subState();
+    if (!s) return false;
+    if (s.isSubscribed) return false;
+    if (s.cancelAtPeriodEnd) return false;
+    return true;
+  });
+
+  readonly stripeReturnBanner = signal<{ kind: 'success' | 'canceled' | null; storeId?: string | null }>({ kind: null });
+  private routeSub?: Subscription;
+
+  readonly canAccessSubscription = computed(() => {
+    const s = this.store();
+    const u = this.authService.currentUser$.getValue();
+    if (!u) return false;
+    return this.permissionService.canAccessSubscription(s?.id ?? u.storeId ?? undefined);
+  });
 
   readonly returns = signal<InspectionRow[]>([]);
   readonly returnsLoading = signal(false);
@@ -852,11 +1240,26 @@ export class StoreDashboardShellComponent implements OnInit, OnDestroy {
   ngOnInit(): void {
     this.loadStore();
     this.trackActiveTab();
+    this.watchActiveTabSubscription();
     this.watchActiveTabReturns();
+
+    this.routeSub = this.route.queryParams.subscribe(qp => {
+      const v = typeof qp?.['subscription'] === 'string' ? qp['subscription'] : '';
+      if (v === 'success') {
+        this.stripeReturnBanner.set({ kind: 'success', storeId: (qp?.['store'] as string | undefined) ?? null });
+        queueMicrotask(() => this.loadStoreSubscription());
+      } else if (v === 'canceled') {
+        this.stripeReturnBanner.set({ kind: 'canceled', storeId: (qp?.['store'] as string | undefined) ?? null });
+        queueMicrotask(() => this.loadStoreSubscription());
+      } else {
+        this.stripeReturnBanner.set({ kind: null });
+      }
+    });
   }
 
   ngOnDestroy(): void {
-    this.routerSub?.unsubscribe();
+    if (this.routerSub) this.routerSub.unsubscribe();
+    if (this.routeSub) this.routeSub.unsubscribe();
   }
 
   private trackActiveTab(): void {
@@ -866,6 +1269,8 @@ export class StoreDashboardShellComponent implements OnInit, OnDestroy {
         this.activeTab.set('transactions');
       } else if (url.includes('/returns')) {
         this.activeTab.set('returns');
+      } else if (url.includes('/subscription') || this.activeTab() === 'subscription') {
+        this.activeTab.set('subscription');
       } else {
         this.activeTab.set('products');
       }
@@ -875,6 +1280,113 @@ export class StoreDashboardShellComponent implements OnInit, OnDestroy {
     this.routerSub = this.router.events.subscribe(e => {
       if (e instanceof NavigationEnd) updateFromUrl();
     });
+  }
+
+  private watchActiveTabSubscription(): void {
+    queueMicrotask(() => {
+      if (this.activeTab() === 'subscription') {
+        this.loadStoreSubscription();
+      }
+    });
+    this.router.events.subscribe(e => {
+      if (e instanceof NavigationEnd) {
+        if (this.activeTab() === 'subscription') {
+          this.loadStoreSubscription();
+        }
+      }
+    });
+  }
+
+  async loadStoreSubscription(): Promise<void> {
+    const storeId = await this.waitForStoreId(25, 200);
+    if (!storeId) return;
+    this.storeSubscriptionLoading.set(true);
+    this.subError.set(null);
+    try {
+      const sub = await this.subscriptionPlanService.getStoreSubscription(storeId);
+      this.subState.set(sub);
+      if ((sub as any)?.error) {
+        this.subError.set(String((sub as any).error));
+      }
+    } catch (err: any) {
+      this.subState.set(null);
+      this.subError.set((typeof err?.message === 'string' ? err.message : null) ?? 'Could not load subscription details.');
+    } finally {
+      this.storeSubscriptionLoading.set(false);
+    }
+  }
+
+  private async waitForStoreId(maxAttempts: number, intervalMs: number): Promise<string | null> {
+    for (let i = 0; i < maxAttempts; i++) {
+      const direct = String(this.store()?.id ?? this.authService.currentUser$.getValue()?.storeId ?? '');
+      if (direct && direct.length > 0 && direct !== 'null' && direct !== 'undefined') return direct;
+      const routeStoreId = this.route.snapshot.paramMap.get('storeId');
+      if (routeStoreId && routeStoreId !== 'me' && routeStoreId.length > 0) return routeStoreId;
+      await new Promise(r => setTimeout(r, intervalMs));
+    }
+    return null;
+  }
+
+  onUnsubscribe(): void {
+    const storeId = this.store()?.id ?? this.authService.currentUser$.getValue()?.storeId;
+    if (!storeId) return;
+    this.subConfirmVisible.set(true);
+  }
+
+  onCancelUnsubscribe(): void {
+    if (this.subUnsubscribing()) return;
+    this.subConfirmVisible.set(false);
+  }
+
+  async onConfirmUnsubscribe(): Promise<void> {
+    const storeId = this.store()?.id ?? this.authService.currentUser$.getValue()?.storeId;
+    if (!storeId) return;
+    this.subUnsubscribing.set(true);
+    this.subError.set(null);
+    this.subSuccess.set(null);
+    try {
+      const result: StoreSubscriptionCancelResult =
+        await this.subscriptionPlanService.cancelStoreSubscription(storeId);
+      if (!result.canceled) {
+        this.subError.set(result.error || 'Could not cancel subscription. Please try again.');
+        return;
+      }
+      this.subSuccess.set(result.message || 'Subscription set to cancel at the end of the billing period.');
+      this.subConfirmVisible.set(false);
+      await this.loadStoreSubscription();
+    } catch (err: any) {
+      this.subError.set(
+        (typeof err?.message === 'string' ? err.message : null) ??
+        'Could not cancel subscription. Please try again or contact support.'
+      );
+    } finally {
+      this.subUnsubscribing.set(false);
+    }
+  }
+
+  planDisplayName(): string {
+    const s = this.subState();
+    if (!s) return 'Standard';
+    if (s.planCode) {
+      const pc = String(s.planCode).toUpperCase();
+      if (pc === 'PRO') return 'Pro Plan';
+      if (pc === 'PLUS') return 'Plus Plan';
+      if (pc === 'ENTERPRISE' || pc === 'CUSTOM') return 'Enterprise Plan';
+      return `${pc} Plan`;
+    }
+    return (s.status === 'TRIALING') ? 'Free Trial' : (s.isSubscribed ? 'Standard subscription' : '—');
+  }
+
+  formatIsoDate(iso: string): string {
+    try {
+      const d = new Date(iso);
+      if (Number.isNaN(d.getTime())) return iso;
+      return d.toLocaleDateString(undefined, {
+        year: 'numeric', month: 'short', day: 'numeric'
+      });
+    } catch {
+      return iso;
+    }
   }
 
   private watchActiveTabReturns(): void {
@@ -1029,6 +1541,9 @@ export class StoreDashboardShellComponent implements OnInit, OnDestroy {
         this.http.get<Store>(`${api}/admin/stores/${pathPart}`)
       );
       this.store.set(store);
+      if (this.activeTab() === 'subscription') {
+        queueMicrotask(() => this.loadStoreSubscription());
+      }
     } catch (err) {
       console.error('Failed to load store', err);
     } finally {

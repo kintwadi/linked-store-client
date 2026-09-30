@@ -122,4 +122,21 @@ export class PermissionService {
     }
     return false;
   }
+
+  /**
+   * Access subscription / pricing pages, plan status, upgrades.
+   * Mirrors backend PermissionService.canManageSubscription:
+   *   - Global Admin (any store scope, storeId optional) -> allowed
+   *   - OWNER / STORE_ADMIN on their own storeId -> allowed
+   *   - STORE_REPRESENTATIVE / CLERK / RUNNER -> denied
+   */
+  canAccessSubscription(storeId?: string): boolean {
+    const u = this.user;
+    if (!u) return false;
+    if (u.isGlobalAdmin || u.role === 'GLOBAL_ADMIN') return true;
+    const adminOrOwner = u.role === 'OWNER' || u.role === 'STORE_ADMIN';
+    if (!adminOrOwner) return false;
+    if (!storeId) return false;
+    return !!u.storeId && u.storeId === storeId;
+  }
 }

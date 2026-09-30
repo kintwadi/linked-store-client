@@ -1,9 +1,10 @@
-import { Component, OnInit, inject, signal } from '@angular/core';
+import { Component, OnInit, inject, signal, computed } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { RouterModule, ActivatedRoute } from '@angular/router';
 import { HttpClient } from '@angular/common/http';
-import { firstValueFrom } from 'rxjs';
-import { PricingPlan, PricingPlanFeature, SubscriptionPlanService } from '../../services/subscription-plan.service';
+import { firstValueFrom, filter, timeout, catchError } from 'rxjs';
+import { PricingPlan, PricingPlanFeature, SubscriptionPlanService, StoreSubscriptionState } from '../../services/subscription-plan.service';
+import { AuthService } from '../../services/auth.service';
 
 const FALLBACK_PLANS: PricingPlan[] = [
   {
@@ -412,6 +413,24 @@ const FALLBACK_PLANS: PricingPlan[] = [
     }
     .cta-btn.custom:active { transform: translateY(0); }
 
+    .cta-btn.current {
+      background: #e2e8f0;
+      color: #475569;
+      box-shadow: inset 0 0 0 1px #cbd5e1;
+      cursor: not-allowed;
+      pointer-events: none;
+    }
+    .cta-btn.current:hover {
+      transform: none;
+      box-shadow: inset 0 0 0 1px #cbd5e1;
+    }
+
+    .badge.current-plan {
+      background: #f1f5f9;
+      border: 1px solid #cbd5e1;
+      color: #334155;
+    }
+
     .cta-btn.pulse-ring.pro:hover {
       animation: pulseRingIndigo 1.5s infinite;
     }
@@ -451,6 +470,165 @@ const FALLBACK_PLANS: PricingPlan[] = [
 
     .card.pro { animation: fadeInUp 0.6s ease-out 0.1s both; }
     .card.custom { animation: fadeInUp 0.6s ease-out 0.2s both; }
+
+    .alert {
+      border-radius: 12px;
+      padding: 14px 18px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-size: 14px;
+      line-height: 1.45;
+    }
+    .alert.ok {
+      background: #ecfdf5;
+      color: #065f46;
+      border: 1px solid #a7f3d0;
+    }
+    .alert.err {
+      background: #fef2f2;
+      color: #991b1b;
+      border: 1px solid #fecaca;
+    }
+
+    .modal-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(15, 23, 42, 0.55);
+      backdrop-filter: blur(4px);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+      z-index: 9999;
+      animation: fadeIn 0.15s ease-out both;
+    }
+    .modal {
+      width: 100%;
+      max-width: 480px;
+      background: #ffffff;
+      border-radius: 20px;
+      box-shadow: 0 30px 80px rgba(15, 23, 42, 0.3);
+      padding: 28px;
+      display: flex;
+      flex-direction: column;
+      gap: 18px;
+      animation: modalIn 0.2s ease-out both;
+    }
+    .modal-title {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      font-size: 18px;
+      font-weight: 700;
+      color: #0f172a;
+    }
+    .modal-title-icon {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 40px; height: 40px;
+      border-radius: 12px;
+      background: #fff7ed;
+      color: #c2410c;
+      font-size: 22px;
+      font-weight: 700;
+      flex: 0 0 auto;
+    }
+    .modal-body {
+      color: #334155;
+      font-size: 14.5px;
+      line-height: 1.55;
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+    }
+    .modal-body p { margin: 0; }
+    .modal-what-next {
+      background: #fff7ed;
+      border: 1px solid #fed7aa;
+      border-radius: 14px;
+      padding: 14px 16px 14px 20px;
+      color: #7c2d12;
+    }
+    .modal-what-next > strong {
+      display: block;
+      font-size: 13.5px;
+      color: #9a3412;
+      margin-bottom: 6px;
+      letter-spacing: 0.02em;
+      text-transform: uppercase;
+    }
+    .modal-what-next ul {
+      margin: 0;
+      padding-left: 18px;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      font-size: 13.5px;
+    }
+    .modal-actions {
+      display: flex;
+      justify-content: flex-end;
+      gap: 10px;
+      margin-top: 6px;
+    }
+    @keyframes modalIn {
+      from { opacity: 0; transform: translateY(14px) scale(0.98); }
+      to   { opacity: 1; transform: translateY(0) scale(1); }
+    }
+    @keyframes fadeIn {
+      from { opacity: 0; }
+      to   { opacity: 1; }
+    }
+
+    .pricing-manage {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      width: 100%;
+    }
+    .pricing-manage .cta-btn.current {
+      width: 100%;
+    }
+    .pricing-unsubscribe-link {
+      all: unset;
+      cursor: pointer;
+      color: #be123c;
+      font-size: 13px;
+      font-weight: 500;
+      text-align: center;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      text-decoration: underline;
+      text-decoration-thickness: 1px;
+      text-underline-offset: 3px;
+      text-decoration-color: rgba(190, 18, 60, 0.55);
+      padding: 4px 8px;
+      border-radius: 8px;
+      transition: color 120ms ease, background-color 120ms ease, text-decoration-color 120ms ease;
+    }
+    .pricing-unsubscribe-link:hover {
+      color: #9f1239;
+      background: #fff1f2;
+      text-decoration-color: rgba(159, 18, 57, 0.9);
+    }
+    .pricing-unsubscribe-link:disabled {
+      cursor: progress;
+      color: #be123c;
+      opacity: 0.7;
+      text-decoration: none;
+    }
+    .pricing-unsubscribe-marked {
+      font-size: 12.5px;
+      line-height: 1.45;
+      color: #6b7280;
+      text-align: center;
+      padding: 4px 8px;
+    }
   `],
   template: `
     <div class="pricing-wrap">
@@ -515,22 +693,27 @@ const FALLBACK_PLANS: PricingPlan[] = [
                         <p class="card-desc">{{ plan.description }}</p>
                       }
                     </div>
-                    @if (plan.badges.length > 0) {
-                      @for (badge of plan.badges; track badge) {
-                        <span class="badge" [class.recommended]="badge === 'Recommended'" [class.enterprise]="badge === 'Enterprise'">
-                          @if (badge === 'Recommended') {
-                            <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
-                              <path d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z"/>
-                            </svg>
-                          }
-                          @if (badge === 'Enterprise') {
-                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                              <path d="M13 10V3L4 14h7v7l9-11h-7z"/>
-                            </svg>
-                          }
-                          {{ badge }}
-                        </span>
-                      }
+                    @if (plan.badges.length > 0 || isCurrentPlan(plan.tier)) {
+                      <div style="display:inline-flex;gap:8px;flex-wrap:wrap;">
+                        @if (isCurrentPlan(plan.tier)) {
+                          <span class="badge current-plan">Current plan</span>
+                        }
+                        @for (badge of plan.badges; track badge) {
+                          <span class="badge" [class.recommended]="badge === 'Recommended'" [class.enterprise]="badge === 'Enterprise'">
+                            @if (badge === 'Recommended') {
+                              <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
+                                <path d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z"/>
+                              </svg>
+                            }
+                            @if (badge === 'Enterprise') {
+                              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M13 10V3L4 14h7v7l9-11h-7z"/>
+                              </svg>
+                            }
+                            {{ badge }}
+                          </span>
+                        }
+                      </div>
                     }
                   </div>
 
@@ -571,20 +754,61 @@ const FALLBACK_PLANS: PricingPlan[] = [
 
                 <div class="card-footer">
                   @if (plan.tier === 'PRO') {
-                    <a
-                      class="cta-btn pro pulse-ring"
-                      routerLink="/store/onboarding"
-                      [queryParams]="{ plan: 'PRO' }"
-                    >
-                      Start 30-Day Free Trial
-                    </a>
+                    @if (isCurrentPlan(plan.tier)) {
+                      <div class="pricing-manage">
+                        <button type="button" class="cta-btn current" disabled>
+                          Current plan
+                        </button>
+                        @if (!(currentSubscription()?.cancelAtPeriodEnd ?? false)) {
+                          <button
+                            type="button"
+                            class="pricing-unsubscribe-link"
+                            [disabled]="pricingUnsubscribing()"
+                            (click)="onPricingClickUnsubscribe()">
+                            @if (pricingUnsubscribing()) {
+                              Canceling…
+                            } @else {
+                              Unsubscribe
+                            }
+                          </button>
+                        } @else {
+                          <span class="pricing-unsubscribe-marked">
+                            Subscription will be canceled at the end of your current billing period.
+                          </span>
+                        }
+                        @if (pricingUnsubSuccess()) {
+                          <div class="alert ok">
+                            <span>{{ pricingUnsubSuccess() }}</span>
+                          </div>
+                        }
+                        @if (pricingUnsubError()) {
+                          <div class="alert err">
+                            <span>{{ pricingUnsubError() }}</span>
+                          </div>
+                        }
+                      </div>
+                    } @else {
+                      <a
+                        class="cta-btn pro pulse-ring"
+                        routerLink="/store/onboarding"
+                        [queryParams]="{ plan: 'PRO' }"
+                      >
+                        Start 30-Day Free Trial
+                      </a>
+                    }
                   } @else {
-                    <a
-                      class="cta-btn custom pulse-ring"
-                      href="mailto:sales@linked-store.example"
-                    >
-                      Contact Sales
-                    </a>
+                    @if (isCurrentPlan(plan.tier)) {
+                      <button type="button" class="cta-btn current" disabled>
+                        Current plan
+                      </button>
+                    } @else {
+                      <a
+                        class="cta-btn custom pulse-ring"
+                        href="mailto:sales@linked-store.example"
+                      >
+                        Contact Sales
+                      </a>
+                    }
                   }
                 </div>
               </div>
@@ -593,18 +817,104 @@ const FALLBACK_PLANS: PricingPlan[] = [
         }
       </div>
     </div>
+
+    @if (pricingCancelConfirmVisible()) {
+      <div class="modal-overlay" (click)="onPricingCancelUnsubscribe()">
+        <div class="modal" (click)="$event.stopPropagation()">
+          <div class="modal-title">
+            <div class="modal-title-icon">⚠</div>
+            Cancel your Pro Plan subscription?
+          </div>
+          <div class="modal-body">
+            @if (pricingConfirmIsTrial()) {
+              <p>You are currently in your <strong>30-day free trial</strong>. Canceling now marks your trial to end on <strong>{{ pricingConfirmPeriodEnd() }}</strong>, with no charge to your payment method.</p>
+            } @else {
+              <p>This is <strong>not an immediate cancellation</strong>. Your subscription remains fully active and usable until <strong>{{ pricingConfirmPeriodEnd() }}</strong>.</p>
+            }
+            <div class="modal-what-next">
+              <strong>What happens next</strong>
+              <ul>
+                @if (pricingConfirmIsTrial()) {
+                  <li>Free trial continues with full access until <strong>{{ pricingConfirmPeriodEnd() }}</strong></li>
+                  <li>No charge will be made to your card on that date</li>
+                  <li>Reactivate anytime to start paid access before or after trial ends</li>
+                } @else {
+                  <li>Access remains fully enabled until <strong>{{ pricingConfirmPeriodEnd() }}</strong> (already paid)</li>
+                  <li>You will not be charged again on the next renewal date</li>
+                  <li>You can reactivate at any time before that date to continue uninterrupted</li>
+                }
+              </ul>
+            </div>
+          </div>
+          <div class="modal-actions">
+            <button type="button" class="btn btn-ghost" (click)="onPricingCancelUnsubscribe()">Keep subscription</button>
+            <button type="button" class="btn btn-danger"
+                    [disabled]="pricingUnsubscribing()"
+                    (click)="onPricingConfirmUnsubscribe()">
+              @if (pricingUnsubscribing()) {
+                Canceling…
+              } @else {
+                Yes, cancel at end of period
+              }
+            </button>
+          </div>
+        </div>
+      </div>
+    }
   `,
 })
 export class PricingPageComponent implements OnInit {
   private readonly subscriptionPlanService = inject(SubscriptionPlanService);
   private readonly http = inject(HttpClient);
   private readonly route = inject(ActivatedRoute);
+  private readonly authService = inject(AuthService);
 
   readonly interval = signal<'monthly' | 'annual'>('monthly');
   readonly plans = signal<PricingPlan[]>([]);
   readonly loading = signal(true);
   readonly error = signal<string | null>(null);
+  readonly pricingUnsubscribing = signal(false);
+  readonly pricingUnsubError = signal<string | null>(null);
+  readonly pricingUnsubSuccess = signal<string | null>(null);
+  readonly pricingCancelConfirmVisible = signal(false);
   readonly Math = Math;
+
+  readonly currentSubscription = signal<StoreSubscriptionState | null>(null);
+  readonly isAnySubscribed = computed<boolean>(() => {
+    const s = this.currentSubscription();
+    return !!s && !!s.isSubscribed;
+  });
+  readonly currentPlanTier = computed<string | null>(() => {
+    const s = this.currentSubscription();
+    if (!s || !s.isSubscribed) return null;
+    const pc = (s.planCode ?? '').toString().toUpperCase();
+    if (pc === 'PRO' || pc === 'CUSTOM') return pc;
+    if (pc.includes('PRO')) return 'PRO';
+    if (pc.includes('CUSTOM') || pc.includes('ENTERPRISE')) return 'CUSTOM';
+    // Fallback: if subscribed but planCode unknown, default to PRO since that's
+    // the only tier with automated Stripe checkout (Custom = contact sales only).
+    return 'PRO';
+  });
+  readonly isCurrentPlan = (tier: PricingPlan['tier'] | string): boolean => {
+    const cur = this.currentPlanTier();
+    const t = tier?.toString().toUpperCase();
+    if (t === 'PRO' && this.isAnySubscribed()) return true;
+    if (!cur || !t) return false;
+    return cur.toUpperCase() === t;
+  };
+
+  readonly pricingConfirmPeriodEnd = computed<string>(() => {
+    const s = this.currentSubscription();
+    if (!s) return 'your next renewal date';
+    if (s.status === 'TRIALING' && s.trialEnd) {
+      try { return new Date(s.trialEnd).toLocaleDateString(undefined, { year: 'numeric', month: 'long', day: 'numeric' }); } catch { /* fall through */ }
+    }
+    if (s.currentPeriodEnd) {
+      try { return new Date(s.currentPeriodEnd).toLocaleDateString(undefined, { year: 'numeric', month: 'long', day: 'numeric' }); } catch { /* fall through */ }
+    }
+    return 'the end of your current period';
+  });
+  readonly pricingConfirmIsTrial = computed<boolean>(() => !!this.currentSubscription() && this.currentSubscription()!.status === 'TRIALING');
 
   formatPrice(plan: PricingPlan): number {
     if (this.interval() === 'monthly') {
@@ -619,10 +929,72 @@ export class PricingPageComponent implements OnInit {
       this.interval.set(qp);
     }
     void this.loadPlans();
+    void this.loadCurrentSubscription();
   }
 
   onToggleInterval(): void {
     this.interval.set(this.interval() === 'monthly' ? 'annual' : 'monthly');
+  }
+
+  private resolveRequestedStoreId(): string | null {
+    const qp = this.route.snapshot.queryParamMap.get('store');
+    if (qp) return qp;
+    const user = this.authService.currentUser$.getValue();
+    return user?.storeId ?? null;
+  }
+
+  private async loadCurrentSubscription(): Promise<void> {
+    try {
+      let sid: string | null = this.resolveRequestedStoreId();
+      if (!sid) {
+        try {
+          const emitted = await firstValueFrom(
+            this.authService.currentUser$.pipe(
+              filter((u): u is NonNullable<typeof u> => !!u && !!u.storeId),
+              timeout(350),
+              catchError(() => { throw new Error('no storeId'); })
+            )
+          );
+          sid = emitted.storeId;
+        } catch {
+          return;
+        }
+      }
+      if (!sid) return;
+      const state = await this.subscriptionPlanService.getStoreSubscription(sid);
+      if (state && state.isSubscribed) {
+        this.currentSubscription.set(state);
+      }
+    } catch (ignore) {
+      // public pricing page, failure is non-fatal — no store info means no disable
+    }
+  }
+
+  onPricingClickUnsubscribe(): void {
+    this.pricingUnsubError.set(null);
+    this.pricingUnsubSuccess.set(null);
+    this.pricingCancelConfirmVisible.set(true);
+  }
+  onPricingCancelUnsubscribe(): void {
+    this.pricingCancelConfirmVisible.set(false);
+  }
+  async onPricingConfirmUnsubscribe(): Promise<void> {
+    this.pricingUnsubscribing.set(true);
+    this.pricingUnsubError.set(null);
+    try {
+      const sid = this.resolveRequestedStoreId();
+      if (!sid) throw new Error('No store context available. Go to your store dashboard to manage subscription.');
+      const res = await this.subscriptionPlanService.cancelStoreSubscription(sid);
+      if (!res?.canceled) throw new Error(res?.error ?? 'Could not cancel subscription at this time.');
+      const nextState = await this.subscriptionPlanService.getStoreSubscription(sid);
+      if (nextState) this.currentSubscription.set(nextState);
+      this.pricingUnsubSuccess.set('Subscription marked to cancel at the end of your current period. No further charges will be made.');
+    } catch (e: any) {
+      this.pricingUnsubError.set(String(e?.message ?? 'Unexpected error canceling subscription.'));
+    } finally {
+      this.pricingUnsubscribing.set(false);
+      this.pricingCancelConfirmVisible.set(false);
+    }
   }
 
   private async loadPlans(): Promise<void> {
