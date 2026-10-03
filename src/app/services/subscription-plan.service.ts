@@ -48,6 +48,7 @@ export interface StoreSubscriptionState {
   provider?: string | null;
   providerSubscriptionId?: string | null;
   planCode?: string | null;
+  planDisplayName?: string | null;
   updatedAt?: string;
   error?: string | null;
 }

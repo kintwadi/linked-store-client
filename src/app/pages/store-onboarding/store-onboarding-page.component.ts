@@ -20,6 +20,12 @@ type StoreRow = any & {
   _dashboardLoading?: boolean;
   country?: string;
   _isSubscribed?: boolean;
+  _cancelAtPeriodEnd?: boolean;
+  _status?: string | null;
+  _currentPeriodEnd?: string | null;
+  _trialEnd?: string | null;
+  _planCode?: string | null;
+  _planDisplayName?: string | null;
 };
 
 const COUNTRY_OPTIONS: readonly { code: string; label: string; currency: string }[] = [
@@ -780,7 +786,7 @@ function guessCountryCode(store: any): string | null {
                   </span>
                   <div class="feature-text">
                     <span class="feature-label">Current plan</span>
-                    <span class="feature-sub">{{ planLabel(store) }} subscription{{ store.subscriptionStatus ? ' · ' + store.subscriptionStatus : '' }}</span>
+                    <span class="feature-sub">{{ resolveStorePlanDisplayName(store) }}{{ resolveStorePlanStatusSuffix(store) }}</span>
                   </div>
                 </div>
 
@@ -839,18 +845,15 @@ function guessCountryCode(store: any): string | null {
                         <path d="M21 12a9 9 0 1 1-6.219-8.56"/>
                       } @else if (!isStoreAlreadySubscribed(store)) {
                         <path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/>
+                      } @else if (isStoreMarkedToCancel(store)) {
+                        <path d="M12 2v10"/><circle cx="12" cy="20" r="1"/>
+                        <path d="M4.93 4.93l14.14 14.14"/>
                       } @else {
                         <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/>
                         <polyline points="22 4 12 14.01 9 11.01"/>
                       }
                     </svg>
-                    @if (matchesStore(startingSubscriptionForStoreId(), store)) {
-                      Starting Stripe subscription…
-                    } @else if (isStoreAlreadySubscribed(store)) {
-                      Current plan — subscription active
-                    } @else {
-                      Start subscription process ({{ resolveSelectedPlanCode(store) === 'CUSTOM' ? 'Custom/Enterprise' : 'Pro Plan' }})
-                    }
+                    {{ resolveStoreSubButtonText(store) }}
                   </button>
                 </div>
 
@@ -1026,22 +1029,41 @@ export class StoreOnboardingPageComponent implements OnInit {
       await Promise.all(stores.map(async (s) => {
         const storeId = String(s.id);
         if (!storeId) return;
-        // Fast path: if the store row itself already carries subscriptionStatus in an active state,
-        // we can skip the per-store API round-trip entirely.
         const st = (s.subscriptionStatus || s.plan_status || s.sub_status || '')
           .toString()
           .toUpperCase();
-        if (st === 'ACTIVE' || st === 'TRIALING' || st === 'PAST_DUE') {
-          s._isSubscribed = true;
+
+        // Fast-path ONLY when we're CERTAIN there is no subscription
+        // (terminated state). For ACTIVE/TRIALING/PAST_DUE we MUST call the API
+        // to learn cancelAtPeriodEnd, plan info, and period end dates.
+        const columnTerminated =
+          st === 'CANCELED' || st === 'EXPIRED' || st === 'SUSPENDED' || st === 'FREE' || st === '';
+        if (columnTerminated) {
+          s._isSubscribed = false;
+          s._cancelAtPeriodEnd = false;
+          s._status = st || 'FREE';
           return;
         }
+
         try {
           const sub: StoreSubscriptionState =
             await this.subscriptionPlanService.getStoreSubscription(storeId);
           s._isSubscribed = !!sub && !!sub.isSubscribed;
+          s._cancelAtPeriodEnd = !!sub?.cancelAtPeriodEnd;
+          s._status = sub?.status ?? (st || null);
+          s._currentPeriodEnd = sub?.currentPeriodEnd ?? null;
+          s._trialEnd = sub?.trialEnd ?? null;
+          s._planCode = sub?.planCode ?? null;
+          s._planDisplayName = sub?.planDisplayName ?? null;
         } catch {
           // If API call fails (403 no permission, no auth, etc.), fall back to row-level subscriptionStatus
           s._isSubscribed = st === 'ACTIVE' || st === 'TRIALING' || st === 'PAST_DUE';
+          s._cancelAtPeriodEnd = false;
+          s._status = st || null;
+          s._currentPeriodEnd = null;
+          s._trialEnd = null;
+          s._planCode = null;
+          s._planDisplayName = null;
         }
       }));
       // Trigger change detection by re-setting the array references after enrichment
@@ -1057,6 +1079,56 @@ export class StoreOnboardingPageComponent implements OnInit {
       .toString()
       .toUpperCase();
     return st === 'ACTIVE' || st === 'TRIALING' || st === 'PAST_DUE';
+  }
+
+  isStoreMarkedToCancel(s: StoreRow): boolean {
+    return s?._cancelAtPeriodEnd === true;
+  }
+
+  resolveStoreSubButtonText(s: StoreRow): string {
+    if (this.matchesStore(this.startingSubscriptionForStoreId(), s)) {
+      return 'Starting Stripe subscription…';
+    }
+    if (this.isStoreAlreadySubscribed(s)) {
+      if (this.isStoreMarkedToCancel(s)) {
+        const date = s._currentPeriodEnd;
+        if (date) {
+          try {
+            const d = new Date(date);
+            const pretty = d.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' });
+            return `Current plan · marked to cancel (${pretty})`;
+          } catch { /* fall through */ }
+        }
+        return 'Current plan · marked to cancel at period end';
+      }
+      return 'Current plan — subscription active';
+    }
+    const code = this.resolveSelectedPlanCode(s);
+    return `Start subscription process (${code === 'CUSTOM' ? 'Custom/Enterprise' : 'Pro Plan'})`;
+  }
+
+  resolveStorePlanDisplayName(s: StoreRow): string {
+    if (s?._planDisplayName) return s._planDisplayName;
+    if (s?._planCode === 'PRO') return 'Pro Plan';
+    if (s?._planCode === 'CUSTOM') return 'Custom / Enterprise';
+    return this.planLabel(s) + ' subscription';
+  }
+
+  resolveStorePlanStatusSuffix(s: StoreRow): string {
+    if (this.isStoreMarkedToCancel(s)) {
+      const date = s._currentPeriodEnd;
+      if (date) {
+        try {
+          const d = new Date(date);
+          const pretty = d.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' });
+          return ` · Marked to cancel (${pretty})`;
+        } catch { /* fall through */ }
+      }
+      return ' · Marked to cancel';
+    }
+    if (s?._status) return ' · ' + s._status;
+    if (s?.subscriptionStatus) return ' · ' + s.subscriptionStatus;
+    return '';
   }
 
   private async ensureOnboardingLink(store: StoreRow): Promise<string | null> {
