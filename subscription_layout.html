@@ -1,0 +1,510 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Subscription Plans</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdn.jsdelivr.net/fontsource/css/inter@latest/index.css" rel="stylesheet">
+    <style>
+        * { font-family: 'Inter', sans-serif; }
+        .toggle-slider {
+            transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        .card-glow {
+            box-shadow: 0 0 60px rgba(99, 102, 241, 0.12), 0 20px 60px rgba(0, 0, 0, 0.08);
+        }
+        .card-glow-gold {
+            box-shadow: 0 0 60px rgba(245, 158, 11, 0.12), 0 20px 60px rgba(0, 0, 0, 0.08);
+        }
+        .badge-shine {
+            background: linear-gradient(135deg, #6366f1, #8b5cf6, #a78bfa);
+            background-size: 200% 200%;
+            animation: shimmer 3s ease infinite;
+        }
+        .badge-shine-gold {
+            background: linear-gradient(135deg, #f59e0b, #fbbf24, #f59e0b);
+            background-size: 200% 200%;
+            animation: shimmer 3s ease infinite;
+        }
+        @keyframes shimmer {
+            0%, 100% { background-position: 0% 50%; }
+            50% { background-position: 100% 50%; }
+        }
+        @keyframes fadeInUp {
+            from { opacity: 0; transform: translateY(30px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        .animate-fade-in-up {
+            animation: fadeInUp 0.6s ease-out forwards;
+        }
+        .animate-delay-1 { animation-delay: 0.1s; opacity: 0; }
+        .animate-delay-2 { animation-delay: 0.2s; opacity: 0; }
+        .animate-delay-3 { animation-delay: 0.3s; opacity: 0; }
+        .price-transition {
+            transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        .check-icon {
+            transition: transform 0.2s ease;
+        }
+        .feature-row:hover .check-icon {
+            transform: scale(1.2);
+        }
+        .btn-pulse:hover {
+            animation: pulse-ring 1.5s infinite;
+        }
+        @keyframes pulse-ring {
+            0% { box-shadow: 0 0 0 0 rgba(99, 102, 241, 0.4); }
+            70% { box-shadow: 0 0 0 12px rgba(99, 102, 241, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(99, 102, 241, 0); }
+        }
+        .btn-pulse-gold:hover {
+            animation: pulse-ring-gold 1.5s infinite;
+        }
+        @keyframes pulse-ring-gold {
+            0% { box-shadow: 0 0 0 0 rgba(245, 158, 11, 0.4); }
+            70% { box-shadow: 0 0 0 12px rgba(245, 158, 11, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(245, 158, 11, 0); }
+        }
+    </style>
+</head>
+<body class="min-h-screen bg-gradient-to-br from-slate-50 via-white to-indigo-50">
+
+    <!-- Background decorations -->
+    <div class="fixed inset-0 overflow-hidden pointer-events-none">
+        <div class="absolute -top-40 -right-40 w-96 h-96 bg-indigo-100 rounded-full opacity-40 blur-3xl"></div>
+        <div class="absolute -bottom-40 -left-40 w-96 h-96 bg-purple-100 rounded-full opacity-40 blur-3xl"></div>
+        <div class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-amber-100 rounded-full opacity-20 blur-3xl"></div>
+    </div>
+
+    <div class="relative z-10 min-h-screen flex flex-col">
+        <!-- Header -->
+        <header class="w-full py-6 px-6">
+            <div class="max-w-6xl mx-auto flex items-center justify-between">
+                <div class="flex items-center gap-2">
+                    <div class="w-9 h-9 rounded-lg bg-indigo-600 flex items-center justify-center">
+                        <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/>
+                        </svg>
+                    </div>
+                    <span class="text-xl font-bold text-slate-800">Linked-Store</span>
+                </div>
+                <nav class="hidden md:flex items-center gap-8">
+                    <a href="#" class="text-sm text-slate-500 hover:text-slate-800 transition-colors">Features</a>
+                    <a href="#" class="text-sm text-slate-500 hover:text-slate-800 transition-colors">Pricing</a>
+                    <a href="#" class="text-sm text-slate-500 hover:text-slate-800 transition-colors">Docs</a>
+                    <a href="#" class="text-sm font-medium text-indigo-600 hover:text-indigo-700 transition-colors">Sign In</a>
+                </nav>
+            </div>
+        </header>
+
+        <!-- Main Content -->
+        <main class="flex-1 flex items-center justify-center px-6 py-12">
+            <div class="w-full max-w-5xl">
+
+                <!-- Title Section -->
+                <div class="text-center mb-10 animate-fade-in-up">
+                    <div class="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-indigo-50 border border-indigo-100 mb-5">
+                        <span class="w-2 h-2 rounded-full bg-green-400 animate-pulse"></span>
+                        <span class="text-xs font-semibold text-indigo-700 uppercase tracking-wide">30 Days Free</span>
+                    </div>
+                    <h1 class="text-4xl md:text-5xl font-extrabold text-slate-900 mb-4 leading-tight">
+                        Simple, transparent<br>pricing
+                    </h1>
+                    <p class="text-lg text-slate-500 max-w-xl mx-auto">
+                        Choose the plan that fits your business. Start with a 30-day free trial — no credit card required.
+                    </p>
+                </div>
+
+                <!-- Billing Toggle -->
+                <div class="flex items-center justify-center gap-4 mb-10 animate-fade-in-up animate-delay-1">
+                    <span id="monthlyLabel" class="text-sm font-semibold text-slate-800 transition-colors">Monthly</span>
+                    <button id="billingToggle" onclick="toggleBilling()" class="relative w-14 h-7 bg-indigo-600 rounded-full p-0.5 cursor-pointer focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 transition-colors" aria-label="Toggle billing period">
+                        <div id="toggleKnob" class="toggle-slider w-6 h-6 bg-white rounded-full shadow-md flex items-center justify-center">
+                            <svg id="toggleIcon" class="w-3.5 h-3.5 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 8v4l3 3"/>
+                            </svg>
+                        </div>
+                    </button>
+                    <div class="flex items-center gap-2">
+                        <span id="annualLabel" class="text-sm font-medium text-slate-400 transition-colors">Annually</span>
+                        <span id="saveBadge" class="text-xs font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-full transition-all duration-300 opacity-0 scale-90">Save 20%</span>
+                    </div>
+                </div>
+
+                <!-- Pricing Cards Grid -->
+                <div class="grid md:grid-cols-2 gap-6 animate-fade-in-up animate-delay-2">
+
+                    <!-- Pro Plan Card -->
+                    <div class="relative bg-white rounded-2xl border border-slate-200/80 card-glow overflow-hidden">
+                        <!-- Top gradient bar -->
+                        <div class="h-1.5 badge-shine"></div>
+
+                        <!-- Card Header -->
+                        <div class="px-8 pt-8 pb-6">
+                            <div class="flex items-start justify-between mb-6">
+                                <div>
+                                    <h2 class="text-xl font-bold text-slate-900">Pro Plan</h2>
+                                    <p class="text-sm text-slate-400 mt-1">For growing businesses</p>
+                                </div>
+                                <div class="flex items-center gap-1.5 px-3 py-1 rounded-full bg-indigo-50 border border-indigo-200">
+                                    <svg class="w-3.5 h-3.5 text-indigo-500" fill="currentColor" viewBox="0 0 24 24">
+                                        <path d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z"/>
+                                    </svg>
+                                    <span class="text-xs font-semibold text-indigo-700">Recommended</span>
+                                </div>
+                            </div>
+
+                            <!-- Price Display -->
+                            <div class="flex items-baseline gap-1 mb-1">
+                                <span class="text-sm font-medium text-slate-400">$</span>
+                                <span id="priceValue" class="text-6xl font-extrabold text-slate-900 price-transition tracking-tight">29</span>
+                                <span id="pricePeriod" class="text-sm font-medium text-slate-400 ml-1">/month</span>
+                            </div>
+                            <p id="priceNote" class="text-sm text-slate-400 mt-1">Billed monthly</p>
+                        </div>
+
+                        <!-- Divider -->
+                        <div class="mx-8 border-t border-slate-100"></div>
+
+                        <!-- Features List -->
+                        <div class="px-8 py-6">
+                            <ul class="space-y-4">
+                                <li class="feature-row flex items-center gap-3 group cursor-default">
+                                    <div class="check-icon w-5 h-5 rounded-full bg-indigo-100 flex items-center justify-center flex-shrink-0">
+                                        <svg class="w-3 h-3 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7"/>
+                                        </svg>
+                                    </div>
+                                    <span class="text-sm text-slate-600">30 days free trial</span>
+                                </li>
+                                <li class="feature-row flex items-center gap-3 group cursor-default">
+                                    <div class="check-icon w-5 h-5 rounded-full bg-indigo-100 flex items-center justify-center flex-shrink-0">
+                                        <svg class="w-3 h-3 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7"/>
+                                        </svg>
+                                    </div>
+                                    <span class="text-sm text-slate-600">Unlimited connected stores</span>
+                                </li>
+                                <li class="feature-row flex items-center gap-3 group cursor-default">
+                                    <div class="check-icon w-5 h-5 rounded-full bg-indigo-100 flex items-center justify-center flex-shrink-0">
+                                        <svg class="w-3 h-3 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7"/>
+                                        </svg>
+                                    </div>
+                                    <span class="text-sm text-slate-600">Up to 100 monthly orders</span>
+                                </li>
+                                <li class="feature-row flex items-center gap-3 group cursor-default">
+                                    <div class="check-icon w-5 h-5 rounded-full bg-indigo-100 flex items-center justify-center flex-shrink-0">
+                                        <svg class="w-3 h-3 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7"/>
+                                        </svg>
+                                    </div>
+                                    <span class="text-sm text-slate-600">Standard API & webhooks access</span>
+                                </li>
+                                <li class="feature-row flex items-center gap-3 group cursor-default">
+                                    <div class="check-icon w-5 h-5 rounded-full bg-indigo-100 flex items-center justify-center flex-shrink-0">
+                                        <svg class="w-3 h-3 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7"/>
+                                        </svg>
+                                    </div>
+                                    <span class="text-sm text-slate-600">Email support (24-hour response time)</span>
+                                </li>
+                            </ul>
+                        </div>
+
+                        <!-- CTA Section -->
+                        <div class="px-8 pb-8">
+                            <button id="ctaButton" class="btn-pulse w-full py-3.5 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold rounded-xl shadow-lg shadow-indigo-200 transition-all duration-200 hover:shadow-xl hover:shadow-indigo-300 hover:-translate-y-0.5 active:translate-y-0 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2">
+                                Start 30-Day Free Trial
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Custom Plan Card (for large stores) -->
+                    <div class="relative bg-white rounded-2xl border border-slate-200/80 card-glow-gold overflow-hidden">
+                        <!-- Top gradient bar -->
+                        <div class="h-1.5 badge-shine-gold"></div>
+
+                        <!-- Card Header -->
+                        <div class="px-8 pt-8 pb-6">
+                            <div class="flex items-start justify-between mb-6">
+                                <div>
+                                    <div class="flex items-center gap-2 mb-1">
+                                        <h2 class="text-xl font-bold text-slate-900">Custom Plan</h2>
+                                        <svg class="w-5 h-5 text-amber-500" fill="currentColor" viewBox="0 0 24 24">
+                                            <path d="M12 2l2.4 7.4H22l-6.2 4.5 2.4 7.4L12 16.8l-6.2 4.5 2.4-7.4L2 9.4h7.6z"/>
+                                        </svg>
+                                    </div>
+                                    <p class="text-sm text-slate-400 mt-1">For large stores & enterprises</p>
+                                </div>
+                                <div class="flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-50 border border-amber-200">
+                                    <svg class="w-3.5 h-3.5 text-amber-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/>
+                                    </svg>
+                                    <span class="text-xs font-semibold text-amber-700">Enterprise</span>
+                                </div>
+                            </div>
+
+                            <!-- Price Display -->
+                            <div class="flex items-baseline gap-1 mb-1">
+                                <span class="text-5xl font-extrabold text-slate-900 tracking-tight">Custom</span>
+                            </div>
+                            <p class="text-sm text-slate-400 mt-1">Tailored to your business needs</p>
+                        </div>
+
+                        <!-- Divider -->
+                        <div class="mx-8 border-t border-slate-100"></div>
+
+                        <!-- Features List -->
+                        <div class="px-8 py-6">
+                            <ul class="space-y-4">
+                                <li class="feature-row flex items-center gap-3 group cursor-default">
+                                    <div class="check-icon w-5 h-5 rounded-full bg-amber-100 flex items-center justify-center flex-shrink-0">
+                                        <svg class="w-3 h-3 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7"/>
+                                        </svg>
+                                    </div>
+                                    <span class="text-sm text-slate-600">Everything in Pro Plan</span>
+                                </li>
+                                <li class="feature-row flex items-center gap-3 group cursor-default">
+                                    <div class="check-icon w-5 h-5 rounded-full bg-amber-100 flex items-center justify-center flex-shrink-0">
+                                        <svg class="w-3 h-3 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7"/>
+                                        </svg>
+                                    </div>
+                                    <span class="text-sm text-slate-600">Unlimited monthly orders & high-volume processing</span>
+                                </li>
+                                <li class="feature-row flex items-center gap-3 group cursor-default">
+                                    <div class="check-icon w-5 h-5 rounded-full bg-amber-100 flex items-center justify-center flex-shrink-0">
+                                        <svg class="w-3 h-3 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7"/>
+                                        </svg>
+                                    </div>
+                                    <span class="text-sm text-slate-600">Dedicated account manager</span>
+                                </li>
+                                <li class="feature-row flex items-center gap-3 group cursor-default">
+                                    <div class="check-icon w-5 h-5 rounded-full bg-amber-100 flex items-center justify-center flex-shrink-0">
+                                        <svg class="w-3 h-3 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7"/>
+                                        </svg>
+                                    </div>
+                                    <span class="text-sm text-slate-600">Custom integrations & higher API rate limits</span>
+                                </li>
+                                <li class="feature-row flex items-center gap-3 group cursor-default">
+                                    <div class="check-icon w-5 h-5 rounded-full bg-amber-100 flex items-center justify-center flex-shrink-0">
+                                        <svg class="w-3 h-3 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7"/>
+                                        </svg>
+                                    </div>
+                                    <span class="text-sm text-slate-600">Custom SLA & priority onboarding</span>
+                                </li>
+                                <li class="feature-row flex items-center gap-3 group cursor-default">
+                                    <div class="check-icon w-5 h-5 rounded-full bg-amber-100 flex items-center justify-center flex-shrink-0">
+                                        <svg class="w-3 h-3 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7"/>
+                                        </svg>
+                                    </div>
+                                    <span class="text-sm text-slate-600">Advanced security & SAML SSO log-in</span>
+                                </li>
+                            </ul>
+                        </div>
+
+                        <!-- CTA Section -->
+                        <div class="px-8 pb-8">
+                            <button id="ctaButtonCustom" class="btn-pulse-gold w-full py-3.5 bg-amber-500 hover:bg-amber-400 text-slate-900 font-semibold rounded-xl shadow-lg shadow-amber-200 transition-all duration-200 hover:shadow-xl hover:shadow-amber-300 hover:-translate-y-0.5 active:translate-y-0 focus:outline-none focus:ring-2 focus:ring-amber-400 focus:ring-offset-2">
+                                Contact Sales
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- FAQ mini -->
+                <div class="animate-fade-in-up animate-delay-3 mt-12 max-w-2xl mx-auto">
+                    <div class="space-y-3">
+                        <details class="group bg-white/60 backdrop-blur rounded-xl border border-slate-200/60 overflow-hidden">
+                            <summary class="flex items-center justify-between px-5 py-3.5 cursor-pointer text-sm font-medium text-slate-700 hover:text-slate-900 transition-colors">
+                                What happens after the 30-day trial?
+                                <svg class="w-4 h-4 text-slate-400 transition-transform group-open:rotate-180" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+                                </svg>
+                            </summary>
+                            <div class="px-5 pb-4 text-sm text-slate-500 leading-relaxed">
+                                After your 30-day free trial ends, you'll be automatically subscribed to the plan you selected. You can cancel anytime before the trial ends without being charged.
+                            </div>
+                        </details>
+                        <details class="group bg-white/60 backdrop-blur rounded-xl border border-slate-200/60 overflow-hidden">
+                            <summary class="flex items-center justify-between px-5 py-3.5 cursor-pointer text-sm font-medium text-slate-700 hover:text-slate-900 transition-colors">
+                                What's included in the Custom Plan?
+                                <svg class="w-4 h-4 text-slate-400 transition-transform group-open:rotate-180" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+                                </svg>
+                            </summary>
+                            <div class="px-5 pb-4 text-sm text-slate-500 leading-relaxed">
+                                The Custom Plan includes everything in the Pro Plan, plus unlimited monthly orders, a dedicated account manager, custom integrations with higher API rate limits, custom SLA with priority onboarding, and advanced security features including SAML SSO log-in. Pricing is based on your specific needs.
+                            </div>
+                        </details>
+                        <details class="group bg-white/60 backdrop-blur rounded-xl border border-slate-200/60 overflow-hidden">
+                            <summary class="flex items-center justify-between px-5 py-3.5 cursor-pointer text-sm font-medium text-slate-700 hover:text-slate-900 transition-colors">
+                                How many stores can I connect?
+                                <svg class="w-4 h-4 text-slate-400 transition-transform group-open:rotate-180" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+                                </svg>
+                            </summary>
+                            <div class="px-5 pb-4 text-sm text-slate-500 leading-relaxed">
+                                Both plans include unlimited connected stores. The Custom Plan offers additional benefits for large-scale operations with multiple locations and high-volume processing.
+                            </div>
+                        </details>
+                        <details class="group bg-white/60 backdrop-blur rounded-xl border border-slate-200/60 overflow-hidden">
+                            <summary class="flex items-center justify-between px-5 py-3.5 cursor-pointer text-sm font-medium text-slate-700 hover:text-slate-900 transition-colors">
+                                Do I need a credit card to start?
+                                <svg class="w-4 h-4 text-slate-400 transition-transform group-open:rotate-180" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+                                </svg>
+                            </summary>
+                            <div class="px-5 pb-4 text-sm text-slate-500 leading-relaxed">
+                                No credit card is required to start your 30-day free trial. You'll only need to add payment details when your trial is about to end.
+                            </div>
+                        </details>
+                    </div>
+                </div>
+            </div>
+        </main>
+
+        <!-- Footer -->
+        <footer class="py-6 px-6 border-t border-slate-100">
+            <div class="max-w-6xl mx-auto flex flex-col md:flex-row items-center justify-between gap-4">
+                <p class="text-xs text-slate-400">© 2026 Linked-Store. All rights reserved.</p>
+                <div class="flex items-center gap-6">
+                    <a href="#" class="text-xs text-slate-400 hover:text-slate-600 transition-colors">Privacy</a>
+                    <a href="#" class="text-xs text-slate-400 hover:text-slate-600 transition-colors">Terms</a>
+                    <a href="#" class="text-xs text-slate-400 hover:text-slate-600 transition-colors">Contact</a>
+                </div>
+            </div>
+        </footer>
+    </div>
+
+    <script>
+        let isAnnual = false;
+        const monthlyPrice = 29;
+        const annualPrice = 23;
+
+        function toggleBilling() {
+            isAnnual = !isAnnual;
+            
+            const toggleKnob = document.getElementById('toggleKnob');
+            const monthlyLabel = document.getElementById('monthlyLabel');
+            const annualLabel = document.getElementById('annualLabel');
+            const priceValue = document.getElementById('priceValue');
+            const pricePeriod = document.getElementById('pricePeriod');
+            const priceNote = document.getElementById('priceNote');
+            const saveBadge = document.getElementById('saveBadge');
+
+            if (isAnnual) {
+                toggleKnob.style.transform = 'translateX(28px)';
+                monthlyLabel.classList.remove('font-semibold', 'text-slate-800');
+                monthlyLabel.classList.add('font-medium', 'text-slate-400');
+                annualLabel.classList.remove('font-medium', 'text-slate-400');
+                annualLabel.classList.add('font-semibold', 'text-slate-800');
+                
+                priceValue.style.opacity = '0';
+                priceValue.style.transform = 'translateY(-10px)';
+                
+                setTimeout(() => {
+                    priceValue.textContent = annualPrice;
+                    priceValue.style.opacity = '1';
+                    priceValue.style.transform = 'translateY(0)';
+                }, 200);
+                
+                pricePeriod.textContent = '/month';
+                priceNote.textContent = `$${annualPrice * 12} billed annually`;
+                
+                saveBadge.classList.remove('opacity-0', 'scale-90');
+                saveBadge.classList.add('opacity-100', 'scale-100');
+            } else {
+                toggleKnob.style.transform = 'translateX(0)';
+                annualLabel.classList.remove('font-semibold', 'text-slate-800');
+                annualLabel.classList.add('font-medium', 'text-slate-400');
+                monthlyLabel.classList.remove('font-medium', 'text-slate-400');
+                monthlyLabel.classList.add('font-semibold', 'text-slate-800');
+                
+                priceValue.style.opacity = '0';
+                priceValue.style.transform = 'translateY(-10px)';
+                
+                setTimeout(() => {
+                    priceValue.textContent = monthlyPrice;
+                    priceValue.style.opacity = '1';
+                    priceValue.style.transform = 'translateY(0)';
+                }, 200);
+                
+                pricePeriod.textContent = '/month';
+                priceNote.textContent = 'Billed monthly';
+                
+                saveBadge.classList.remove('opacity-100', 'scale-100');
+                saveBadge.classList.add('opacity-0', 'scale-90');
+            }
+        }
+
+        // Pro Plan CTA button click handler
+        document.getElementById('ctaButton').addEventListener('click', function() {
+            this.innerHTML = `
+                <svg class="inline w-5 h-5 mr-2 animate-spin" fill="none" viewBox="0 0 24 24">
+                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
+                Starting trial...
+            `;
+            this.disabled = true;
+            
+            setTimeout(() => {
+                this.innerHTML = `
+                    <svg class="inline w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/>
+                    </svg>
+                    Trial started!
+                `;
+                this.classList.remove('bg-indigo-600', 'hover:bg-indigo-700');
+                this.classList.add('bg-emerald-600', 'hover:bg-emerald-700');
+                
+                setTimeout(() => {
+                    this.innerHTML = 'Start 30-Day Free Trial';
+                    this.disabled = false;
+                    this.classList.remove('bg-emerald-600', 'hover:bg-emerald-700');
+                    this.classList.add('bg-indigo-600', 'hover:bg-indigo-700');
+                }, 2000);
+            }, 1500);
+        });
+
+        // Custom Plan CTA button click handler
+        document.getElementById('ctaButtonCustom').addEventListener('click', function() {
+            const originalText = this.innerHTML;
+            this.innerHTML = `
+                <svg class="inline w-5 h-5 mr-2 animate-spin" fill="none" viewBox="0 0 24 24">
+                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
+                Opening chat...
+            `;
+            this.disabled = true;
+            
+            setTimeout(() => {
+                this.innerHTML = `
+                    <svg class="inline w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/>
+                    </svg>
+                    We'll be in touch!
+                `;
+                this.classList.remove('bg-amber-500', 'hover:bg-amber-400');
+                this.classList.add('bg-emerald-500', 'hover:bg-emerald-400');
+                
+                setTimeout(() => {
+                    this.innerHTML = originalText;
+                    this.disabled = false;
+                    this.classList.remove('bg-emerald-500', 'hover:bg-emerald-400');
+                    this.classList.add('bg-amber-500', 'hover:bg-amber-400');
+                }, 2000);
+            }, 1500);
+        });
+    </script>
+</body>
+</html>

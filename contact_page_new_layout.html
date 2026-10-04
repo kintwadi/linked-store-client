@@ -1,0 +1,329 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Linked-Store — Contact Us</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fontsource/inter@5.0.0/index.min.css">
+<style>
+  * { font-family: 'Inter', system-ui, sans-serif; }
+  body { background: #f8f7f4; }
+  .gradient-text {
+    background: linear-gradient(135deg, #4c1d95 0%, #7c3aed 50%, #a855f7 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+  .card-shadow {
+    box-shadow: 0 1px 3px rgba(0,0,0,0.04), 0 8px 24px rgba(0,0,0,0.06);
+  }
+  .radio-card {
+    transition: all 0.2s ease;
+  }
+  .radio-card:hover {
+    border-color: #a78bfa;
+    background: #faf5ff;
+  }
+  .radio-card.selected {
+    border-color: #7c3aed;
+    background: #f5f0ff;
+    box-shadow: 0 0 0 2px rgba(124, 58, 237, 0.15);
+  }
+  .btn-send {
+    background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
+    transition: all 0.3s ease;
+  }
+  .btn-send:hover {
+    background: linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%);
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(217, 119, 6, 0.4);
+  }
+  .btn-send:active {
+    transform: translateY(0);
+  }
+  .success-alert {
+    animation: slideDown 0.4s ease-out;
+  }
+  @keyframes slideDown {
+    from { opacity: 0; transform: translateY(-10px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+  .fade-in {
+    animation: fadeIn 0.5s ease-out;
+  }
+  @keyframes fadeIn {
+    from { opacity: 0; transform: translateY(12px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+  .badge {
+    transition: all 0.2s ease;
+  }
+  .badge:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+  }
+  .form-input {
+    transition: all 0.2s ease;
+  }
+  .form-input:focus {
+    border-color: #7c3aed;
+    box-shadow: 0 0 0 3px rgba(124, 58, 237, 0.1);
+  }
+  .pulse-dot {
+    animation: pulse 2s infinite;
+  }
+  @keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.5; }
+  }
+  .header-bg {
+    background: linear-gradient(180deg, #fafaf8 0%, #f8f7f4 100%);
+  }
+</style>
+</head>
+<body class="min-h-screen header-bg">
+
+  <!-- Header -->
+  <header class="max-w-7xl mx-auto px-6 py-5 flex items-center justify-between">
+    <div class="flex items-center gap-2.5">
+      <div class="w-9 h-9 rounded-lg bg-gradient-to-br from-violet-600 to-purple-700 flex items-center justify-center text-white text-sm font-bold shadow-sm">
+        LS
+      </div>
+      <span class="text-lg font-semibold text-gray-900">Linked-Store</span>
+    </div>
+    <div class="flex items-center gap-3">
+      <a href="#" class="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 hover:border-gray-300 transition-all flex items-center gap-1.5">
+        <span>←</span> Back to pricing
+      </a>
+      <a href="#" class="px-5 py-2 text-sm font-semibold text-white bg-gray-900 rounded-lg hover:bg-gray-800 transition-all shadow-sm">
+        Log in
+      </a>
+    </div>
+  </header>
+
+  <!-- Main Content -->
+  <main class="max-w-7xl mx-auto px-6 py-10">
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-12 lg:gap-16">
+
+      <!-- Left Column -->
+      <div class="fade-in">
+        <h1 class="text-4xl lg:text-5xl font-bold leading-tight mb-6">
+          <span class="gradient-text">Talk to the team behind</span><br>
+          <span class="text-gray-900">Linked-Store.</span>
+        </h1>
+        <p class="text-gray-600 text-base leading-relaxed mb-10 max-w-lg">
+          Whether you're scaling from 1 store to 100+, evaluating Custom enterprise terms, or just have a quick question — a real person reads every message and typically replies within one business day.
+        </p>
+
+        <!-- Info List -->
+        <div class="space-y-4 mb-8">
+          <div class="flex items-center justify-between py-2 border-b border-gray-200/60">
+            <div class="flex items-center gap-2.5 text-sm text-gray-700">
+              <span class="text-base"></span>
+              <span class="font-medium">Europe & LATAM</span>
+            </div>
+            <span class="text-sm text-gray-600">Lisbon / São Paulo friendly hours</span>
+          </div>
+          <div class="flex items-center justify-between py-2 border-b border-gray-200/60">
+            <div class="flex items-center gap-2.5 text-sm text-gray-700">
+              <span class="text-base">⚡</span>
+              <span class="font-medium">Average reply</span>
+            </div>
+            <span class="text-sm text-gray-600 font-medium">&lt; 1 business day</span>
+          </div>
+          <div class="flex items-center justify-between py-2 border-b border-gray-200/60">
+            <div class="flex items-center gap-2.5 text-sm text-gray-700">
+              <span class="text-base">🔒</span>
+              <span class="font-medium">Your data</span>
+            </div>
+            <span class="text-sm text-gray-600 font-medium">Never shared, never spammed</span>
+          </div>
+          <div class="flex items-center justify-between py-2">
+            <div class="flex items-center gap-2.5 text-sm text-gray-700">
+              <span class="text-base">💬</span>
+              <span class="font-medium">Prefer email?</span>
+            </div>
+            <a href="mailto:info@vicinity24.com" class="text-sm text-violet-600 font-medium hover:text-violet-700 transition-colors">info@vicinity24.com</a>
+          </div>
+        </div>
+
+        <!-- Badges -->
+        <div class="flex flex-wrap gap-2.5">
+          <span class="badge inline-flex items-center gap-1.5 px-3.5 py-1.5 bg-amber-50 text-amber-700 border border-amber-200 rounded-full text-xs font-medium cursor-default">
+            ⚡ Enterprise SLA
+          </span>
+          <span class="badge inline-flex items-center gap-1.5 px-3.5 py-1.5 bg-violet-50 text-violet-700 border border-violet-200 rounded-full text-xs font-medium cursor-default">
+            🏢 Multi-store network
+          </span>
+          <span class="badge inline-flex items-center gap-1.5 px-3.5 py-1.5 bg-gray-50 text-gray-700 border border-gray-200 rounded-full text-xs font-medium cursor-default">
+            🔧 Custom integrations
+          </span>
+          <span class="badge inline-flex items-center gap-1.5 px-3.5 py-1.5 bg-rose-50 text-rose-700 border border-rose-200 rounded-full text-xs font-medium cursor-default">
+             Dedicated success manager
+          </span>
+        </div>
+      </div>
+
+      <!-- Right Column - Form -->
+      <div class="fade-in" style="animation-delay: 0.1s;">
+        <div class="bg-white rounded-2xl card-shadow p-8 lg:p-10 border border-gray-100">
+          <div class="flex items-start justify-between mb-1">
+            <div>
+              <h2 class="text-2xl font-bold text-gray-900 mb-1">Send us a message</h2>
+              <p class="text-sm text-gray-500">Fill out the form and we'll get back to the email you provide.</p>
+            </div>
+            <span class="hidden sm:inline-flex items-center px-3 py-1.5 bg-amber-50 text-amber-700 border border-amber-200 rounded-full text-xs font-medium whitespace-nowrap">
+              Interest: Custom / Enterprise Plan
+            </span>
+          </div>
+
+          <!-- Success Alert -->
+          <div id="successAlert" class="success-alert hidden mt-6 p-4 bg-emerald-50 border border-emerald-200 rounded-xl">
+            <div class="flex items-start gap-3">
+              <div class="w-6 h-6 rounded-full bg-emerald-500 flex items-center justify-center flex-shrink-0 mt-0.5">
+                <svg class="w-3.5 h-3.5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7"/>
+                </svg>
+              </div>
+              <div>
+                <p class="font-semibold text-emerald-800 text-sm">Message sent!</p>
+                <p class="text-sm text-emerald-700 mt-0.5">Thanks for reaching out — we'll reply to <span id="replyEmail" class="font-medium">jane@ald.de</span> as soon as possible.</p>
+              </div>
+            </div>
+          </div>
+
+          <form id="contactForm" class="mt-6 space-y-5">
+            <!-- Name & Email Row -->
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1.5">Full name <span class="text-red-500">*</span></label>
+                <input type="text" id="fullName" value="jane" class="form-input w-full px-3.5 py-2.5 border border-gray-300 rounded-lg text-sm text-gray-900 placeholder-gray-400 focus:outline-none" placeholder="Your full name">
+              </div>
+              <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1.5">Work email <span class="text-red-500">*</span></label>
+                <input type="email" id="workEmail" value="jane@ald.de" class="form-input w-full px-3.5 py-2.5 border border-gray-300 rounded-lg text-sm text-gray-900 placeholder-gray-400 focus:outline-none" placeholder="you@company.com">
+              </div>
+            </div>
+
+            <!-- Company & Phone Row -->
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1.5">Company</label>
+                <input type="text" id="company" class="form-input w-full px-3.5 py-2.5 border border-gray-300 rounded-lg text-sm text-gray-900 placeholder-gray-400 focus:outline-none" placeholder="Acme Holdings (optional)">
+              </div>
+              <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1.5">Phone number</label>
+                <input type="tel" id="phone" class="form-input w-full px-3.5 py-2.5 border border-gray-300 rounded-lg text-sm text-gray-900 placeholder-gray-400 focus:outline-none" placeholder="+351 912 345 678 (option)">
+              </div>
+            </div>
+
+            <!-- Plan of Interest -->
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-2.5">Plan of interest <span class="text-red-500">*</span></label>
+              <div class="space-y-2.5">
+                <label class="radio-card selected flex items-start gap-3 p-3.5 border-2 border-violet-300 bg-violet-50/50 rounded-xl cursor-pointer" data-plan="enterprise">
+                  <div class="mt-0.5 w-5 h-5 rounded-full border-2 border-violet-600 bg-violet-600 flex items-center justify-center flex-shrink-0">
+                    <div class="w-2 h-2 rounded-full bg-white"></div>
+                  </div>
+                  <div>
+                    <span class="text-sm font-semibold text-gray-900">Custom / Enterprise Plan</span>
+                    <p class="text-xs text-gray-500 mt-0.5">Unlimited orders. Dedicated success manager. SAML SSO, custom SLA & integrations.</p>
+                  </div>
+                </label>
+                <label class="radio-card flex items-start gap-3 p-3.5 border-2 border-gray-200 bg-white rounded-xl cursor-pointer" data-plan="partnership">
+                  <div class="mt-0.5 w-5 h-5 rounded-full border-2 border-gray-300 flex items-center justify-center flex-shrink-0">
+                  </div>
+                  <div>
+                    <span class="text-sm font-semibold text-gray-900">Partnership / Co-marketing</span>
+                    <p class="text-xs text-gray-500 mt-0.5">Press, integration partner, platform or reseller discussion.</p>
+                  </div>
+                </label>
+                <label class="radio-card flex items-start gap-3 p-3.5 border-2 border-gray-200 bg-white rounded-xl cursor-pointer" data-plan="other">
+                  <div class="mt-0.5 w-5 h-5 rounded-full border-2 border-gray-300 flex items-center justify-center flex-shrink-0">
+                  </div>
+                  <div>
+                    <span class="text-sm font-semibold text-gray-900">Other inquiry</span>
+                    <p class="text-xs text-gray-500 mt-0.5">Anything else — we read every message.</p>
+                  </div>
+                </label>
+              </div>
+            </div>
+
+            <!-- Message -->
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-1.5">Tell us a bit about what you need <span class="text-red-500">*</span></label>
+              <textarea id="message" rows="5" class="form-input w-full px-3.5 py-2.5 border border-gray-300 rounded-lg text-sm text-gray-900 placeholder-gray-400 focus:outline-none resize-y" placeholder="Include store count, locations, POS / ERP tools, and any timelines you have in mind.">test inquiry</textarea>
+              <p class="text-xs text-gray-400 mt-1.5">10 characters minimum. Include store count, locations, POS / ERP tools, and any timelines you have in mind.</p>
+            </div>
+
+            <!-- Submit -->
+            <div class="flex items-center justify-between pt-2">
+              <p class="text-sm text-gray-500">Or email us directly at <a href="mailto:info@vicinity24.com" class="text-violet-600 font-medium hover:text-violet-700 transition-colors">info@vicinity24.com</a>.</p>
+              <button type="submit" id="submitBtn" class="btn-send px-6 py-3 text-white font-semibold text-sm rounded-xl shadow-md flex items-center gap-2">
+                <span>Send</span>
+                <span>message</span>
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <script>
+    // Radio card selection
+    const radioCards = document.querySelectorAll('.radio-card');
+    radioCards.forEach(card => {
+      card.addEventListener('click', () => {
+        radioCards.forEach(c => {
+          c.classList.remove('selected');
+          c.classList.remove('border-violet-300', 'bg-violet-50/50');
+          c.classList.add('border-gray-200', 'bg-white');
+          const dot = c.querySelector('.w-5');
+          dot.classList.remove('border-violet-600', 'bg-violet-600');
+          dot.classList.add('border-gray-300');
+          const innerDot = dot.querySelector('.w-2');
+          if (innerDot) innerDot.remove();
+        });
+        card.classList.add('selected');
+        card.classList.remove('border-gray-200', 'bg-white');
+        card.classList.add('border-violet-300', 'bg-violet-50/50');
+        const dot = card.querySelector('.w-5');
+        dot.classList.remove('border-gray-300');
+        dot.classList.add('border-violet-600', 'bg-violet-600');
+        const innerDot = document.createElement('div');
+        innerDot.className = 'w-2 h-2 rounded-full bg-white';
+        dot.appendChild(innerDot);
+      });
+    });
+
+    // Form submission
+    const form = document.getElementById('contactForm');
+    const successAlert = document.getElementById('successAlert');
+    const submitBtn = document.getElementById('submitBtn');
+
+    form.addEventListener('submit', (e) => {
+      e.preventDefault();
+      const email = document.getElementById('workEmail').value;
+      const name = document.getElementById('fullName').value;
+      const message = document.getElementById('message').value;
+
+      if (!name.trim() || !email.trim() || message.trim().length < 10) {
+        return;
+      }
+
+      submitBtn.disabled = true;
+      submitBtn.innerHTML = '<svg class="animate-spin w-4 h-4" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path></svg> Sending...';
+
+      setTimeout(() => {
+        document.getElementById('replyEmail').textContent = email;
+        successAlert.classList.remove('hidden');
+        submitBtn.disabled = false;
+        submitBtn.innerHTML = '<span>Send</span><span>message</span>';
+        successAlert.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+      }, 1200);
+    });
+  </script>
+</body>
+</html>

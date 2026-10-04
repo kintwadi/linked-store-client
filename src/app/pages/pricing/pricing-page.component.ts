@@ -804,7 +804,9 @@ const FALLBACK_PLANS: PricingPlan[] = [
                     } @else {
                       <a
                         class="cta-btn custom pulse-ring"
-                        href="mailto:sales@linked-store.example"
+                        routerLink="/contact-sales"
+                        [queryParams]="{ plan: 'CUSTOM' }"
+                        href="/contact-sales?plan=CUSTOM"
                       >
                         Contact Sales
                       </a>

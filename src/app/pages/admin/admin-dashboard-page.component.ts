@@ -1,6 +1,6 @@
 import { Component, OnInit, signal, computed, inject, ChangeDetectorRef, SecurityContext, OnDestroy, WritableSignal, effect } from '@angular/core';
 import { CommonModule, DatePipe } from '@angular/common';
-import { FormsModule, ReactiveFormsModule, FormBuilder, FormGroup, Validators } from '@angular/forms';
+import { FormsModule, ReactiveFormsModule, FormBuilder, FormGroup, FormArray, Validators } from '@angular/forms';
 import { Router, RouterLink } from '@angular/router';
 import { HttpClient, HttpErrorResponse } from '@angular/common/http';
 import { DomSanitizer, SafeUrl } from '@angular/platform-browser';
@@ -8,8 +8,15 @@ import { firstValueFrom } from 'rxjs';
 import { AuthService, AuthUser } from '../../services/auth.service';
 import { CanPipe } from '../../pipes/can.pipe';
 import { PermissionService } from '../../services/permission.service';
+import {
+  SubscriptionPlanService,
+  AdminPlanDto,
+  AdminPlanFeatureDto,
+  UpsertPlanRequest,
+  UpsertPlanFeatureRequest,
+} from '../../services/subscription-plan.service';
 
-type TabKey = 'stores' | 'users' | 'transactions' | 'returns' | 'subscription';
+type TabKey = 'stores' | 'users' | 'transactions' | 'returns' | 'subscription' | 'plans';
 
 interface SseEventShape {
   eventId?: string | null;
@@ -112,38 +119,35 @@ interface PaginatedInspections {
       background: var(--bg);
     }
 
-    /* ====== TOP NAV (from design) ====== */
-    .topnav {
-      background: var(--surface);
-      border-bottom: 1px solid var(--border);
-      padding: 14px 32px;
-      display: flex; align-items: center; justify-content: space-between;
-      position: sticky; top: 0; z-index: 50;
-      backdrop-filter: blur(12px);
-      background: rgba(255,255,255,0.85);
+    /* ====== TOP BRAND STRIP (bar chrome removed; just the app name) ====== */
+    .top-brand {
+      width: 100%;
+      max-width: 1280px;
+      margin: 0 auto;
+      padding: 18px 32px 0 32px;
+      display: flex;
+      align-items: center;
+      justify-content: flex-start;
+      box-sizing: border-box;
     }
-    .logo {
-      display: flex; align-items: center; gap: 10px;
+    .brand {
+      display: inline-flex; align-items: center; gap: 10px;
       font-weight: 700; font-size: 1.05rem; color: var(--text);
       text-decoration: none;
+      user-select: none;
     }
-    .logo-dot {
+    .brand-dot {
       width: 28px; height: 28px; border-radius: 8px;
       background: linear-gradient(135deg, #6366f1, #8b5cf6);
       display: grid; place-items: center; color: #fff;
+      box-shadow: 0 3px 10px rgba(99, 102, 241, 0.3);
     }
-    .topnav-right { display: flex; align-items: center; gap: 16px; }
-    .nav-link {
-      font-size: 0.875rem; color: var(--text-muted); text-decoration: none;
-      font-weight: 500; transition: color 0.15s;
-    }
-    .nav-link:hover { color: var(--text); }
 
     /* ====== MAIN CONTAINER ====== */
     .wrap {
       max-width: 1200px;
       margin: 0 auto;
-      padding: 24px 32px 64px;
+      padding: 16px 32px 64px;
       display: grid;
       gap: 24px;
     }
@@ -993,6 +997,22 @@ interface PaginatedInspections {
       display: inline-flex; align-items: center; gap: 6px;
     }
     .form-field label .req { color: #ef4444; }
+    .quota-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      padding: 2px 8px;
+      border-radius: 999px;
+      font-size: 11px;
+      font-weight: 700;
+      line-height: 1.5;
+      letter-spacing: 0.01em;
+    }
+    .quota-pill.pill-unlimited {
+      background: linear-gradient(135deg, #ecfdf5 0%, #eff6ff 100%);
+      border: 1px solid #a7f3d0;
+      color: #065f46;
+    }
     .form-field input, .form-field select, .form-field textarea {
       width: 100%; box-sizing: border-box; padding: 11px 13px; font-size: 14px;
       color: #111827; background: #fff;
@@ -1625,6 +1645,519 @@ interface PaginatedInspections {
       outline: 0; border-color: var(--primary); box-shadow: 0 0 0 3px rgba(99,102,241,0.15); }
     .panel-content { padding: 0; display: grid; gap: 0; }
     .panel-sub { font-size: 0.8125rem; color: var(--text-muted); }
+
+    /* ============ PLANS TAB ============ */
+    .plans-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 24px;
+    }
+    @media (max-width: 900px) {
+      .plans-grid { grid-template-columns: 1fr; max-width: 520px; margin: 0 auto; }
+    }
+
+    .plan-card {
+      position: relative;
+      background: #fff;
+      border-radius: 24px;
+      overflow: hidden;
+      transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+    .plan-card:hover {
+      transform: translateY(-4px);
+    }
+    .plan-card.pro {
+      border: 1px solid #e2e8f0;
+      box-shadow: 0 0 60px rgba(99, 102, 241, 0.12), 0 20px 60px rgba(15, 23, 42, 0.08);
+    }
+    .plan-card.custom {
+      border: 1px solid #e2e8f0;
+      box-shadow: 0 0 60px rgba(245, 158, 11, 0.12), 0 20px 60px rgba(15, 23, 42, 0.08);
+    }
+
+    .plan-topbar {
+      height: 6px;
+      background-size: 200% 200%;
+      animation: shimmer 3s ease infinite;
+    }
+    .plan-card.pro .plan-topbar { background-image: linear-gradient(135deg, #6366f1, #8b5cf6, #ec4899); }
+    .plan-card.custom .plan-topbar { background-image: linear-gradient(135deg, #f59e0b, #fbbf24, #f59e0b); }
+
+    .plan-body { padding: 32px 32px 8px; }
+
+    .plan-head {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      margin-bottom: 24px;
+      gap: 12px;
+    }
+    .plan-titles h2,
+    .plan-titles h3 {
+      margin: 0 0 4px;
+      font-size: 20px;
+      font-weight: 800;
+      color: #0f172a;
+      letter-spacing: -0.01em;
+    }
+    .plan-desc {
+      font-size: 13px;
+      color: #94a3b8;
+      margin: 0;
+    }
+
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 5px 12px;
+      border-radius: 999px;
+      font-size: 11px;
+      font-weight: 700;
+      white-space: nowrap;
+    }
+    .badge.recommended {
+      background: #eef2ff;
+      border: 1px solid #c7d2fe;
+      color: #4338ca;
+    }
+    .badge.enterprise {
+      background: #fffbeb;
+      border: 1px solid #fde68a;
+      color: #b45309;
+    }
+    .badge svg { flex-shrink: 0; }
+
+    .plan-price-block { margin-bottom: 24px; }
+    .plan-price-row {
+      display: flex;
+      align-items: baseline;
+      gap: 4px;
+      margin-bottom: 4px;
+    }
+    .plan-price-dollar {
+      font-size: 16px;
+      font-weight: 500;
+      color: #94a3b8;
+    }
+    .plan-price-value {
+      font-size: 60px;
+      font-weight: 800;
+      color: #0f172a;
+      letter-spacing: -0.02em;
+      line-height: 1;
+      transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+    .plan-price-period {
+      font-size: 14px;
+      font-weight: 500;
+      color: #94a3b8;
+      margin-left: 4px;
+    }
+    .plan-price-note {
+      font-size: 13px;
+      color: #94a3b8;
+      margin: 0;
+    }
+
+    .plan-divider {
+      height: 1px;
+      background: #f1f5f9;
+      margin: 0 32px;
+    }
+
+    .plan-features {
+      padding: 24px 32px 32px;
+      list-style: none;
+      margin: 0;
+      display: grid;
+      gap: 16px;
+    }
+    .plan-feature-row {
+      display: flex;
+      align-items: flex-start;
+      gap: 12px;
+      cursor: default;
+    }
+    .plan-check-wrap {
+      width: 22px; height: 22px;
+      border-radius: 50%;
+      display: grid;
+      place-items: center;
+      flex-shrink: 0;
+      margin-top: 1px;
+      transition: transform 0.2s ease;
+    }
+    .plan-feature-row:hover .plan-check-wrap { transform: scale(1.2); }
+    .plan-card.pro .plan-check-wrap { background: #eef2ff; }
+    .plan-card.custom .plan-check-wrap { background: #fef3c7; }
+    .plan-card.pro .plan-check-wrap svg { color: #4f46e5; }
+    .plan-card.custom .plan-check-wrap svg { color: #d97706; }
+
+    .plan-feature-label {
+      font-size: 14px;
+      color: #475569;
+      line-height: 1.5;
+      font-weight: 500;
+    }
+    .plan-feature-label.highlight {
+      font-weight: 700;
+      color: #0f172a;
+    }
+
+    .plan-footer {
+      padding: 0 32px 32px;
+      display: flex;
+      gap: 12px;
+      justify-content: flex-end;
+    }
+
+    /* Mini preview card inside edit modal */
+    .plan-card.mini {
+      border-radius: 18px;
+      transform: none;
+    }
+    .plan-card.mini .plan-body { padding: 22px 22px 4px; }
+    .plan-card.mini .plan-titles h3 { font-size: 16px; }
+    .plan-card.mini .plan-price-value { font-size: 44px; }
+    .plan-card.mini .plan-divider { margin: 0 22px; }
+    .plan-card.mini .plan-features { padding: 18px 22px 22px; gap: 12px; }
+    .plan-card.mini .plan-feature-label { font-size: 13px; }
+
+    @keyframes shimmer {
+      0%, 100% { background-position: 0% 50%; }
+      50% { background-position: 100% 50%; }
+    }
+
+    /* ============ PLAN EDIT MODAL ============ */
+    .plan-edit-modal {
+      max-width: 1120px !important;
+      width: calc(100vw - 40px) !important;
+    }
+    .plan-edit-modal .modal-body {
+      padding: 24px 28px 12px;
+    }
+    .plan-edit-grid {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) 360px;
+      gap: 28px;
+      align-items: start;
+    }
+    @media (max-width: 960px) {
+      .plan-edit-grid { grid-template-columns: 1fr; }
+      .plan-card.mini { position: sticky; top: 0; }
+    }
+
+    .plan-edit-section {
+      display: grid;
+      gap: 14px;
+      margin-bottom: 22px;
+    }
+    .plan-edit-section-title {
+      font-size: 0.8125rem;
+      font-weight: 800;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: var(--text-muted);
+      padding-bottom: 6px;
+      border-bottom: 1px dashed var(--border);
+    }
+    .plan-edit-grid2 {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+    }
+    @media (max-width: 640px) {
+      .plan-edit-grid2 { grid-template-columns: 1fr; }
+    }
+    .plan-edit-field { display: grid; gap: 6px; }
+    .plan-edit-field label {
+      font-size: 0.75rem;
+      font-weight: 600;
+      color: var(--text-muted);
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .plan-edit-field label .req { color: #b91c1c; font-weight: 700; }
+    .plan-edit-field .hint {
+      font-size: 0.72rem;
+      color: var(--text-light);
+    }
+    .plan-edit-input,
+    .plan-edit-textarea,
+    .plan-edit-select {
+      width: 100%;
+      padding: 10px 12px;
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      background: var(--surface);
+      font-family: inherit;
+      font-size: 0.875rem;
+      color: var(--text);
+      transition: border-color 0.15s, box-shadow 0.15s;
+      box-sizing: border-box;
+    }
+    .plan-edit-textarea { min-height: 72px; resize: vertical; }
+    .plan-edit-input:focus,
+    .plan-edit-textarea:focus,
+    .plan-edit-select:focus {
+      outline: 0;
+      border-color: var(--primary);
+      box-shadow: 0 0 0 3px rgba(99,102,241,0.15);
+    }
+    .plan-edit-checkbox-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 10px 12px;
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      background: var(--surface);
+    }
+    .plan-edit-checkbox-row input[type="checkbox"] {
+      width: 18px; height: 18px; cursor: pointer;
+    }
+    .plan-edit-checkbox-row label {
+      font-size: 0.875rem;
+      font-weight: 600;
+      color: var(--text);
+      cursor: pointer;
+    }
+
+    .features-list {
+      display: grid;
+      gap: 8px;
+    }
+    .plan-feature-row-edit {
+      display: grid;
+      grid-template-columns: 1fr auto auto auto auto;
+      gap: 8px;
+      align-items: center;
+      padding: 8px;
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      background: var(--surface);
+    }
+    .plan-feature-row-edit .feat-label-input {
+      padding: 7px 10px;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      font-family: inherit;
+      font-size: 0.875rem;
+      background: #fff;
+    }
+    .plan-feature-row-edit .feat-label-input:focus {
+      outline: 0;
+      border-color: var(--primary);
+      box-shadow: 0 0 0 3px rgba(99,102,241,0.12);
+    }
+    .plan-feature-row-edit .feat-check {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      padding: 4px 8px;
+      border-radius: 6px;
+      font-size: 0.75rem;
+      color: var(--text-muted);
+      font-weight: 600;
+    }
+    .plan-feature-row-edit .feat-check input { cursor: pointer; }
+
+    .pf-btn-move,
+    .pf-btn-del {
+      width: 32px; height: 32px;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      background: var(--surface-2);
+      color: var(--text-muted);
+      cursor: pointer;
+      display: inline-grid;
+      place-items: center;
+      font-family: inherit;
+      font-size: 0.8125rem;
+      font-weight: 700;
+      transition: all 0.15s;
+      flex-shrink: 0;
+    }
+    .pf-btn-move:hover:not(:disabled) { background: var(--primary-light); color: var(--primary-dark); border-color: var(--primary); }
+    .pf-btn-move:disabled { opacity: 0.3; cursor: not-allowed; }
+    .pf-btn-del:hover { background: #fef2f2; color: #b91c1c; border-color: #fca5a5; }
+    .plan-features-empty {
+      padding: 18px;
+      text-align: center;
+      border: 1px dashed var(--border);
+      border-radius: 10px;
+      color: var(--text-muted);
+      font-size: 0.875rem;
+    }
+    .plan-edit-features-footer {
+      display: flex;
+      justify-content: flex-end;
+    }
+
+    .plan-edit-footer {
+      padding: 16px 28px 24px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 14px;
+      border-top: 1px solid var(--border);
+    }
+    .plan-edit-footer .err {
+      font-size: 0.8125rem;
+      color: #b91c1c;
+      font-weight: 600;
+    }
+    .plan-edit-footer .actions {
+      display: flex;
+      gap: 10px;
+    }
+
+    .alert-note {
+      padding: 12px 14px;
+      border-radius: 10px;
+      font-size: 0.8125rem;
+      line-height: 1.5;
+    }
+    .alert-note.ok { background: #ecfdf5; border: 1px solid #a7f3d0; color: #047857; }
+    .alert-note.info { background: #eff6ff; border: 1px solid #bfdbfe; color: #1d4ed8; }
+
+    /* Plan edit modal - structure mirrors .modal-backdrop/.modal but with plan prefix */
+    .modal-overlay {
+      position: fixed; inset: 0; background: rgba(17, 24, 39, 0.6);
+      backdrop-filter: blur(4px);
+      display: grid; place-items: start center;
+      padding: 32px 16px; z-index: 50;
+      animation: fadeIn 0.18s ease-out;
+      overflow-y: auto;
+    }
+    .plan-edit-modal {
+      width: 100%;
+      max-width: 1120px !important;
+      background: #fff;
+      border-radius: 18px;
+      box-shadow: 0 40px 80px -20px rgba(0,0,0,0.35), 0 0 0 1px rgba(0,0,0,0.05);
+      display: grid;
+      gap: 0;
+      overflow: hidden;
+      animation: slideUp 0.25s cubic-bezier(.2,.9,.3,1);
+    }
+    .plan-edit-head {
+      padding: 18px 28px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      background: linear-gradient(180deg, #f9fafb 0%, #fff 100%);
+      border-bottom: 1px solid #f3f4f6;
+    }
+    .plan-edit-head h2 { margin: 0; font-size: 18px; font-weight: 800; letter-spacing: -0.01em; color: #0f172a; }
+    .plan-edit-body {
+      padding: 0;
+      display: grid;
+      gap: 0;
+    }
+    .plan-edit-grid {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) 360px;
+      gap: 28px;
+      padding: 24px 28px;
+      align-items: start;
+    }
+    @media (max-width: 960px) {
+      .plan-edit-grid { grid-template-columns: 1fr; padding: 20px 16px; }
+    }
+    .plan-edit-left { display: grid; gap: 22px; }
+    .plan-edit-right {
+      position: sticky;
+      top: 16px;
+      align-self: start;
+    }
+    @media (max-width: 960px) {
+      .plan-edit-right { position: static; }
+    }
+
+    /* Feature editor row sub-layout: [pf-btns][pf-main][pf-btn-del] */
+    .plan-features-list {
+      display: grid;
+      gap: 8px;
+    }
+    .plan-feature-row-edit {
+      display: grid;
+      grid-template-columns: auto 1fr auto;
+      gap: 10px;
+      align-items: stretch;
+      padding: 10px;
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      background: var(--surface);
+    }
+    .plan-feature-row-edit .pf-btns {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      align-items: center;
+      justify-content: center;
+    }
+    .plan-feature-row-edit .pf-main {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      min-width: 0;
+    }
+    .plan-feature-row-edit .pf-label-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .plan-feature-row-edit .pf-label-row > label {
+      font-size: 0.75rem;
+      color: var(--text-muted);
+      font-weight: 600;
+      min-width: 48px;
+      flex-shrink: 0;
+    }
+    .plan-feature-row-edit .pf-label-row input {
+      flex: 1;
+      padding: 7px 10px;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      font-family: inherit;
+      font-size: 0.875rem;
+      background: #fff;
+      min-width: 0;
+    }
+    .plan-feature-row-edit .pf-label-row input:focus {
+      outline: 0;
+      border-color: var(--primary);
+      box-shadow: 0 0 0 3px rgba(99,102,241,0.12);
+    }
+    .plan-feature-row-edit .pf-checks-row {
+      display: flex;
+      gap: 14px;
+      align-items: center;
+      flex-wrap: wrap;
+    }
+    .plan-feature-row-edit .pf-checks-row > label {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 0.75rem;
+      color: var(--text-muted);
+      font-weight: 600;
+      cursor: pointer;
+    }
+    .plan-feature-row-edit .pf-checks-row > label input {
+      cursor: pointer;
+      width: 15px; height: 15px;
+    }
+    .plan-feature-row-edit .pf-order {
+      margin-left: auto;
+      font-size: 0.72rem;
+      color: var(--text-light);
+      font-weight: 500;
+    }
   `],
   template: `
     <!-- SSE Toast stack -->
@@ -1658,14 +2191,14 @@ interface PaginatedInspections {
       }
     </div>
 
-    <nav class="topnav">
-      <a class="logo" routerLink="/">
-        <span class="logo-dot">
+    <div class="top-brand">
+      <a class="brand" routerLink="/">
+        <span class="brand-dot">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>
         </span>
         Linked-Store
       </a>
-    </nav>
+    </div>
 
     <div class="wrap">
       <a class="back-link" routerLink="/">
@@ -1948,6 +2481,12 @@ interface PaginatedInspections {
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 12V8H6a2 2 0 0 1-2-2c0-1.1.9-2 2-2h12v4"/><path d="M4 6v12c0 1.1.9 2 2 2h14v-4"/><path d="M18 12a2 2 0 0 0 0 4h4v-4z"/><line x1="8" y1="12" x2="14" y2="12"/></svg>
               Subscription
             </a>
+          }
+          @if (isGlobalAdmin()) {
+            <button class="tab" [class.active]="activeTab() === 'plans'" (click)="activeTab.set('plans')">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="1" y="4" width="22" height="16" rx="2"/><path d="M1 10h22"/><path d="M7 15h2"/><path d="M12 15h5"/></svg>
+              Plans
+            </button>
           }
         </div>
 
@@ -3072,6 +3611,394 @@ interface PaginatedInspections {
           </div>
         </div>
       }
+
+        <!-- ============ PLANS TAB ============ -->
+        @if (activeTab() === 'plans') {
+          <section class="panel">
+            <div class="panel-head">
+              <div style="display: flex; align-items: center; gap: 10px;">
+                <div class="section-icon">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="1" y="4" width="22" height="16" rx="2"/><path d="M1 10h22"/><path d="M7 15h2"/><path d="M12 15h5"/></svg>
+                </div>
+                <div class="section-title-wrap">
+                  <h2>Subscription Plans</h2>
+                  <span class="muted">Live edits publish instantly to <span style="font-family: ui-monospace, SFMono-Regular, Menlo, monospace; background: var(--surface-2); border: 1px solid var(--border); padding: 1px 8px; border-radius: 8px; font-size: 12px;">/pricing</span> and the next checkout session.</span>
+                </div>
+              </div>
+              <div style="display:flex;gap:10px;align-items:center;">
+                @if (!canEditSubscriptionPlans()) {
+                  <span class="muted" style="color:#991b1b;font-weight:600;">Restricted: Global Admin required.</span>
+                }
+              </div>
+            </div>
+
+            @if (!canEditSubscriptionPlans()) {
+              <div class="panel-body">
+                <div class="alert err" style="max-width:720px;">
+                  <div style="display:flex;align-items:flex-start;gap:10px;">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+                    <div>
+                      <div style="font-weight:700;margin-bottom:4px;">Subscription plan management is restricted to Global Admins.</div>
+                      <div style="font-size:13px;opacity:0.9;">Contact your platform administrator to request pricing or feature changes.</div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            } @else {
+              <div class="panel-body">
+                @if (plansLoading()) {
+                  <div class="loading">Loading subscription plans…</div>
+                } @else if (plansError()) {
+                  <div class="alert err">
+                    <div style="display:flex;align-items:flex-start;gap:10px;">
+                      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+                      <div>
+                        <div style="font-weight:700;">Failed to load subscription plans.</div>
+                        <div style="font-size:13px;opacity:0.9;margin-top:2px;">{{ plansError() }}</div>
+                      </div>
+                    </div>
+                  </div>
+                } @else {
+                  @if (plansSuccess()) {
+                    <div class="alert ok" style="margin-bottom:20px;">
+                      <div style="display:flex;align-items:center;gap:8px;">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="5 13 9 17 19 7"/></svg>
+                        <strong>{{ plansSuccess() }}</strong>
+                      </div>
+                    </div>
+                  }
+                  <div class="plans-grid">
+                    @for (plan of adminPlans(); track plan.id) {
+                      <div class="plan-card" [class.pro]="plan.planCode === 'PRO'" [class.custom]="plan.planCode === 'CUSTOM'">
+                        <div class="plan-topbar"></div>
+                        <div class="plan-body">
+                          <div class="plan-head">
+                            <div class="plan-titles">
+                              <h3>{{ plan.displayName }}</h3>
+                              @if (plan.description) { <p class="plan-desc">{{ plan.description }}</p> }
+                            </div>
+                            <div style="display:inline-flex;gap:8px;flex-wrap:wrap;">
+                              @for (badge of (plan.badges ?? []); track badge) {
+                                <span class="badge" [class.recommended]="badge === 'Recommended'" [class.enterprise]="badge === 'Enterprise'">
+                                  @if (badge === 'Recommended') { <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><path d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z"/></svg> }
+                                  @if (badge === 'Enterprise') { <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M13 10V3L4 14h7v7l9-11h-7z"/></svg> }
+                                  {{ badge }}
+                                </span>
+                              }
+                            </div>
+                          </div>
+
+                          <div class="plan-price-block">
+                            <div class="plan-price-row">
+                              @if (plan.planCode === 'CUSTOM') {
+                                <span class="plan-price-value" style="font-size:48px;">Custom</span>
+                              } @else {
+                                <span class="plan-price-dollar">$</span>
+                                <span class="plan-price-value">{{ formatPlanPriceDollars(plan) }}</span>
+                                <span class="plan-price-period">{{ plan.billingLabelMonthly ?? '/month' }}</span>
+                              }
+                            </div>
+                            <p class="plan-price-note">
+                              @if (plan.planCode === 'CUSTOM') {
+                                {{ plan.billingLabelAnnual ?? 'Contact sales for pricing' }}
+                              } @else {
+                                {{ plan.billingLabelAnnual ?? '' }}
+                              }
+                            </p>
+                          </div>
+                        </div>
+
+                        <div class="plan-divider"></div>
+
+                        <ul class="plan-features">
+                          @for (feat of plan.features; track feat.label + feat.displayOrder) {
+                            <li class="plan-feature-row">
+                              <span class="plan-check-wrap">
+                                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="5 13 9 17 19 7"/></svg>
+                              </span>
+                              <span class="plan-feature-label" [class.highlight]="feat.highlight">{{ feat.label }}</span>
+                            </li>
+                          }
+                        </ul>
+
+                        <div class="plan-footer">
+                          <button type="button" class="btn btn-primary" style="width:100%;padding:14px 20px;font-weight:700;border-radius:14px;" (click)="openPlanEdit(plan)">
+                            <span class="ico">✎</span> Edit plan
+                          </button>
+                        </div>
+                      </div>
+                    }
+                  </div>
+                }
+              </div>
+            }
+          </section>
+        }
+
+        @if (planEditVisible()) {
+          <div class="modal-overlay" (click)="closePlanEdit()">
+            <div class="plan-edit-modal" (click)="$event.stopPropagation()">
+              <div class="plan-edit-head">
+                <div style="display:flex;align-items:center;gap:10px;">
+                  <div class="section-icon" style="background: var(--primary-light); color: var(--primary-dark);">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="1" y="4" width="22" height="16" rx="2"/><path d="M1 10h22"/><path d="M7 15h2"/><path d="M12 15h5"/></svg>
+                  </div>
+                  <div>
+                    <h2 style="margin:0;font-size:20px;font-weight:800;">Edit {{ planEditing()?.displayName ?? 'Plan' }}</h2>
+                    <span class="muted" style="font-size:13px;">Changes apply immediately to <span style="font-family:ui-monospace,SFMono-Regular,Menlo,monospace;background:var(--surface-2);border:1px solid var(--border);padding:1px 8px;border-radius:8px;font-size:12px;">/pricing</span> after save.</span>
+                  </div>
+                </div>
+                <button type="button" class="btn btn-ghost" (click)="closePlanEdit()" aria-label="Close">✕</button>
+              </div>
+
+              <form [formGroup]="planEditForm" (ngSubmit)="savePlanEdit()" class="plan-edit-body">
+                @if (planEditError()) {
+                  <div class="alert err" style="margin: 20px 28px 0;">
+                    <div style="display:flex;align-items:flex-start;gap:10px;">
+                      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+                      <div>
+                        <div style="font-weight:700;">Save failed.</div>
+                        <div style="font-size:13px;opacity:0.9;margin-top:2px;">{{ planEditError() }}</div>
+                      </div>
+                    </div>
+                  </div>
+                }
+
+                <div class="plan-edit-grid">
+                  <div class="plan-edit-left">
+                  <div class="plan-edit-section">
+                    <div class="plan-edit-section-title">Plan details</div>
+                    <div class="form-field">
+                      <label for="pf-name">Display name <span class="req">*</span></label>
+                      <input id="pf-name" type="text" formControlName="displayName" placeholder="Pro Plan" />
+                    </div>
+                    <div class="form-field">
+                      <label for="pf-desc">Description</label>
+                      <textarea id="pf-desc" rows="3" formControlName="description" placeholder="Everything growing stores need to list, broker, and fulfill inventory across the network."></textarea>
+                    </div>
+                    <div class="form-field">
+                      <label for="pf-badges">Badges (comma-separated)</label>
+                      <input id="pf-badges" type="text" formControlName="badgesCsv" placeholder="Recommended, Popular" />
+                      <div class="field-hint">Shows as pill badges on the pricing card. Example: <code style="font-family:ui-monospace,SFMono-Regular,Menlo,monospace;background:var(--surface-2);border:1px solid var(--border);padding:1px 6px;border-radius:6px;font-size:12px;">Recommended</code> or <code style="font-family:ui-monospace,SFMono-Regular,Menlo,monospace;background:var(--surface-2);border:1px solid var(--border);padding:1px 6px;border-radius:6px;font-size:12px;">Enterprise</code>.</div>
+                    </div>
+                    <div class="form-grid-2">
+                      <div class="form-field">
+                        <label for="pf-sort">Sort order</label>
+                        <input id="pf-sort" type="number" min="0" formControlName="sortOrder" />
+                      </div>
+                      <div class="form-field">
+                        <label for="pf-active">
+                          <input type="checkbox" formControlName="isActive" id="pf-active" style="width:16px;height:16px;vertical-align:middle;margin-right:6px;" />
+                          Plan is active on /pricing
+                        </label>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div class="plan-edit-section">
+                    <div class="plan-edit-section-title">Billing &amp; currency</div>
+                    @if (planEditing()?.planCode === 'PRO') {
+                      <div class="form-grid-2">
+                        <div class="form-field">
+                          <label for="pf-monthly">Monthly price (cents) <span class="req">*</span></label>
+                          <input id="pf-monthly" type="number" min="1" formControlName="monthlyPriceCents" placeholder="2900" />
+                          <div class="field-hint">Minimum 1 (e.g. 2900 = $29.00).</div>
+                        </div>
+                        <div class="form-field">
+                          <label for="pf-annual">Annual price (cents)</label>
+                          <input id="pf-annual" type="number" min="0" formControlName="annualPriceCents" placeholder="27600" />
+                        </div>
+                      </div>
+                      <div class="form-grid-2">
+                        <div class="form-field">
+                          <label for="pf-discount">Annual discount %</label>
+                          <input id="pf-discount" type="number" min="0" max="100" formControlName="annualDiscountPercent" />
+                        </div>
+                        <div class="form-field">
+                          <label for="pf-currency">Currency</label>
+                          <input id="pf-currency" type="text" formControlName="currency" placeholder="usd" />
+                        </div>
+                      </div>
+                      <div class="form-grid-2">
+                        <div class="form-field">
+                          <label for="pf-label-month">Monthly billing label</label>
+                          <input id="pf-label-month" type="text" formControlName="billingLabelMonthly" placeholder="/month" />
+                        </div>
+                        <div class="form-field">
+                          <label for="pf-label-year">Annual billing label</label>
+                          <input id="pf-label-year" type="text" formControlName="billingLabelAnnual" placeholder="$276.0/yr" />
+                        </div>
+                      </div>
+                      <div class="form-grid-2">
+                        <div class="form-field">
+                          <label for="pf-trial">Trial days</label>
+                          <input id="pf-trial" type="number" min="0" formControlName="trialDays" />
+                        </div>
+                        <div class="form-field">&nbsp;</div>
+                      </div>
+                    } @else {
+                      <div class="alert-note ok" style="margin-bottom:14px;">
+                        <div style="font-weight:700;">Custom plan uses Contact Sales</div>
+                        <div style="font-size:13px;opacity:0.9;margin-top:2px;">Pricing fields are disabled for Custom; set contact info below.</div>
+                      </div>
+                    }
+                  </div>
+
+                  <div class="plan-edit-section">
+                    <div class="plan-edit-section-title">Quotas</div>
+                    <div class="form-grid-2">
+                      <div class="form-field">
+                        <label for="pf-orders">Monthly order limit
+                          @if (isQuotaUnlimited(planEditForm.get('monthlyOrderLimit')?.value)) {
+                            <span class="quota-pill pill-unlimited">Unlimited</span>
+                          }
+                        </label>
+                        <input id="pf-orders" type="number" min="0" formControlName="monthlyOrderLimit" placeholder="100 (leave empty for unlimited)" />
+                        <div class="field-hint">Leave empty to indicate unlimited. PRO default 100.</div>
+                      </div>
+                      <div class="form-field">
+                        <label for="pf-stores">Max connected stores
+                          @if (isQuotaUnlimited(planEditForm.get('maxConnectedStores')?.value)) {
+                            <span class="quota-pill pill-unlimited">Unlimited</span>
+                          }
+                        </label>
+                        <input id="pf-stores" type="number" min="0" formControlName="maxConnectedStores" placeholder="(leave empty for unlimited)" />
+                        <div class="field-hint">Leave empty to indicate unlimited. Applies to cross-store linkups and broker flows.</div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div class="plan-edit-section">
+                    <div class="plan-edit-section-title">Contact sales</div>
+                    <div class="form-field">
+                      <label for="pf-cs-enabled">
+                        <input type="checkbox" id="pf-cs-enabled" formControlName="contactSalesEnabled" style="width:16px;height:16px;vertical-align:middle;margin-right:6px;" />
+                        Show Contact sales CTA (required for Custom)
+                      </label>
+                    </div>
+                    @if (planEditForm.get('contactSalesEnabled')?.value ?? false) {
+                      <div class="form-grid-2">
+                        <div class="form-field">
+                          <label for="pf-cs-email">Contact email <span class="req">*</span></label>
+                          <input id="pf-cs-email" type="email" formControlName="contactSalesEmail" placeholder="sales@example.com" />
+                        </div>
+                        <div class="form-field">
+                          <label for="pf-cs-url">Contact URL <span class="req">*</span></label>
+                          <input id="pf-cs-url" type="text" formControlName="contactSalesUrl" placeholder="/contact-sales or https://… or mailto:" />
+                          <div class="field-hint">Must start with <code>/</code>, <code>https://</code>, or <code>mailto:</code>.</div>
+                        </div>
+                      </div>
+                    }
+                  </div>
+
+                  <div class="plan-edit-section plan-edit-features">
+                    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
+                      <div class="plan-edit-section-title" style="margin:0;">Feature bullets</div>
+                      <button type="button" class="btn btn-secondary" (click)="addPlanFeature()">+ Add feature</button>
+                    </div>
+                    <div class="plan-features-list">
+                      @for (fg of planEditFeaturesArr(); track $index) {
+                        <div class="plan-feature-row-edit" [formGroup]="fg">
+                          <div class="pf-btns">
+                            <button type="button" class="pf-btn-move" [disabled]="$index === 0" (click)="movePlanFeature($index, -1)" aria-label="Move up">↑</button>
+                            <button type="button" class="pf-btn-move" [disabled]="$index === planEditFeaturesArr().length - 1" (click)="movePlanFeature($index, 1)" aria-label="Move down">↓</button>
+                          </div>
+                          <div class="pf-main">
+                            <div class="pf-label-row">
+                              <label>Label</label>
+                              <input type="text" formControlName="label" placeholder="e.g. Up to 100 monthly orders" />
+                            </div>
+                            <div class="pf-checks-row">
+                              <label>
+                                <input type="checkbox" formControlName="included" />
+                                Included
+                              </label>
+                              <label>
+                                <input type="checkbox" formControlName="highlight" />
+                                Highlight
+                              </label>
+                              <span class="pf-order">Order {{ $index }}</span>
+                            </div>
+                          </div>
+                          <button type="button" class="pf-btn-del" (click)="deletePlanFeature($index)" aria-label="Delete feature">✕</button>
+                        </div>
+                      }
+                      @if (planEditFeaturesArr().length === 0) {
+                        <div class="muted" style="padding:24px;text-align:center;border:1px dashed var(--border);border-radius:12px;">
+                          No feature bullets yet. Click “Add feature” to start building the list.
+                        </div>
+                      }
+                    </div>
+                  </div>
+                  </div>
+
+                  <div class="plan-edit-right">
+                  <div class="plan-edit-section plan-edit-preview">
+                    <div class="plan-edit-section-title">Live preview</div>
+                    <div class="plan-card mini" [class.pro]="(planEditing()?.planCode ?? 'PRO') === 'PRO'" [class.custom]="(planEditing()?.planCode ?? 'PRO') === 'CUSTOM'">
+                      <div class="plan-topbar"></div>
+                      <div class="plan-body">
+                        <div class="plan-head">
+                          <div class="plan-titles">
+                            <h3>{{ planEditForm.get('displayName')?.value ?? 'Plan name' }}</h3>
+                            @if (planEditForm.get('description')?.value) { <p class="plan-desc">{{ planEditForm.get('description')?.value }}</p> }
+                          </div>
+                          <div style="display:inline-flex;gap:8px;flex-wrap:wrap;">
+                            @for (badge of splitBadges(planEditForm.get('badgesCsv')?.value ?? ''); track badge) {
+                              <span class="badge" [class.recommended]="badge === 'Recommended'" [class.enterprise]="badge === 'Enterprise'">{{ badge }}</span>
+                            }
+                          </div>
+                        </div>
+                        <div class="plan-price-block">
+                          <div class="plan-price-row">
+                            @if ((planEditing()?.planCode ?? 'PRO') === 'CUSTOM') {
+                              <span class="plan-price-value" style="font-size:44px;">Custom</span>
+                            } @else {
+                              <span class="plan-price-dollar">$</span>
+                              <span class="plan-price-value">{{ formatCentsToDollars(planEditForm.get('monthlyPriceCents')?.value ?? null) }}</span>
+                              <span class="plan-price-period">{{ planEditForm.get('billingLabelMonthly')?.value ?? '/month' }}</span>
+                            }
+                          </div>
+                          <p class="plan-price-note">
+                            @if ((planEditing()?.planCode ?? 'PRO') === 'CUSTOM') {
+                              {{ planEditForm.get('billingLabelAnnual')?.value ?? 'Contact sales for pricing' }}
+                            } @else {
+                              {{ planEditForm.get('billingLabelAnnual')?.value ?? '' }}
+                            }
+                          </p>
+                        </div>
+                      </div>
+                      <div class="plan-divider"></div>
+                      <ul class="plan-features">
+                        @for (fg of planEditFeaturesArr(); track $index) {
+                          <li class="plan-feature-row">
+                            <span class="plan-check-wrap">
+                              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="5 13 9 17 19 7"/></svg>
+                            </span>
+                            <span class="plan-feature-label" [class.highlight]="!!fg.get('highlight')?.value">
+                              {{ fg.get('label')?.value || '(New feature bullet)' }}
+                            </span>
+                          </li>
+                        }
+                      </ul>
+                    </div>
+                  </div>
+                  </div>
+                </div>
+
+                <div class="plan-edit-footer">
+                  <button type="button" class="btn btn-ghost" (click)="closePlanEdit()">Cancel</button>
+                  <button type="submit" class="btn btn-primary"
+                          [disabled]="planEditSaving() || planEditForm.invalid">
+                    @if (planEditSaving()) { <span class="ico">⟳</span> Saving… }
+                    @else { <span class="ico">✓</span> Save plan }
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        }
+
     </div>
   `,
 })
@@ -3081,6 +4008,7 @@ export class AdminDashboardPageComponent implements OnInit, OnDestroy {
   readonly authService = inject(AuthService);
   readonly router = inject(Router);
   readonly permissionService = inject(PermissionService);
+  readonly subscriptionPlanService = inject(SubscriptionPlanService);
 
   readonly activeTab = signal<TabKey>('stores');
   readonly currentUser = signal<AuthUser | null>(null);
@@ -3155,6 +4083,17 @@ export class AdminDashboardPageComponent implements OnInit, OnDestroy {
   readonly returnsError = signal<string | null>(null);
   readonly returnsSuccess = signal<string | null>(null);
 
+  // --- Plans tab ---
+  readonly adminPlans = signal<AdminPlanDto[]>([]);
+  readonly plansLoading = signal(false);
+  readonly plansError = signal<string | null>(null);
+  readonly plansSuccess = signal<string | null>(null);
+  readonly planEditing = signal<AdminPlanDto | null>(null);
+  readonly planEditVisible = signal(false);
+  readonly planEditSaving = signal(false);
+  readonly planEditError = signal<string | null>(null);
+  readonly planEditForm: FormGroup;
+
   readonly isGlobalAdmin = computed(() => {
     const u = this.currentUser();
     return !!(u?.isGlobalAdmin || u?.role === 'GLOBAL_ADMIN');
@@ -3186,6 +4125,12 @@ export class AdminDashboardPageComponent implements OnInit, OnDestroy {
     const u = this.currentUser();
     if (!u) return false;
     return this.permissionService.canAccessSubscription(u.storeId || undefined);
+  });
+
+  readonly canEditSubscriptionPlans = computed(() => {
+    const u = this.currentUser();
+    if (!u) return false;
+    return this.permissionService.canEditSubscriptionPlans();
   });
 
   readonly pagedTransactions = computed(() => {
@@ -3295,6 +4240,28 @@ export class AdminDashboardPageComponent implements OnInit, OnDestroy {
       logoUrl: [''],
       heroImageUrl: [''],
     });
+    this.planEditForm = this.fb.group({
+      id: [null as string | null],
+      planCode: ['PRO'],
+      displayName: ['', [Validators.required]],
+      description: [''],
+      monthlyPriceCents: [null as number | null],
+      annualPriceCents: [null as number | null],
+      annualDiscountPercent: [null as number | null],
+      billingLabelMonthly: ['/month'],
+      billingLabelAnnual: [''],
+      currency: ['usd'],
+      trialDays: [null as number | null],
+      monthlyOrderLimit: [null as number | null],
+      maxConnectedStores: [null as number | null],
+      sortOrder: [0],
+      badgesCsv: [''],
+      contactSalesEnabled: [false],
+      contactSalesEmail: [''],
+      contactSalesUrl: [''],
+      isActive: [true],
+      features: this.fb.array([]),
+    });
   }
 
   private api(): string {
@@ -3328,12 +4295,16 @@ export class AdminDashboardPageComponent implements OnInit, OnDestroy {
       void this.loadUsers();
       void this.loadTransactions();
       void this.loadReturns();
+      void this.loadAdminPlans();
     });
   }
 
   private readonly _tabEffect = effect(() => {
     if (this.activeTab() === 'returns') {
       void this.loadReturns();
+    }
+    if (this.activeTab() === 'plans') {
+      void this.loadAdminPlans();
     }
   });
 
@@ -3931,6 +4902,218 @@ export class AdminDashboardPageComponent implements OnInit, OnDestroy {
     const c = currency || 'USD';
     const n = Number(cents) / 100;
     return new Intl.NumberFormat('en-US', { style: 'currency', currency: c }).format(n);
+  }
+
+  // ---------------- SUBSCRIPTION PLANS ----------------
+
+  planEditFeaturesArr(): FormGroup[] {
+    const arr = this.planEditForm.get('features') as FormArray;
+    return arr.controls as FormGroup[];
+  }
+
+  splitBadges(csv: string): string[] {
+    if (!csv) return [];
+    return csv.split(',').map(s => s.trim()).filter(Boolean);
+  }
+
+  formatCentsToDollars(cents: number | null | undefined): string {
+    if (cents === null || cents === undefined || isNaN(Number(cents))) return '—';
+    const n = Math.round(Number(cents)) / 100;
+    if (Number.isInteger(n)) return n.toFixed(0);
+    return n.toFixed(2).replace(/0+$/, '').replace(/\.$/, '');
+  }
+
+  formatPlanPriceDollars(plan: AdminPlanDto): string {
+    if (plan.planCode === 'CUSTOM') return '';
+    return this.formatCentsToDollars(plan.monthlyPriceCents);
+  }
+
+  isQuotaUnlimited(value: number | null | undefined): boolean {
+    if (value === null || value === undefined) return true;
+    const n = Number(value);
+    if (isNaN(n)) return true;
+    if (n <= 0) return true;
+    if (n >= 2147483647) return true;
+    return false;
+  }
+
+  normalizeQuotaForForm(value: number | null | undefined): number | null {
+    if (this.isQuotaUnlimited(value)) return null;
+    const n = Math.trunc(Number(value));
+    return Number.isFinite(n) ? n : null;
+  }
+
+  normalizeQuotaForSave(value: number | null | undefined): number | null {
+    if (value === null || value === undefined) return null;
+    const n = Number(value);
+    if (!Number.isFinite(n) || isNaN(n)) return null;
+    if (n <= 0) return null;
+    if (n >= 2147483647) return null;
+    return Math.trunc(n);
+  }
+
+  clearPlanMessagesSoon(): void {
+    setTimeout(() => { this.plansError.set(null); this.plansSuccess.set(null); }, 4000);
+  }
+
+  private async loadAdminPlans(): Promise<void> {
+    if (!this.canEditSubscriptionPlans()) return;
+    this.plansLoading.set(true);
+    this.plansError.set(null);
+    try {
+      const list = await this.subscriptionPlanService.getAdminPlans();
+      this.adminPlans.set(list);
+    } catch (err: any) {
+      this.plansError.set(err?.error?.message ?? err?.error ?? err?.message ?? 'Failed to load subscription plans.');
+      this.adminPlans.set([]);
+    } finally {
+      this.plansLoading.set(false);
+    }
+  }
+
+  private buildFeatureFormGroup(feat: AdminPlanFeatureDto | null, order: number): FormGroup {
+    return this.fb.group({
+      id: [feat?.id ?? null as string | null],
+      label: [feat?.label ?? '', [Validators.required]],
+      included: [feat?.included ?? true],
+      highlight: [feat?.highlight ?? false],
+      displayOrder: [feat?.displayOrder ?? order],
+    });
+  }
+
+  openPlanEdit(plan: AdminPlanDto): void {
+    this.planEditError.set(null);
+    this.planEditSaving.set(false);
+    this.planEditing.set(plan);
+    const featuresArr = this.planEditForm.get('features') as FormArray;
+    while (featuresArr.length > 0) featuresArr.removeAt(0);
+    (plan.features ?? []).forEach((f, i) => {
+      featuresArr.push(this.buildFeatureFormGroup(f, i));
+    });
+    this.planEditForm.patchValue({
+      id: plan.id,
+      planCode: plan.planCode,
+      displayName: plan.displayName,
+      description: plan.description ?? '',
+      monthlyPriceCents: plan.monthlyPriceCents,
+      annualPriceCents: plan.annualPriceCents,
+      annualDiscountPercent: plan.annualDiscountPercent,
+      billingLabelMonthly: plan.billingLabelMonthly ?? '/month',
+      billingLabelAnnual: plan.billingLabelAnnual ?? '',
+      currency: plan.currency ?? 'usd',
+      trialDays: plan.trialDays,
+      monthlyOrderLimit: this.normalizeQuotaForForm(plan.monthlyOrderLimit),
+      maxConnectedStores: this.normalizeQuotaForForm(plan.maxConnectedStores),
+      sortOrder: plan.sortOrder ?? 0,
+      badgesCsv: (plan.badges ?? []).join(', '),
+      contactSalesEnabled: !!plan.contactSalesEnabled,
+      contactSalesEmail: plan.contactSalesEmail ?? '',
+      contactSalesUrl: plan.contactSalesUrl ?? '',
+      isActive: plan.isActive,
+    });
+    this.planEditVisible.set(true);
+  }
+
+  closePlanEdit(): void {
+    this.planEditVisible.set(false);
+    this.planEditing.set(null);
+    this.planEditError.set(null);
+    this.planEditSaving.set(false);
+  }
+
+  addPlanFeature(): void {
+    const featuresArr = this.planEditForm.get('features') as FormArray;
+    const order = featuresArr.length;
+    featuresArr.push(this.buildFeatureFormGroup(null, order));
+  }
+
+  deletePlanFeature(i: number): void {
+    const featuresArr = this.planEditForm.get('features') as FormArray;
+    if (i >= 0 && i < featuresArr.length) {
+      featuresArr.removeAt(i);
+      for (let j = 0; j < featuresArr.length; j++) {
+        (featuresArr.at(j) as FormGroup).get('displayOrder')?.setValue(j);
+      }
+    }
+  }
+
+  movePlanFeature(i: number, dir: number): void {
+    const featuresArr = this.planEditForm.get('features') as FormArray;
+    const j = i + dir;
+    if (dir === 0) return;
+    if (i < 0 || i >= featuresArr.length) return;
+    if (j < 0 || j >= featuresArr.length) return;
+    const ctrlI = featuresArr.at(i);
+    const ctrlJ = featuresArr.at(j);
+    featuresArr.setControl(i, ctrlJ);
+    featuresArr.setControl(j, ctrlI);
+    for (let k = 0; k < featuresArr.length; k++) {
+      (featuresArr.at(k) as FormGroup).get('displayOrder')?.setValue(k);
+    }
+  }
+
+  private readFeaturesFromForm(): UpsertPlanFeatureRequest[] {
+    const featuresArr = this.planEditForm.get('features') as FormArray;
+    const list: UpsertPlanFeatureRequest[] = [];
+    for (let i = 0; i < featuresArr.length; i++) {
+      const fg = featuresArr.at(i) as FormGroup;
+      list.push({
+        id: fg.get('id')?.value ?? null,
+        label: fg.get('label')?.value ?? '',
+        included: !!fg.get('included')?.value,
+        highlight: !!fg.get('highlight')?.value,
+        displayOrder: fg.get('displayOrder')?.value ?? i,
+      });
+    }
+    list.sort((a, b) => (a.displayOrder ?? 0) - (b.displayOrder ?? 0));
+    return list;
+  }
+
+  async savePlanEdit(): Promise<void> {
+    const plan = this.planEditing();
+    if (!plan) return;
+    if (this.planEditForm.invalid) {
+      this.planEditError.set('Please fix the highlighted fields before saving.');
+      return;
+    }
+    this.planEditSaving.set(true);
+    this.planEditError.set(null);
+    this.plansError.set(null);
+    this.plansSuccess.set(null);
+    try {
+      const raw = this.planEditForm.getRawValue();
+      const features = this.readFeaturesFromForm();
+      const body: UpsertPlanRequest = {
+        displayName: raw.displayName,
+        description: raw.description || null,
+        monthlyPriceCents: raw.monthlyPriceCents,
+        annualPriceCents: raw.annualPriceCents,
+        annualDiscountPercent: raw.annualDiscountPercent,
+        billingLabelMonthly: raw.billingLabelMonthly || null,
+        billingLabelAnnual: raw.billingLabelAnnual || null,
+        currency: raw.currency || null,
+        trialDays: raw.trialDays,
+        monthlyOrderLimit: this.normalizeQuotaForSave(raw.monthlyOrderLimit),
+        maxConnectedStores: this.normalizeQuotaForSave(raw.maxConnectedStores),
+        sortOrder: raw.sortOrder ?? 0,
+        badgesCsv: raw.badgesCsv ?? '',
+        contactSalesEnabled: !!raw.contactSalesEnabled,
+        contactSalesEmail: raw.contactSalesEmail || null,
+        contactSalesUrl: raw.contactSalesUrl || null,
+        isActive: raw.isActive !== false,
+        features,
+      };
+      await this.subscriptionPlanService.upsertAdminPlan(plan.planCode, body);
+      this.plansSuccess.set('Plan saved successfully. Changes are live on /pricing now.');
+      this.clearPlanMessagesSoon();
+      this.closePlanEdit();
+      await this.loadAdminPlans();
+    } catch (err: any) {
+      const msg = err?.error?.message ?? err?.error?.errorCode ?? err?.message ?? 'Failed to save plan.';
+      this.planEditError.set(msg);
+    } finally {
+      this.planEditSaving.set(false);
+    }
   }
 
   // ============ SSE NOTIFICATIONS ============

@@ -139,4 +139,10 @@ export class PermissionService {
     if (!storeId) return false;
     return !!u.storeId && u.storeId === storeId;
   }
+
+  canEditSubscriptionPlans(): boolean {
+    const u = this.user;
+    if (!u) return false;
+    return !!(u.isGlobalAdmin || u.role === 'GLOBAL_ADMIN');
+  }
 }

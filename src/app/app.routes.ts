@@ -10,6 +10,7 @@ import { MerchantPickupPageComponent } from './pages/merchant-pickup/merchant-pi
 import { RunnerPickupPageComponent } from './pages/runner/runner-pickup-page.component';
 import { SignupPageComponent } from './pages/signup/signup-page.component';
 import { LoginPageComponent } from './pages/login/login-page.component';
+import { StoreStaffLoginPageComponent } from './pages/login/store-staff-login-page.component';
 import { AdminDashboardPageComponent } from './pages/admin/admin-dashboard-page.component';
 import { AdminNotificationsPageComponent } from './pages/admin/admin-notifications-page.component';
 import { AdminRequestDetailPageComponent } from './pages/admin/admin-request-detail-page.component';
@@ -20,9 +21,11 @@ import { StoreProductFormComponent } from './pages/store-dashboard/store-product
 import { StoreTransactionsListComponent } from './pages/store-dashboard/store-transactions-list.component';
 import { AdminRefundPageComponent } from './pages/admin/admin-refund-page.component';
 import { PricingPageComponent } from './pages/pricing/pricing-page.component';
+import { ContactSalesPageComponent } from './pages/contact-sales/contact-sales-page.component';
 
 export const routes: Routes = [
   { path: 'pricing',                 component: PricingPageComponent,           title: 'Pricing | Linked-Store' },
+  { path: 'contact-sales',           component: ContactSalesPageComponent,      title: 'Contact Sales | Linked-Store' },
   { path: '',                        component: HomePageComponent,              title: 'Linked-Store' },
   { path: 'p/:productId',            component: ProductDetailPageComponent,     title: 'Product' },
   { path: 'p/:productId/qr',         component: ProductQrSharePageComponent,    title: 'Product QR · Share' },
@@ -33,6 +36,7 @@ export const routes: Routes = [
   { path: 'merchant/pickup',         component: MerchantPickupPageComponent,     title: 'Merchant Pickup | Linked-Store' },
   { path: 'signup',                  component: SignupPageComponent,             title: 'Sign up' },
   { path: 'login',                   component: LoginPageComponent,              title: 'Log in' },
+  { path: 'staff-login',             component: StoreStaffLoginPageComponent,    title: 'Store Staff Sign In' },
   { path: 'runner/pickup',           component: RunnerPickupPageComponent,       title: 'Runner Pickup Queue | Linked-Store', canActivate: [authGuard] },
   { path: 'admin',                   component: AdminDashboardPageComponent,     title: 'Admin | Linked-Store', canActivate: [authGuard], data: { requireStoreAdmin: true } },
   { path: 'admin/notifications',     component: AdminNotificationsPageComponent, title: 'All Notifications | Linked-Store', canActivate: [authGuard], data: { requireStoreAdmin: true } },

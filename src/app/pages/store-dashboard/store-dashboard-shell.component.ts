@@ -78,26 +78,57 @@ interface PaginatedInspections {
     }
     .back {
       display: inline-flex; align-items: center; gap: 6px;
-      color: var(--color-muted); text-decoration: none; font-size: 14px;
-      font-weight: 500;
+      color: #6b7280; text-decoration: none; font-size: 14px;
+      font-weight: 600;
+      padding: 6px 10px; border-radius: 10px;
+      transition: background 0.15s ease, color 0.15s ease;
+      width: fit-content;
     }
-    .back:hover { color: var(--color-ink, #111827); }
+    .back:hover { background: #f3f4f6; color: #111827; }
 
     .hero {
-      background: #fff;
-      border-radius: 20px;
-      padding: 28px 32px;
-      color: #111827;
-      box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+      background: linear-gradient(135deg, #ffffff 0%, #fafbff 52%, #eff6ff 100%);
+      border-radius: 24px;
+      padding: 28px 32px 24px;
+      color: #0f172a;
+      box-shadow:
+        0 1px 0 rgba(15, 23, 42, 0.04) inset,
+        0 30px 60px -28px rgba(99, 102, 241, 0.18),
+        0 1px 2px rgba(15, 23, 42, 0.04);
       position: relative;
       overflow: hidden;
-      border: 1px solid #f3f4f6;
+      border: 1px solid rgba(199, 210, 254, 0.45);
     }
-    .hero::before { display: none; }
+    .hero::before {
+      content: '';
+      position: absolute;
+      right: -120px;
+      top: -140px;
+      width: 360px; height: 360px;
+      border-radius: 50%;
+      background: radial-gradient(circle at 30% 30%,
+        rgba(168, 85, 247, 0.14) 0%,
+        rgba(99, 102, 241, 0.10) 38%,
+        rgba(59, 130, 246, 0.0) 72%);
+      pointer-events: none;
+    }
+    .hero::after {
+      content: '';
+      position: absolute;
+      left: -80px;
+      bottom: -160px;
+      width: 320px; height: 320px;
+      border-radius: 50%;
+      background: radial-gradient(circle at 70% 70%,
+        rgba(16, 185, 129, 0.10) 0%,
+        rgba(6, 182, 212, 0.06) 40%,
+        rgba(6, 182, 212, 0.0) 72%);
+      pointer-events: none;
+    }
     .hero-inner {
       position: relative; z-index: 1;
       display: grid;
-      gap: 20px;
+      gap: 22px;
     }
     .hero-top {
       display: flex; align-items: center; justify-content: space-between;
@@ -105,56 +136,82 @@ interface PaginatedInspections {
     }
     .hero-left { display: flex; align-items: center; gap: 20px; flex-wrap: wrap; }
     .logo-or-avatar {
-      width: 72px; height: 72px; border-radius: 18px;
-      background: #f3f4f6;
-      border: 2px solid #e5e7eb;
+      width: 80px; height: 80px; border-radius: 22px;
+      background: linear-gradient(135deg, #ffffff 0%, #eef2ff 100%);
+      border: 1px solid #e0e7ff;
+      box-shadow:
+        0 10px 24px -16px rgba(99, 102, 241, 0.35),
+        0 0 0 1px rgba(255,255,255,0.7) inset;
       display: inline-flex; align-items: center; justify-content: center;
-      font-size: 28px; color: #4b5563;
+      font-size: 34px; color: #4338ca;
       overflow: hidden;
       flex-shrink: 0;
     }
     .logo-or-avatar img { width: 100%; height: 100%; object-fit: cover; }
-    .titles { display: grid; gap: 8px; }
-    .hero-title { margin: 0; font-size: 28px; font-weight: 800; letter-spacing: -0.01em; color: #111827; }
+    .titles { display: grid; gap: 10px; }
+    .hero-title {
+      margin: 0; font-size: 32px; font-weight: 800;
+      letter-spacing: -0.02em; color: #0f172a;
+      line-height: 1.1;
+    }
     .hero-meta {
       display: inline-flex; gap: 10px; flex-wrap: wrap;
       font-size: 13px; color: #6b7280; align-items: center;
     }
     .status-badge {
-      display: inline-flex; align-items: center; gap: 6px;
-      padding: 5px 11px;
-      border-radius: 999px; font-size: 12px; font-weight: 700;
+      display: inline-flex; align-items: center; gap: 7px;
+      padding: 6px 12px;
+      border-radius: 999px; font-size: 12.5px; font-weight: 700;
       letter-spacing: 0.01em;
+      border: 1px solid transparent;
+      backdrop-filter: blur(2px);
     }
     .status-badge::before {
-      content: ''; width: 6px; height: 6px; border-radius: 50%;
-      background: currentColor; opacity: 0.7;
+      content: ''; width: 7px; height: 7px; border-radius: 50%;
+      background: currentColor; opacity: 0.85;
+      box-shadow: 0 0 0 3px rgba(255,255,255,0.6);
     }
-    .status-badge.ok   { background: #ecfdf5; color: #059669; }
-    .status-badge.warn { background: #fffbeb; color: #b45309; }
-    .status-badge.err  { background: #fef2f2; color: #dc2626; }
-    .status-badge.info { background: #eef2ff; color: #4338ca; }
+    .status-badge.ok   { background: #ecfdf5; border-color: #a7f3d0; color: #047857; }
+    .status-badge.warn { background: #fffbeb; border-color: #fde68a; color: #92400e; }
+    .status-badge.err  { background: #fef2f2; border-color: #fecaca; color: #b91c1c; }
+    .status-badge.info { background: #eef2ff; border-color: #c7d2fe; color: #4338ca; }
 
     .tabs {
-      display: inline-flex; gap: 4px; padding: 4px;
-      background: #f3f4f6;
-      border-radius: 14px;
+      display: inline-flex; gap: 3px; padding: 5px;
+      background: rgba(255, 255, 255, 0.75);
+      border-radius: 16px;
       justify-self: start;
-      border: 1px solid #e5e7eb;
+      border: 1px solid #e0e7ff;
+      box-shadow:
+        0 1px 2px rgba(15,23,42,0.04),
+        0 0 0 1px rgba(255,255,255,0.7) inset;
+      backdrop-filter: blur(6px);
     }
     .tab {
-      display: inline-flex; align-items: center; gap: 8px;
+      display: inline-flex; align-items: center; gap: 9px;
       padding: 10px 20px; font-size: 14px; font-weight: 600;
-      color: #6b7280; background: transparent;
-      border: none; border-radius: 10px; cursor: pointer;
-      transition: all 0.18s ease; white-space: nowrap;
+      color: #475569; background: transparent;
+      border: none; border-radius: 12px; cursor: pointer;
+      transition: all 0.18s cubic-bezier(.2,.8,.2,1);
+      white-space: nowrap;
       text-decoration: none;
+      position: relative;
     }
-    .tab .ico { font-size: 15px; }
-    .tab:hover { color: #111827; background: rgba(255,255,255,0.5); }
+    .tab .ico { font-size: 15px; display: inline-grid; place-items: center; }
+    .tab svg { width: 16px; height: 16px; stroke: currentColor; fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+    .tab:hover { color: #0f172a; background: rgba(255,255,255,0.6); }
     .tab.active {
-      background: #fff; color: #111827;
-      box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+      background: linear-gradient(135deg, #6366f1 0%, #a855f7 100%);
+      color: #fff;
+      box-shadow:
+        0 10px 24px -12px rgba(99, 102, 241, 0.75),
+        0 1px 0 rgba(255,255,255,0.25) inset;
+    }
+    .tab.active::before { box-shadow: none; content: none; }
+    .tab[style*="opacity:0.6"] {
+      opacity: 1 !important;
+      color: #94a3b8 !important;
+      cursor: not-allowed !important;
     }
 
     .loading {
@@ -484,143 +541,294 @@ interface PaginatedInspections {
     }
     @keyframes spin { to { transform: rotate(360deg); } }
 
+    /* ============ SUBSCRIPTION TAB REDESIGN ============ */
     .sub-panel-head {
       display: flex; align-items: flex-start; justify-content: space-between; gap: 12px;
-      padding: 4px 2px;
+      padding: 6px 4px 4px;
     }
-    .sub-title-main { font-size: 22px; font-weight: 700; color: #0f172a; letter-spacing: -0.01em; }
-    .sub-subtitle { font-size: 13px; color: #6b7280; margin-top: 2px; }
+    .sub-title { display: inline-flex; align-items: flex-start; gap: 14px; }
+    .sub-title-ico {
+      width: 44px; height: 44px; border-radius: 14px; flex: 0 0 44px;
+      display: inline-grid; place-items: center;
+      background: linear-gradient(135deg, #6366f1 0%, #a855f7 100%);
+      color: #fff;
+      box-shadow:
+        0 12px 28px -14px rgba(99, 102, 241, 0.7),
+        0 0 0 1px rgba(255,255,255,0.2) inset;
+    }
+    .sub-title-ico svg { width: 20px; height: 20px; stroke: currentColor; fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+    .sub-title-main { font-size: 22px; font-weight: 800; color: #0f172a; letter-spacing: -0.015em; line-height: 1.1; }
+    .sub-subtitle { font-size: 13.5px; color: #64748b; margin-top: 4px; line-height: 1.5; max-width: 520px; }
 
     .sub-card {
-      background: #fff;
-      border: 1px solid #eef2f7;
-      border-radius: 18px;
-      box-shadow: 0 1px 2px rgba(15,23,42,0.04), 0 8px 30px -10px rgba(15,23,42,0.08);
-      padding: 24px;
+      background:
+        linear-gradient(180deg, rgba(255,255,255, 0.6), rgba(255,255,255, 1) 40%),
+        #ffffff;
+      border: 1px solid rgba(199, 210, 254, 0.55);
+      border-radius: 24px;
+      box-shadow:
+        0 1px 2px rgba(15,23,42,0.04),
+        0 30px 60px -28px rgba(99, 102, 241, 0.2);
+      padding: 28px;
       display: grid;
-      gap: 20px;
+      gap: 24px;
+      position: relative;
+      overflow: hidden;
+    }
+    .sub-card::before {
+      content: '';
+      position: absolute;
+      top: -40px; right: -40px;
+      width: 220px; height: 220px; border-radius: 50%;
+      background: radial-gradient(circle at 30% 30%,
+        rgba(168,85,247,0.10) 0%,
+        rgba(99,102,241,0.06) 40%,
+        rgba(99,102,241,0.00) 70%);
+      pointer-events: none;
     }
     .sub-summary {
+      position: relative; z-index: 1;
       display: grid;
       grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-      gap: 16px 28px;
+      gap: 18px 28px;
     }
     .sub-plan-label {
-      font-size: 11px; font-weight: 600; text-transform: uppercase;
+      font-size: 11px; font-weight: 700; text-transform: uppercase;
       letter-spacing: 0.08em; color: #94a3b8;
     }
-    .sub-plan-name { font-size: 18px; font-weight: 700; color: #0f172a; margin-top: 4px; display: flex; align-items: center; gap: 8px; }
-    .sub-status-row { display: flex; align-items: center; gap: 10px; margin-top: 4px; flex-wrap: wrap; }
-    .sub-period-val { font-size: 14px; color: #0f172a; font-weight: 600; margin-top: 4px; }
-    .sub-note { font-size: 12px; color: #b45309; }
+    .sub-plan-name { font-size: 19px; font-weight: 800; color: #0f172a; margin-top: 5px; display: flex; align-items: center; gap: 10px; letter-spacing: -0.01em; }
+    .sub-status-row { display: flex; align-items: center; gap: 10px; margin-top: 5px; flex-wrap: wrap; }
+    .sub-period-val { font-size: 14.5px; color: #0f172a; font-weight: 700; margin-top: 5px; }
+    .sub-note { font-size: 12.5px; color: #92400e; background: #fffbeb; padding: 4px 10px; border-radius: 999px; border: 1px solid #fde68a; display: inline-flex; width: fit-content; }
 
     .status-pill {
-      display: inline-flex; align-items: center; padding: 4px 10px; border-radius: 999px;
-      font-size: 12px; font-weight: 600;
+      display: inline-flex; align-items: center; gap: 6px;
+      padding: 5px 11px; border-radius: 999px;
+      font-size: 12.5px; font-weight: 700;
+      border: 1px solid transparent;
     }
-    .status-pill.ok { background: #ecfdf5; color: #065f46; }
-    .status-pill.warn { background: #fff7ed; color: #9a3412; }
-    .status-pill.err { background: #fef2f2; color: #991b1b; }
+    .status-pill::before {
+      content: ''; width: 6px; height: 6px; border-radius: 50%;
+      background: currentColor; opacity: 0.75;
+      box-shadow: 0 0 0 3px rgba(255,255,255,0.7);
+    }
+    .status-pill.ok { background: #ecfdf5; border-color: #a7f3d0; color: #047857; }
+    .status-pill.warn { background: #fff7ed; border-color: #fed7aa; color: #9a3412; }
+    .status-pill.err { background: #fef2f2; border-color: #fecaca; color: #991b1b; }
 
     .chip {
-      display: inline-flex; align-items: center; padding: 3px 9px; border-radius: 999px;
-      font-size: 11px; font-weight: 600;
+      display: inline-flex; align-items: center; padding: 3px 10px; border-radius: 999px;
+      font-size: 11.5px; font-weight: 700;
+      border: 1px solid transparent;
     }
-    .chip.warn { background: #fff7ed; color: #9a3412; }
+    .chip.warn { background: #fff7ed; color: #9a3412; border-color: #fed7aa; }
 
     .sub-actions {
-      display: flex; gap: 10px; flex-wrap: wrap; padding-top: 6px; border-top: 1px dashed #e2e8f0;
+      position: relative; z-index: 1;
+      display: flex; gap: 12px; flex-wrap: wrap; padding-top: 16px;
+      border-top: 1px dashed #dce4ff;
     }
     .btn, .btn-primary, .btn-danger, .btn-ghost {
-      display: inline-flex; align-items: center; justify-content: center; gap: 8px;
-      padding: 10px 16px; border-radius: 12px; font-size: 14px; font-weight: 600;
+      display: inline-flex; align-items: center; justify-content: center; gap: 9px;
+      padding: 11px 18px; border-radius: 14px; font-size: 14px; font-weight: 700;
       border: 1px solid transparent; cursor: pointer; text-decoration: none;
-      transition: transform .06s ease, box-shadow .15s ease, background .15s ease, border-color .15s ease;
-      white-space: nowrap;
+      transition: transform .06s ease, box-shadow .2s ease, background .15s ease, border-color .15s ease;
+      white-space: nowrap; line-height: 1;
+      letter-spacing: -0.005em;
     }
     .btn:disabled, .btn-primary:disabled, .btn-danger:disabled { opacity: 0.65; cursor: progress; }
     .btn-primary {
-      background: linear-gradient(135deg, #6366f1, #a855f7);
+      background: linear-gradient(135deg, #6366f1 0%, #a855f7 100%);
       color: #fff;
-      box-shadow: 0 10px 24px -12px rgba(99,102,241,0.7);
+      box-shadow: 0 12px 28px -12px rgba(99, 102, 241, 0.8), 0 1px 0 rgba(255,255,255,0.25) inset;
     }
-    .btn-primary:hover { transform: translateY(-1px); }
+    .btn-primary:hover { transform: translateY(-1px); box-shadow: 0 16px 36px -12px rgba(99, 102, 241, 0.9), 0 1px 0 rgba(255,255,255,0.25) inset; }
+    .btn-primary svg { stroke: currentColor; fill: none; }
     .btn-danger {
-      background: linear-gradient(135deg, #ef4444, #dc2626);
+      background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
       color: #fff;
-      box-shadow: 0 10px 24px -12px rgba(239,68,68,0.7);
+      box-shadow: 0 12px 28px -12px rgba(239, 68, 68, 0.75), 0 1px 0 rgba(255,255,255,0.2) inset;
     }
     .btn-danger:hover { transform: translateY(-1px); }
     .btn-ghost {
-      background: #f8fafc; color: #0f172a; border-color: #e2e8f0;
+      background: #ffffff; color: #334155; border-color: #e2e8f0;
+      box-shadow: 0 1px 2px rgba(15,23,42,0.04), 0 0 0 1px rgba(255,255,255,0.6) inset;
     }
-    .btn-ghost:hover { background: #f1f5f9; }
+    .btn-ghost:hover { background: #f8fafc; border-color: #cbd5e1; color: #0f172a; }
 
-    .btn svg { width: 16px; height: 16px; flex: 0 0 auto; }
-    .btn-primary svg, .btn-danger svg { stroke: currentColor; fill: none; }
+    .btn svg { width: 17px; height: 17px; flex: 0 0 auto; stroke: currentColor; fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
     .btn-danger svg:nth-child(1) { animation: spin 1s linear infinite; }
 
     .alert {
-      padding: 12px 14px; border-radius: 14px; font-size: 13px;
+      padding: 12px 16px; border-radius: 14px; font-size: 13px;
       border: 1px solid transparent;
+      position: relative; z-index: 1;
     }
     .alert.ok { background: #ecfdf5; border-color: #a7f3d0; color: #065f46; }
     .alert.danger { background: #fef2f2; border-color: #fecaca; color: #991b1b; }
 
-    .modal-overlay {
-      position: fixed; inset: 0; background: rgba(15, 23, 42, 0.55);
-      display: grid; place-items: center; z-index: 9999;
-      padding: 24px; backdrop-filter: blur(2px);
+    /* === EMPTY STATE: premium 2-col upsell card === */
+    .sub-upsell {
+      position: relative; z-index: 1;
+      display: grid;
+      grid-template-columns: minmax(0, 1.2fr) minmax(300px, 0.9fr);
+      gap: 28px;
+      align-items: stretch;
     }
-    .modal {
-      width: 100%; max-width: 440px;
-      background: #fff; border-radius: 20px;
-      box-shadow: 0 30px 80px -20px rgba(15, 23, 42, 0.35);
-      padding: 28px;
-      display: grid; gap: 18px;
-      animation: modalPop .18s ease-out;
-    }
-    @keyframes modalPop {
-      from { opacity: 0; transform: translateY(8px) scale(.98); }
-      to   { opacity: 1; transform: translateY(0)   scale(1);   }
-    }
-    .modal-title {
-      font-size: 18px; font-weight: 700; color: #0f172a; letter-spacing: -0.01em;
-      display: flex; align-items: center; gap: 10px;
-    }
-    .modal-title-icon {
-      width: 34px; height: 34px; border-radius: 10px;
-      background: linear-gradient(135deg, #fef2f2, #fee2e2);
-      color: #dc2626; font-size: 18px;
-      display: grid; place-items: center; flex: 0 0 auto;
-    }
-    .modal-body {
-      font-size: 14px; line-height: 1.55; color: #475569;
-      display: grid; gap: 12px;
-    }
-    .modal-summary {
-      background: #fff7ed; border: 1px solid #fed7aa;
-      padding: 12px 14px; border-radius: 14px;
-      color: #9a3412; font-size: 13px;
-      display: grid; gap: 4px;
-    }
-    .modal-summary strong { color: #7c2d12; }
-    .modal-actions {
-      display: flex; gap: 10px; justify-content: flex-end; flex-wrap: wrap;
-      padding-top: 4px;
+    @media (max-width: 900px) {
+      .sub-upsell { grid-template-columns: 1fr; }
     }
 
-    .sub-summary.sub-empty {
-      display: grid; grid-template-columns: 48px 1fr; gap: 14px;
-      padding: 8px 2px 4px;
+    .upsell-copy {
+      display: grid; align-content: start;
+      gap: 18px;
     }
-    .sub-empty-icon {
-      width: 44px; height: 44px; border-radius: 12px;
-      background: linear-gradient(135deg, #eef2ff, #f0abfc33);
-      display: grid; place-items: center; font-size: 22px;
+    .upsell-kicker {
+      display: inline-flex; align-items: center; gap: 8px;
+      padding: 6px 12px;
+      width: fit-content;
+      background: #f3e8ff;
+      color: #6b21a8;
+      border: 1px solid #ddd6fe;
+      border-radius: 999px;
+      font-size: 11.5px; font-weight: 800; letter-spacing: 0.04em;
+      text-transform: uppercase;
     }
-    .sub-empty-title { font-size: 16px; font-weight: 700; color: #0f172a; }
-    .sub-empty-sub { font-size: 13px; color: #6b7280; margin-top: 2px; }
+    .upsell-kicker svg { width: 14px; height: 14px; stroke: currentColor; fill: none; stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; }
+    .upsell-headline {
+      font-size: 28px; font-weight: 800; letter-spacing: -0.02em;
+      color: #0f172a; line-height: 1.15;
+      margin: 0;
+    }
+    .upsell-headline .accent {
+      background: linear-gradient(135deg, #6366f1, #a855f7);
+      -webkit-background-clip: text; background-clip: text;
+      -webkit-text-fill-color: transparent;
+      color: transparent;
+    }
+    .upsell-sub {
+      font-size: 14.5px; line-height: 1.65;
+      color: #475569;
+      max-width: 520px;
+      margin: 0;
+    }
+    .upsell-benefits { list-style: none; padding: 0; margin: 4px 0 0; display: grid; gap: 10px; }
+    .upsell-benefit {
+      display: flex; align-items: flex-start; gap: 12px;
+      padding: 10px 12px;
+      background: #ffffff;
+      border: 1px solid #eef2ff;
+      border-radius: 14px;
+      transition: border-color 0.15s ease, transform 0.15s ease;
+    }
+    .upsell-benefit:hover { border-color: #c7d2fe; transform: translateY(-1px); }
+    .benefit-check {
+      flex: 0 0 22px; width: 22px; height: 22px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, #10b981, #06b6d4);
+      display: inline-grid; place-items: center;
+      color: white;
+      box-shadow: 0 6px 12px -6px rgba(16, 185, 129, 0.7);
+      margin-top: 1px;
+    }
+    .benefit-check svg { width: 12px; height: 12px; stroke: currentColor; fill: none; stroke-width: 3; stroke-linecap: round; stroke-linejoin: round; }
+    .benefit-text { font-size: 13.5px; color: #334155; line-height: 1.5; }
+    .benefit-text b { color: #0f172a; }
+    .upsell-actions { display: flex; gap: 12px; flex-wrap: wrap; padding-top: 6px; }
+
+    .plan-preview {
+      border-radius: 22px;
+      padding: 24px;
+      background:
+        radial-gradient(120% 80% at 10% 0%, rgba(168, 85, 247, 0.16) 0%, rgba(99, 102, 241, 0.04) 45%, transparent 70%),
+        linear-gradient(180deg, #0f172a 0%, #1e1b4b 100%);
+      color: white;
+      position: relative;
+      overflow: hidden;
+      box-shadow:
+        0 30px 60px -22px rgba(15, 23, 42, 0.5),
+        0 0 0 1px rgba(148, 163, 184, 0.2) inset;
+      display: grid; align-content: start;
+      gap: 14px;
+    }
+    .plan-preview::before {
+      content: '';
+      position: absolute;
+      top: -60px; right: -60px;
+      width: 220px; height: 220px; border-radius: 50%;
+      background: radial-gradient(circle at 30% 30%,
+        rgba(236, 72, 153, 0.4) 0%,
+        rgba(168, 85, 247, 0.2) 40%,
+        transparent 70%);
+      filter: blur(2px);
+    }
+    .plan-preview::after {
+      content: '';
+      position: absolute;
+      inset: auto -20px -100px auto;
+      width: 280px; height: 280px; border-radius: 50%;
+      background: radial-gradient(circle at 50% 50%,
+        rgba(99, 102, 241, 0.35) 0%,
+        rgba(6, 182, 212, 0.12) 45%,
+        transparent 70%);
+      filter: blur(2px);
+    }
+    .plan-preview-top { position: relative; z-index: 1; display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+    .plan-preview-badge {
+      display: inline-flex; align-items: center; gap: 6px;
+      padding: 5px 11px;
+      background: rgba(255,255,255,0.12);
+      border: 1px solid rgba(255,255,255,0.22);
+      backdrop-filter: blur(4px);
+      color: #e9d5ff;
+      border-radius: 999px;
+      font-size: 11px; font-weight: 800; letter-spacing: 0.06em;
+      text-transform: uppercase;
+    }
+    .plan-preview-badge svg { width: 12px; height: 12px; stroke: currentColor; fill: none; stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; }
+    .plan-preview-name { position: relative; z-index: 1; font-size: 20px; font-weight: 800; letter-spacing: -0.01em; }
+    .plan-preview-price {
+      position: relative; z-index: 1;
+      display: flex; align-items: baseline; gap: 6px;
+      margin-top: 10px;
+    }
+    .plan-price-currency { font-size: 18px; font-weight: 700; opacity: 0.85; }
+    .plan-price-amount { font-size: 52px; font-weight: 900; letter-spacing: -0.03em; line-height: 1; }
+    .plan-price-period { color: #cbd5e1; font-size: 13.5px; font-weight: 600; padding-left: 2px; }
+    .plan-preview-features {
+      position: relative; z-index: 1;
+      display: grid; gap: 8px;
+      margin-top: 14px;
+      padding: 14px 14px 16px;
+      background: rgba(255,255,255,0.06);
+      border: 1px solid rgba(255,255,255,0.12);
+      border-radius: 16px;
+    }
+    .plan-preview-features-title {
+      font-size: 11px; font-weight: 800; letter-spacing: 0.08em;
+      color: #c4b5fd; text-transform: uppercase;
+      margin-bottom: 2px;
+    }
+    .plan-feature {
+      display: flex; align-items: flex-start; gap: 10px;
+      padding: 6px 2px;
+      font-size: 13px; color: #e2e8f0;
+    }
+    .plan-feature svg {
+      flex: 0 0 16px; width: 16px; height: 16px; margin-top: 2px;
+      color: #34d399; stroke: currentColor; fill: none; stroke-width: 2.4; stroke-linecap: round; stroke-linejoin: round;
+    }
+    .plan-feature b { color: #fff; font-weight: 700; }
+    .plan-preview-foot {
+      position: relative; z-index: 1;
+      margin-top: 4px;
+      font-size: 12px; color: #a5b4fc;
+      line-height: 1.5;
+    }
+    .plan-preview-foot strong { color: #c4b5fd; font-weight: 700; }
+
+    .sub-summary.sub-empty { display: none; }
+    .sub-empty-icon { display: none; }
   `],
   template: `
     <div class="wrap">
@@ -659,24 +867,29 @@ interface PaginatedInspections {
 
             <div class="tabs" role="tablist">
               <a class="tab" [class.active]="activeTab() === 'products'" routerLink="products">
-                <span class="ico">📦</span> Products
+                <svg viewBox="0 0 24 24"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/></svg>
+                Products
               </a>
               <a class="tab" [class.active]="activeTab() === 'transactions'" routerLink="transactions">
-                <span class="ico">🧾</span> Transactions
+                <svg viewBox="0 0 24 24"><rect x="2" y="5" width="20" height="14" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/></svg>
+                Transactions
               </a>
               <a class="tab" [class.active]="activeTab() === 'returns'" (click)="activeTab.set('returns')">
-                <span class="ico">🔄</span> Returns
+                <svg viewBox="0 0 24 24"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/><path d="M12 7v5l3 2"/></svg>
+                Returns
                 @if (returnsCounts() && returnsCounts()!.underInspectionCount > 0) {
                   <span class="tab-badge warn">{{ returnsCounts()!.underInspectionCount }}</span>
                 }
               </a>
               @if (canAccessSubscription()) {
                 <a class="tab" [class.active]="activeTab() === 'subscription'" (click)="activeTab.set('subscription')">
+                  <svg viewBox="0 0 24 24"><path d="M20 12V8H6a2 2 0 0 1-2-2V4"/><path d="M4 6v12a2 2 0 0 0 2 2h14v-4"/><path d="M4 6a2 2 0 0 1 2-2h14v6"/><path d="M16 16h4"/><circle cx="20" cy="16" r="1" fill="currentColor" stroke="none"/></svg>
                   Subscription
                 </a>
               }
               <a class="tab" style="opacity:0.6;pointer-events:none;">
-                <span class="ico">⚙️</span> Settings
+                <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+                Settings
               </a>
             </div>
           </div>
@@ -986,8 +1199,13 @@ interface PaginatedInspections {
             <section class="sub-panel" style="display: grid; gap: 20px;">
               <header class="sub-panel-head">
                 <div class="sub-title">
-                  <div class="sub-title-main">Subscription</div>
-                  <div class="sub-subtitle">Manage your plan and recurring billing for this store.</div>
+                  <span class="sub-title-ico" aria-hidden="true">
+                    <svg viewBox="0 0 24 24"><path d="M20 12V8H6a2 2 0 0 1-2-2V4"/><path d="M4 6v12c0 1.1.9 2 2 2h14v-4"/><path d="M18 16h6"/><path d="M4 6a2 2 0 0 1 2-2h14v6"/><circle cx="21" cy="16" r="1" fill="currentColor" stroke="none"/><path d="M8 12h8"/></svg>
+                  </span>
+                  <div>
+                    <div class="sub-title-main">Subscription &amp; Billing</div>
+                    <div class="sub-subtitle">Manage your store plan, payment details, and unlock premium platform features for your team and customers.</div>
+                  </div>
                 </div>
                 @if (storeSubscriptionLoading()) {
                   <span class="status-badge info">Loading…</span>
@@ -1077,20 +1295,115 @@ interface PaginatedInspections {
                         Already marked to cancel
                       </button>
                     }
+                    <a class="btn btn-ghost" [routerLink]="['/pricing']" [queryParams]="{ store: store()?.id ?? null }" queryParamsHandling="merge">
+                      View available plans
+                    </a>
                   </div>
                 } @else {
+                  <!-- Hidden legacy block (display:none) keeps Angular binding safe. Replaced by premium upsell below. -->
                   <div class="sub-summary sub-empty">
                     <div class="sub-empty-icon">💡</div>
                     <div class="sub-empty-title">This store is not currently subscribed.</div>
                     <div class="sub-empty-sub">Pick a plan to unlock full platform features, order volume, and Stripe billing.</div>
                     <div class="sub-actions" style="margin-top: 8px;">
-                      <a class="btn btn-primary" [routerLink]="['/pricing']" [queryParams]="{ store: store()?.id ?? null }" queryParamsHandling="merge">
-                        View subscription plans
-                      </a>
-                      <a class="btn btn-ghost" [routerLink]="['/onboarding']">
-                        Go to onboarding
-                      </a>
+                      <a class="btn btn-primary" [routerLink]="['/pricing']" [queryParams]="{ store: store()?.id ?? null }" queryParamsHandling="merge">View subscription plans</a>
+                      <a class="btn btn-ghost" [routerLink]="['/onboarding']">Go to onboarding</a>
                     </div>
+                  </div>
+
+                  <!-- PREMIUM 2-COL UPSELL (visible) -->
+                  <div class="sub-upsell">
+                    <div class="upsell-copy">
+                      <span class="upsell-kicker">
+                        <svg viewBox="0 0 24 24"><path d="M12 2l2.39 7.36H22l-6.2 4.51L18.18 21 12 16.77 5.82 21l2.38-7.13L2 9.36h7.61z"/></svg>
+                        Unlock Linked-Store Pro
+                      </span>
+                      <h3 class="upsell-headline">
+                        Grow revenue with a <span class="accent">Linked-Store subscription</span> for your store.
+                      </h3>
+                      <p class="upsell-sub">
+                        Get unlimited product catalogs, premium QR sharing, higher order volume, and the full Stripe-powered payment stack — designed to help multi-store teams move faster and sell more.
+                      </p>
+
+                      <ul class="upsell-benefits">
+                        <li class="upsell-benefit">
+                          <span class="benefit-check">
+                            <svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>
+                          </span>
+                          <span class="benefit-text"><b>Unlimited products &amp; variants</b> with bulk upload tools (JSON / CSV / XML) and full image hosting.</span>
+                        </li>
+                        <li class="upsell-benefit">
+                          <span class="benefit-check">
+                            <svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>
+                          </span>
+                          <span class="benefit-text"><b>Premium QR sharing</b> for every product with configurable gateway codes and scannable customer landing pages.</span>
+                        </li>
+                        <li class="upsell-benefit">
+                          <span class="benefit-check">
+                            <svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>
+                          </span>
+                          <span class="benefit-text"><b>Higher order volume</b> with preferential rates, returns automation &amp; inspection workflow built-in.</span>
+                        </li>
+                        <li class="upsell-benefit">
+                          <span class="benefit-check">
+                            <svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>
+                          </span>
+                          <span class="benefit-text"><b>Full Stripe billing &amp; payouts</b> connected directly to your store's bank account with transparent fees.</span>
+                        </li>
+                      </ul>
+
+                      <div class="upsell-actions">
+                        <a class="btn btn-primary" [routerLink]="['/pricing']" [queryParams]="{ store: store()?.id ?? null }" queryParamsHandling="merge">
+                          <svg viewBox="0 0 24 24"><path d="M12 2v20M2 12h20"/></svg>
+                          Explore subscription plans
+                        </a>
+                        <a class="btn btn-ghost" [routerLink]="['/onboarding']" [queryParams]="{ store: store()?.id ?? null }" queryParamsHandling="merge">
+                          <svg viewBox="0 0 24 24"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+                          Finish Stripe onboarding
+                        </a>
+                      </div>
+                    </div>
+
+                    <!-- Dark plan preview card -->
+                    <aside class="plan-preview" aria-hidden="false">
+                      <div class="plan-preview-top">
+                        <span class="plan-preview-badge">
+                          <svg viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5"/></svg>
+                          Recommended
+                        </span>
+                        <span style="font-size:11px;color:#c4b5fd;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;">Most popular</span>
+                      </div>
+                      <div class="plan-preview-name">Linked-Store Professional</div>
+                      <div class="plan-preview-price">
+                        <span class="plan-price-currency">€</span>
+                        <span class="plan-price-amount">49</span>
+                        <span class="plan-price-period">/ month · billed monthly</span>
+                      </div>
+
+                      <div class="plan-preview-features">
+                        <div class="plan-preview-features-title">Included with every plan</div>
+                        <div class="plan-feature">
+                          <svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>
+                          <span><b>Unlimited stores</b> with unified dashboard view</span>
+                        </div>
+                        <div class="plan-feature">
+                          <svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>
+                          <span><b>Priority email &amp; in-app</b> support from our team</span>
+                        </div>
+                        <div class="plan-feature">
+                          <svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>
+                          <span><b>Advanced analytics</b> across all your store inventories</span>
+                        </div>
+                        <div class="plan-feature">
+                          <svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>
+                          <span><b>Cancel anytime</b> · no long-term commitment required</span>
+                        </div>
+                      </div>
+
+                      <div class="plan-preview-foot">
+                        <strong>Secure Stripe checkout.</strong> Prorated upgrades. VAT may apply depending on your billing region.
+                      </div>
+                    </aside>
                   </div>
                 }
               </div>

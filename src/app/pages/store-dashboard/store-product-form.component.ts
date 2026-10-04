@@ -1902,12 +1902,7 @@ export class StoreProductFormComponent implements OnInit {
         }
       }
 
-      const productId = responseProductId ?? responseVariantId;
-      if (productId) {
-        setTimeout(() => this.router.navigate(['/p', productId, 'qr']), 450);
-      } else {
-        setTimeout(() => this.navigateBack(), 500);
-      }
+      setTimeout(() => this.navigateBack(), 450);
     } catch (err: any) {
       console.error('Save failed', err);
       this.showError(err?.error?.message || 'Failed to save product. Please try again.');

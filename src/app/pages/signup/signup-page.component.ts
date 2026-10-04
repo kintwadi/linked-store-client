@@ -112,27 +112,25 @@ interface InvitePreviewResponse {
       padding: 20px;
     }
 
-    .navbar {
+    .brand-wrap {
       width: 100%;
       max-width: 1200px;
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      padding: 20px 0;
-      margin-bottom: 20px;
+      padding: 16px 0 8px 0;
+      margin-bottom: 16px;
     }
 
-    .logo {
-      display: flex;
+    .brand {
+      display: inline-flex;
       align-items: center;
       gap: 12px;
       color: #1a202c;
       font-size: 24px;
       font-weight: 700;
       text-decoration: none;
+      user-select: none;
     }
 
-    .logo-icon {
+    .brand-icon {
       width: 32px;
       height: 32px;
       background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
@@ -140,25 +138,16 @@ interface InvitePreviewResponse {
       display: flex;
       align-items: center;
       justify-content: center;
+      box-shadow: 0 4px 10px rgba(102, 126, 234, 0.28);
     }
 
-    .logo-icon::after {
+    .brand-icon::after {
       content: '';
       width: 16px;
       height: 16px;
       background: #ffffff;
       border-radius: 50%;
     }
-
-    .nav-link {
-      color: #2d3748;
-      text-decoration: none;
-      font-weight: 500;
-      font-size: 16px;
-      transition: color 0.3s;
-    }
-
-    .nav-link:hover { color: #5a67d8; }
 
     .signup-container {
       background: #ffffff;
@@ -567,12 +556,12 @@ interface InvitePreviewResponse {
   `],
   template: `
     <div class="page">
-      <nav class="navbar">
-        <a class="logo" routerLink="/">
-          <span class="logo-icon"></span>
+      <div class="brand-wrap">
+        <a class="brand" routerLink="/">
+          <span class="brand-icon"></span>
           Linked-Store
         </a>
-      </nav>
+      </div>
 
       <div class="signup-container">
         <div class="form-header">

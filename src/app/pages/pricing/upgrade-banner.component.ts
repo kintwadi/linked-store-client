@@ -197,6 +197,10 @@ import { SubscriptionPlanService } from '../../services/subscription-plan.servic
               <polyline points="12 5 19 12 12 19"/>
             </svg>
           </a>
+          <a class="btn-ghost" routerLink="/contact-sales" [queryParams]="{ plan: 'CUSTOM' }" (click)="onDismiss()"
+             href="/contact-sales?plan=CUSTOM">
+            Contact sales
+          </a>
           <button type="button" class="btn-ghost" (click)="onDismiss()">Dismiss</button>
         </div>
       </div>

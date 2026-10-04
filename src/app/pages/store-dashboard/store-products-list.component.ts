@@ -6,6 +6,7 @@ import { firstValueFrom } from 'rxjs';
 import { FormsModule } from '@angular/forms';
 import { AuthService } from '../../services/auth.service';
 import { CanPipe } from '../../pipes/can.pipe';
+import { ProductService } from '../../services/product.service';
 
 interface InventoryVariant {
   variantId: string;
@@ -561,6 +562,36 @@ const PILL_CLASS_FROM_KEY: Record<string, string> = {
     .stock-value.medium { color: var(--warning); }
     .stock-value.low    { color: var(--danger); }
 
+    /* ---------- Success / message banner ---------- */
+    .success-banner {
+      display: flex; align-items: center; gap: 12px;
+      padding: 12px 16px;
+      margin: 14px 0 4px 0;
+      background: linear-gradient(180deg, #ecfdf5 0%, #d1fae5 100%);
+      border: 1px solid #a7f3d0;
+      color: #065f46;
+      border-radius: 14px;
+      cursor: pointer; user-select: none;
+      box-shadow: 0 1px 2px rgba(16,185,129,0.06), 0 0 0 1px rgba(16,185,129,0.02) inset;
+    }
+    .sb-ico {
+      width: 26px; height: 26px; flex: 0 0 26px;
+      display: inline-flex; align-items: center; justify-content: center;
+      background: #10b981; color: white; border-radius: 50%;
+      box-shadow: 0 1px 0 rgba(0,0,0,0.04) inset;
+    }
+    .sb-ico svg { width: 14px; height: 14px; }
+    .sb-text {
+      flex: 1 1 auto;
+      font-weight: 600; font-size: 13.5px; letter-spacing: -0.005em;
+      color: #065f46;
+    }
+    .sb-close {
+      color: #047857; opacity: 0.75;
+      padding: 4px 6px; border-radius: 6px; font-size: 11px;
+    }
+    .success-banner:hover .sb-close { background: rgba(16,185,129,0.12); opacity: 1; }
+
     /* ---------- QR Button ---------- */
     .qr-btn {
       display: inline-flex; align-items: center; gap: 8px;
@@ -681,6 +712,200 @@ const PILL_CLASS_FROM_KEY: Record<string, string> = {
       from { opacity: 0; transform: translateY(8px); }
       to   { opacity: 1; transform: translateY(0); }
     }
+
+    /* ---------- Header actions row ---------- */
+    .header-actions {
+      display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+      justify-content: flex-end;
+    }
+    .btn-outline {
+      display: inline-flex; align-items: center; gap: 8px;
+      border: 1px solid var(--gray-300);
+      background: #fff;
+      color: var(--gray-800);
+      font-weight: 600; font-size: 13.5px;
+      padding: 10px 16px; border-radius: 10px;
+      cursor: pointer; transition: all .15s ease;
+      height: 40px;
+    }
+    .btn-outline:hover { border-color: var(--primary); color: var(--primary); background: var(--primary-light); }
+    .btn-outline svg { width: 16px; height: 16px; }
+    .btn-outline:disabled { opacity: .5; cursor: not-allowed; }
+    .template-btns {
+      display: inline-flex; align-items: center; gap: 6px;
+      padding: 4px 10px; background: var(--gray-50);
+      border: 1px dashed var(--gray-200); border-radius: 10px;
+      font-size: 12px; color: var(--gray-600);
+    }
+    .template-btns-label { font-weight: 600; color: var(--gray-600); }
+    .template-btn {
+      padding: 4px 10px; border-radius: 7px; text-decoration: none;
+      font-weight: 700; font-size: 11.5px; letter-spacing: 0.2px;
+      color: var(--primary); background: #fff;
+      border: 1px solid var(--gray-200);
+      transition: all .12s ease;
+    }
+    .template-btn:hover { background: var(--primary-light); border-color: var(--primary); }
+
+    /* ---------- Upload card ---------- */
+    .upload-card {
+      margin-top: 16px;
+      border: 1px solid var(--gray-200);
+      border-radius: 16px;
+      padding: 20px 20px 18px;
+      background: linear-gradient(180deg, #ffffff 0%, #fafaff 100%);
+      box-shadow: var(--shadow-sm);
+      animation: fadeIn .3s ease both;
+    }
+    .upload-card.dragover { border-color: var(--primary); box-shadow: 0 0 0 3px rgba(79,70,229,0.12); }
+    .upload-card-head {
+      display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; margin-bottom: 14px;
+    }
+    .upload-card-title { display: flex; align-items: center; gap: 12px; }
+    .upload-card-icon {
+      width: 40px; height: 40px; border-radius: 12px;
+      background: var(--primary-light); color: var(--primary);
+      display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0;
+    }
+    .upload-card-icon svg { width: 20px; height: 20px; }
+    .upload-card-title h3 { margin: 0 0 2px 0; font-size: 15.5px; font-weight: 800; color: var(--gray-900); letter-spacing: -0.01em; }
+    .upload-card-title p  { margin: 0; font-size: 12.5px; color: var(--gray-500); line-height: 1.5; }
+    .upload-formats { display: inline-flex; gap: 6px; }
+    .fmt-chip {
+      padding: 4px 9px; border-radius: 7px; font-size: 10.5px; font-weight: 800; letter-spacing: 0.4px;
+      background: var(--gray-100); color: var(--gray-700);
+    }
+    .fmt-chip.json { background: #eef4ff; color: #1d4ed8; }
+    .fmt-chip.csv  { background: #ecfdf5; color: #047857; }
+    .fmt-chip.xml  { background: #fff7ed; color: #b45309; }
+
+    .dropzone {
+      position: relative; display: flex; gap: 16px; align-items: center;
+      padding: 22px; border: 1.5px dashed var(--gray-300);
+      border-radius: 14px; cursor: pointer; background: #fff;
+      transition: all .15s ease;
+    }
+    .dropzone:hover { border-color: var(--primary); background: #fbfbff; }
+    .dropzone.dragover { border-color: var(--primary); background: var(--primary-light); box-shadow: inset 0 0 0 3px rgba(79,70,229,0.08); }
+    .dropzone input[type=file] {
+      position: absolute; inset: 0; opacity: 0; cursor: pointer;
+    }
+    .dz-ico {
+      width: 48px; height: 48px; border-radius: 12px; background: var(--gray-50);
+      color: var(--primary); display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0;
+      border: 1px solid var(--gray-200);
+    }
+    .dz-ico svg { width: 22px; height: 22px; }
+    .dz-body { min-width: 0; }
+    .dz-title { margin: 0 0 2px 0; font-size: 13.5px; color: var(--gray-700); }
+    .dz-link  { color: var(--primary); font-weight: 700; text-decoration: underline; text-decoration-style: dotted; text-underline-offset: 3px; }
+    .dz-hint  { margin: 0; font-size: 12px; color: var(--gray-500); }
+    .dz-file  { margin: 0 0 2px 0; font-size: 14px; color: var(--gray-900); }
+    .dz-size  { font-size: 12px; color: var(--gray-500); font-weight: 500; }
+
+    .upload-card-footer {
+      display: flex; align-items: center; justify-content: space-between; gap: 16px;
+      margin-top: 14px; padding-top: 14px;
+      border-top: 1px solid var(--gray-100);
+      flex-wrap: wrap;
+    }
+    .upload-status { display: inline-flex; align-items: center; gap: 10px; color: var(--gray-700); font-size: 13px; min-width: 0; }
+    .muted { color: var(--gray-500); font-size: 12px; }
+    .ready-pill {
+      background: #ecfdf5; color: #047857;
+      padding: 3px 10px; border-radius: 999px;
+      font-size: 11px; font-weight: 800; letter-spacing: 0.4px; text-transform: uppercase;
+      border: 1px solid #a7f3d0;
+    }
+    .progress-wrap { display: inline-flex; align-items: center; gap: 10px; min-width: 320px; }
+    .progress-bar { flex: 1; height: 8px; background: var(--gray-100); border-radius: 999px; overflow: hidden; }
+    .progress-bar-fill { height: 100%; background: linear-gradient(90deg, var(--primary), var(--accent)); border-radius: 999px; width: 0%; transition: width .25s ease; }
+    .progress-text { font-size: 12px; color: var(--gray-600); font-weight: 600; min-width: 90px; }
+    .upload-actions { display: inline-flex; gap: 8px; align-items: center; }
+    .btn-ghost {
+      background: transparent; color: var(--gray-600); border: 1px solid transparent;
+      padding: 8px 14px; border-radius: 10px; font-weight: 600; font-size: 13px;
+      cursor: pointer;
+    }
+    .btn-ghost:hover:not(:disabled) { background: var(--gray-100); color: var(--gray-900); }
+    .btn-ghost:disabled { opacity: .5; cursor: not-allowed; }
+    .btn-primary.sm { padding: 8px 14px; height: 38px; font-size: 13px; }
+    .btn-primary.sm svg { width: 15px; height: 15px; }
+    .spin {
+      width: 14px; height: 14px; border-radius: 50%;
+      border: 2px solid rgba(255,255,255,0.35);
+      border-top-color: #fff;
+      animation: spin .8s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    .report-card {
+      margin-top: 16px;
+      border-radius: 14px;
+      padding: 18px 18px 16px;
+      background: #fff;
+      border: 1px solid var(--gray-200);
+      box-shadow: var(--shadow-sm);
+    }
+    .report-card.error {
+      background: #fff5f5; border-color: #fecaca; color: #991b1b;
+    }
+    .report-title {
+      display: inline-flex; align-items: center; gap: 10px;
+      font-weight: 800; color: var(--gray-900); font-size: 14.5px; letter-spacing: -0.01em;
+      margin-bottom: 14px;
+    }
+    .report-dot { width: 10px; height: 10px; border-radius: 50%; display: inline-block; }
+    .report-dot.ok  { background: var(--success); }
+    .report-dot.err { background: var(--danger); }
+    .report-format { font-weight: 500; color: var(--gray-500); font-size: 12px; }
+    .report-card.error .report-title { color: #991b1b; }
+    .report-msg { margin: 0; font-size: 13px; color: #7f1d1d; line-height: 1.5; }
+    .report-grids {
+      display: grid; grid-template-columns: repeat(4, minmax(0,1fr)); gap: 10px;
+      margin-bottom: 12px;
+    }
+    @media (max-width: 900px) { .report-grids { grid-template-columns: repeat(2, minmax(0,1fr)); } }
+    .report-tile {
+      background: var(--gray-50); border: 1px solid var(--gray-100);
+      border-radius: 12px; padding: 12px 14px;
+    }
+    .report-tile.ok   { background: #ecfdf5; border-color: #a7f3d0; }
+    .report-tile.ok .tile-num { color: #047857; }
+    .report-tile.info { background: #eff6ff; border-color: #bfdbfe; }
+    .report-tile.info .tile-num { color: #1d4ed8; }
+    .report-tile.err  { background: #fef2f2; border-color: #fecaca; }
+    .report-tile.err  .tile-num { color: #b91c1c; }
+    .tile-num { font-size: 22px; font-weight: 900; letter-spacing: -0.02em; color: var(--gray-900); line-height: 1.1; }
+    .tile-label { font-size: 11.5px; color: var(--gray-600); font-weight: 600; margin-top: 4px; }
+    .tile-sub { font-weight: 500; font-size: 10.5px; color: var(--gray-500); display: block; margin-top: 1px; }
+    .tile-sub-inline { font-weight: 500; font-size: 12px; color: var(--gray-500); margin-left: 2px; }
+    .report-highlights {
+      margin: 6px 0 10px 0; padding-left: 18px;
+      font-size: 13px; color: var(--gray-700); line-height: 1.6;
+    }
+    .report-details {
+      margin-top: 10px; border-radius: 10px;
+      padding: 10px 12px;
+      border: 1px solid var(--gray-100); background: var(--gray-50);
+    }
+    .report-details.warn { background: #fffbeb; border-color: #fde68a; }
+    .report-details.err  { background: #fff5f5; border-color: #fecaca; }
+    .report-details summary { cursor: pointer; font-size: 12.5px; padding: 2px 0; }
+    .report-details ul { margin: 8px 0 2px 0; padding-left: 18px; }
+    .report-details li { font-size: 12.5px; color: var(--gray-700); line-height: 1.5; padding: 2px 0; }
+    .report-details.err li { color: #991b1b; }
+    .report-details.warn li { color: #92400e; }
+    .report-err-table { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 12px; }
+    .report-err-table th, .report-err-table td { text-align: left; padding: 6px 8px; border-bottom: 1px solid #fecaca; }
+    .report-err-table th { color: #b91c1c; font-weight: 700; }
+    .report-err-table td { color: #7f1d1d; }
+    .sku-inline {
+      display: inline-block; margin-left: 6px;
+      padding: 1px 6px; border-radius: 5px; background: #fff;
+      border: 1px solid var(--gray-200); font-size: 10.5px;
+      color: var(--gray-600); font-family: ui-monospace, monospace;
+    }
   `],
   template: `
     <div class="main-layout" [class.with-sidebar]="mode() === 'unified'">
@@ -779,13 +1004,29 @@ const PILL_CLASS_FROM_KEY: Record<string, string> = {
                 </p>
               </div>
               @if (mode() !== 'unified') {
-                <a class="btn-primary" [routerLink]="['./new']">
-                  <svg viewBox="0 0 24 24" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-                    <line x1="12" y1="5" x2="12" y2="19"></line>
-                    <line x1="5" y1="12" x2="19" y2="12"></line>
-                  </svg>
-                  Add Product
-                </a>
+                <div class="header-actions">
+                  <a class="btn-primary" [routerLink]="['./new']">
+                    <svg viewBox="0 0 24 24" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                      <line x1="12" y1="5" x2="12" y2="19"></line>
+                      <line x1="5" y1="12" x2="19" y2="12"></line>
+                    </svg>
+                    Add Product
+                  </a>
+                  <button type="button" class="btn-outline" (click)="toggleUploadPanel()">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                      <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                      <polyline points="17 8 12 3 7 8"></polyline>
+                      <line x1="12" y1="3" x2="12" y2="15"></line>
+                    </svg>
+                    Upload products
+                  </button>
+                  <div class="template-btns" title="Download a pre-filled sample template with 5 products">
+                    <span class="template-btns-label">Templates:</span>
+                    <a class="template-btn" [href]="templateUrl('json')" target="_blank" rel="noopener" download="products-template.json">JSON</a>
+                    <a class="template-btn" [href]="templateUrl('csv')" target="_blank" rel="noopener" download="products-template.csv">CSV</a>
+                    <a class="template-btn" [href]="templateUrl('xml')" target="_blank" rel="noopener" download="products-template.xml">XML</a>
+                  </div>
+                </div>
               }
             </div>
 
@@ -823,6 +1064,175 @@ const PILL_CLASS_FROM_KEY: Record<string, string> = {
                 </button>
               </div>
             </div>
+
+            @if (pageSuccessBanner()) {
+              <div class="success-banner" role="status" (click)="pageSuccessBanner.set('')">
+                <span class="sb-ico">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                    <polyline points="20 6 9 17 4 12"></polyline>
+                  </svg>
+                </span>
+                <span class="sb-text">{{ pageSuccessBanner() }}</span>
+                <span class="sb-close" title="Dismiss">✕</span>
+              </div>
+            }
+
+            @if (mode() !== 'unified' && showUploadPanel()) {
+              <div class="upload-card" [class.dragover]="uploadDragOver()">
+                <div class="upload-card-head">
+                  <div class="upload-card-title">
+                    <span class="upload-card-icon">
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                        <polyline points="17 8 12 3 7 8"></polyline>
+                        <line x1="12" y1="3" x2="12" y2="15"></line>
+                      </svg>
+                    </span>
+                    <div>
+                      <h3>Bulk upload catalog</h3>
+                      <p>Drop a JSON, CSV, or XML file here, or click to browse. <span style="color:var(--gray-500);">Max 100 MB.</span></p>
+                    </div>
+                  </div>
+                  <div class="upload-formats">
+                    <span class="fmt-chip json">JSON</span>
+                    <span class="fmt-chip csv">CSV</span>
+                    <span class="fmt-chip xml">XML</span>
+                  </div>
+                </div>
+
+                <label class="dropzone"
+                       [class.dragover]="uploadDragOver()"
+                       (dragover)="onUploadDragOver($event)"
+                       (dragenter)="onUploadDragOver($event)"
+                       (dragleave)="onUploadDragLeave()"
+                       (drop)="onUploadDrop($event)">
+                  <input type="file" #uploadFileInput accept=".json,.csv,.xml,application/json,text/csv,application/xml" (change)="onFilePicked($event)" />
+                  <div class="dz-ico">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                      <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                      <polyline points="14 2 14 8 20 8"></polyline>
+                      <line x1="12" y1="18" x2="12" y2="12"></line>
+                      <polyline points="9 15 12 12 15 15"></polyline>
+                    </svg>
+                  </div>
+                  <div class="dz-body">
+                    @if (uploadPendingFile()) {
+                      <p class="dz-file"><strong>{{ uploadPendingFile()!.name }}</strong> <span class="dz-size">({{ formatBytes(uploadPendingFile()!.size) }})</span></p>
+                      <p class="dz-hint">Click <b>"Start import"</b> below to process this file into your store.</p>
+                    } @else {
+                      <p class="dz-title"><b>Drop your file here</b> or <span class="dz-link">browse</span></p>
+                      <p class="dz-hint">Need a starter file? Download a <b>template</b> above and re-upload after editing.</p>
+                    }
+                  </div>
+                </label>
+
+                <div class="upload-card-footer">
+                  <div class="upload-status">
+                    @if (uploadLoading()) {
+                      <div class="progress-wrap">
+                        <div class="progress-bar"><div class="progress-bar-fill" [style.width.%]="uploadProgress()"></div></div>
+                        <span class="progress-text">Importing&hellip; {{ uploadProgress() }}%</span>
+                      </div>
+                    } @else if (uploadPendingFile()) {
+                      <span class="ready-pill">Ready</span>
+                      <span class="muted">{{ uploadPendingFile()!.name }} queued</span>
+                    } @else {
+                      <span class="muted">No file chosen.</span>
+                    }
+                  </div>
+                  <div class="upload-actions">
+                    <button type="button" class="btn-ghost" (click)="clearUpload()" [disabled]="uploadLoading() || !uploadPendingFile()">Clear</button>
+                    <button type="button" class="btn-primary sm" (click)="submitUpload()" [disabled]="uploadLoading() || !uploadPendingFile()">
+                      @if (uploadLoading()) {
+                        <span class="spin"></span>
+                        Importing&hellip;
+                      } @else {
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                          <polyline points="20 6 9 17 4 12"></polyline>
+                        </svg>
+                        Start import
+                      }
+                    </button>
+                  </div>
+                </div>
+
+                @if (uploadError()) {
+                  <div class="report-card error">
+                    <div class="report-title">
+                      <span class="report-dot err"></span>
+                      Import failed
+                    </div>
+                    <p class="report-msg">{{ uploadError() }}</p>
+                  </div>
+                }
+
+                @if (lastReport()) {
+                  <div class="report-card">
+                    <div class="report-title">
+                      <span class="report-dot ok"></span>
+                      Import complete
+                      <span class="report-format">({{ lastReport().format?.toUpperCase() }})</span>
+                    </div>
+                    <div class="report-grids">
+                      <div class="report-tile">
+                        <div class="tile-num">{{ lastReport().rowsParsed ?? 0 }}</div>
+                        <div class="tile-label">Rows parsed</div>
+                      </div>
+                      <div class="report-tile ok">
+                        <div class="tile-num">{{ (lastReport().productsCreated ?? 0) + (lastReport().productsUpdated ?? 0) }}</div>
+                        <div class="tile-label">Products <span class="tile-sub">(+{{ lastReport().productsCreated ?? 0 }} new / ~{{ lastReport().productsUpdated ?? 0 }} updated)</span></div>
+                      </div>
+                      <div class="report-tile ok">
+                        <div class="tile-num">{{ (lastReport().variantsCreated ?? 0) + (lastReport().variantsUpdated ?? 0) }}</div>
+                        <div class="tile-label">Variants <span class="tile-sub">(+{{ lastReport().variantsCreated ?? 0 }} new / ~{{ lastReport().variantsUpdated ?? 0 }} updated)</span></div>
+                      </div>
+                      <div class="report-tile info">
+                        <div class="tile-num">{{ lastReport().imagesCopied ?? 0 }}<span class="tile-sub tile-sub-inline">/{{ lastReport().imagesSkipped ?? 0 }} skipped</span></div>
+                        <div class="tile-label">Images imported</div>
+                      </div>
+                      @if ((lastReport().errors ?? 0) > 0) {
+                        <div class="report-tile err">
+                          <div class="tile-num">{{ lastReport().errors }}</div>
+                          <div class="tile-label">Row errors</div>
+                        </div>
+                      }
+                    </div>
+                    @if (lastReport().summaryHighlights && lastReport().summaryHighlights.length) {
+                      <ul class="report-highlights">
+                        @for (h of lastReport().summaryHighlights; track h) {
+                          <li>{{ h }}</li>
+                        }
+                      </ul>
+                    }
+                    @if (lastReport().warningMessages && lastReport().warningMessages.length) {
+                      <details class="report-details warn">
+                        <summary><b>Warnings</b> ({{ lastReport().warningMessages.length }})</summary>
+                        <ul>
+                          @for (w of lastReport().warningMessages; track w) { <li>{{ w }}</li> }
+                        </ul>
+                      </details>
+                    }
+                    @if (lastReport().rowErrors && lastReport().rowErrors.length) {
+                      <details class="report-details err">
+                        <summary><b>Row errors</b> ({{ lastReport().rowErrors.length }})</summary>
+                        <table class="report-err-table">
+                          <thead><tr><th>Row</th><th>Title / SKU</th><th>Message</th></tr></thead>
+                          <tbody>
+                            @for (e of lastReport().rowErrors; track e.rowIndex + '-' + (e.sku ?? e.title ?? '')) {
+                              <tr>
+                                <td>{{ e.rowIndex ?? '-' }}</td>
+                                <td>{{ e.title ?? '—' }} @if (e.sku) { <span class="sku-inline">{{ e.sku }}</span> }</td>
+                                <td>{{ e.message }}</td>
+                              </tr>
+                            }
+                          </tbody>
+                        </table>
+                      </details>
+                    }
+                  </div>
+                }
+              </div>
+            }
           </div>
 
           @if (loading()) {
@@ -1027,6 +1437,7 @@ export class StoreProductsListComponent implements OnInit {
   private readonly authService = inject(AuthService);
   private readonly route = inject(ActivatedRoute);
   private readonly destroyRef = inject(DestroyRef);
+  private readonly productService = inject(ProductService);
 
   // ===== Core state =====
   readonly mode = signal<ViewMode>('store');
@@ -1082,6 +1493,25 @@ export class StoreProductsListComponent implements OnInit {
 
   readonly firstPage = computed(() => this.page() === 0);
   readonly lastPage = computed(() => this.page() >= Math.max(0, this.totalPages() - 1));
+
+  // ===== Upload state =====
+  readonly showUploadPanel = signal<boolean>(false);
+  readonly uploadDragOver = signal<boolean>(false);
+  readonly uploadPendingFile = signal<File | null>(null);
+  readonly uploadLoading = signal<boolean>(false);
+  readonly uploadProgress = signal<number>(0);
+  readonly uploadError = signal<string>('');
+  readonly lastReport = signal<any>(null);
+  readonly pageSuccessBanner = signal<string>('');
+  private pageBannerTimer: ReturnType<typeof setTimeout> | null = null;
+  private showBanner(msg: string): void {
+    this.pageSuccessBanner.set(msg);
+    if (this.pageBannerTimer) clearTimeout(this.pageBannerTimer);
+    this.pageBannerTimer = setTimeout(() => {
+      this.pageSuccessBanner.set('');
+      this.pageBannerTimer = null;
+    }, 5500);
+  }
 
   readonly pageNumbers = computed<Array<{ type: 'num' | 'ellipsis'; value?: number; label: string }>>(() => {
     const totalPages = Math.max(1, this.totalPages());
@@ -1435,5 +1865,175 @@ export class StoreProductsListComponent implements OnInit {
       }
     }
     return params;
+  }
+
+  // ========= Upload public methods =========
+  toggleUploadPanel(): void {
+    this.showUploadPanel.update(v => !v);
+    if (!this.showUploadPanel()) {
+      this.uploadPendingFile.set(null);
+      this.uploadError.set('');
+      this.uploadDragOver.set(false);
+    }
+  }
+
+  templateUrl(fmt: 'json' | 'csv' | 'xml'): string {
+    const sid = this.effectiveStoreId();
+    const base = this.authService.resolveApiBasePublic() ?? '/api';
+    return `${base}/v1/stores/${encodeURIComponent(sid)}/products/upload/templates/${fmt}`;
+  }
+
+  formatBytes(n: number | null | undefined): string {
+    if (!n || n <= 0) return '0 B';
+    const units = ['B','KB','MB','GB'];
+    let i = 0;
+    let v = n;
+    while (v >= 1024 && i < units.length - 1) { v = v / 1024; i++; }
+    return `${v.toFixed(v < 10 && i > 0 ? 1 : 0)} ${units[i]}`;
+  }
+
+  private effectiveStoreId(): string {
+    const s = this.storeId();
+    if (s && s !== 'me') return s;
+    const user = (this.authService as any).currentUser$?.value;
+    return (user?.storeId != null ? String(user.storeId) : (s || 'me'));
+  }
+
+  onUploadDragOver(ev: DragEvent): void {
+    ev.preventDefault();
+    ev.stopPropagation();
+    this.uploadDragOver.set(true);
+  }
+
+  onUploadDragLeave(): void {
+    this.uploadDragOver.set(false);
+  }
+
+  onUploadDrop(ev: DragEvent): void {
+    ev.preventDefault();
+    ev.stopPropagation();
+    this.uploadDragOver.set(false);
+    const files = (ev as any).dataTransfer?.files ?? ev.dataTransfer?.files;
+    if (files && files.length > 0) this.acceptFile(files[0]);
+  }
+
+  onFilePicked(ev: Event): void {
+    const input = ev.target as HTMLInputElement | null;
+    if (input?.files && input.files.length > 0) this.acceptFile(input.files[0]);
+  }
+
+  private acceptFile(file: File): void {
+    const sizeLimit = 100 * 1024 * 1024; // 100 MB — keep in sync with backend multipart cap
+    if (!file) return;
+    const lower = file.name.toLowerCase();
+    const okExt = lower.endsWith('.json') || lower.endsWith('.csv') || lower.endsWith('.xml');
+    if (!okExt) {
+      this.uploadError.set('Unsupported file type. Please choose a JSON, CSV, or XML file.');
+      this.uploadPendingFile.set(null);
+      return;
+    }
+    if (file.size > sizeLimit) {
+      this.uploadError.set(`File too large (${this.formatBytes(file.size)}). Max size is ${this.formatBytes(sizeLimit)}.`);
+      this.uploadPendingFile.set(null);
+      return;
+    }
+    this.uploadError.set('');
+    this.lastReport.set(null);
+    this.uploadPendingFile.set(file);
+  }
+
+  clearUpload(): void {
+    this.uploadPendingFile.set(null);
+    this.uploadError.set('');
+    this.uploadProgress.set(0);
+    this.lastReport.set(null);
+  }
+
+  async submitUpload(): Promise<void> {
+    const file = this.uploadPendingFile();
+    if (!file) return;
+    const sid = this.effectiveStoreId();
+    if (!sid) {
+      this.uploadError.set('Could not determine the target store.');
+      return;
+    }
+    const apiBase = this.authService.resolveApiBasePublic() ?? '/api';
+    const url = `${apiBase}/v1/stores/${encodeURIComponent(sid)}/products/upload`;
+
+    const form = new FormData();
+    form.append('file', file, file.name);
+
+    this.uploadLoading.set(true);
+    this.uploadProgress.set(5);
+    this.uploadError.set('');
+    this.lastReport.set(null);
+
+    try {
+      // Manually handle upload progress via XMLHttpRequest since HttpClient reportProgress requires extra wiring.
+      const result: any = await new Promise((resolve, reject) => {
+        const xhr = new XMLHttpRequest();
+        xhr.open('POST', url, true);
+        xhr.withCredentials = true;
+        const token = (() => { try { return localStorage.getItem('ls.access_token') || ''; } catch { return ''; } })();
+        if (token) xhr.setRequestHeader('Authorization', `Bearer ${token}`);
+
+        xhr.upload.addEventListener('progress', (evt) => {
+          if (evt.lengthComputable) {
+            const pct = Math.min(80, Math.round((evt.loaded / evt.total) * 80));
+            this.uploadProgress.set(Math.max(5, pct));
+          }
+        });
+        xhr.addEventListener('loadend', () => {
+          try {
+            const body = xhr.responseText ? (() => {
+              try { return JSON.parse(xhr.responseText); } catch { return xhr.responseText; }
+            })() : {};
+            if (xhr.status >= 200 && xhr.status < 300) {
+              this.uploadProgress.set(100);
+              resolve(body);
+            } else {
+              const msg = body?.message || body?.error || `Upload failed (HTTP ${xhr.status})`;
+              reject(new Error(typeof msg === 'string' ? msg : JSON.stringify(msg)));
+            }
+          } catch (err) {
+            reject(err);
+          }
+        });
+        xhr.addEventListener('error', () => reject(new Error('Network error during upload.')));
+        xhr.addEventListener('abort', () => reject(new Error('Upload aborted.')));
+        xhr.send(form);
+      });
+
+      this.lastReport.set(result || {});
+
+      const report = result || {};
+      const pc = Number(report.productsCreated ?? 0);
+      const pu = Number(report.productsUpdated ?? 0);
+      const vc = Number(report.variantsCreated ?? 0);
+      const vu = Number(report.variantsUpdated ?? 0);
+      const rows = Number(report.rowsParsed ?? 0);
+      const banner = `Import complete: ${rows} row${rows !== 1 ? 's' : ''} processed · ${pc + pu} product${(pc + pu) !== 1 ? 's' : ''} (+${pc} new / ~${pu} updated) · ${vc + vu} variant${(vc + vu) !== 1 ? 's' : ''} (+${vc} new / ~${vu} updated).`;
+      this.showBanner(banner);
+
+      // Invalidate list cache so the freshly upserted rows show up
+      try { this.productService.invalidateProductCache(); } catch { /* ignore */ }
+      this.page.set(0);
+      await this.fetchPage({
+        page: 0,
+        size: this.size(),
+        query: this.debouncedSearchQuery(),
+        storeIds: this.selectedStoreIds(),
+        statuses: this.selectedStatuses(),
+        mode: this.mode(),
+        storeId: this.storeId(),
+      });
+    } catch (err: any) {
+      const msg = err?.message ? String(err.message) : 'Upload failed unexpectedly.';
+      this.uploadError.set(msg);
+    } finally {
+      this.uploadLoading.set(false);
+      if (this.uploadProgress() > 0 && this.uploadProgress() < 100) this.uploadProgress.set(100);
+      if (this.uploadError()) setTimeout(() => this.uploadProgress.set(0), 1200);
+    }
   }
 }

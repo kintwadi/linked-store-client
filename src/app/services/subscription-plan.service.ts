@@ -53,6 +53,69 @@ export interface StoreSubscriptionState {
   error?: string | null;
 }
 
+export interface AdminPlanFeatureDto {
+  id?: string | null;
+  label: string;
+  included: boolean;
+  highlight: boolean;
+  displayOrder: number;
+}
+
+export interface AdminPlanDto {
+  id: string;
+  planCode: 'PRO' | 'CUSTOM' | string;
+  displayName: string;
+  description?: string | null;
+  monthlyPriceCents?: number | null;
+  annualPriceCents?: number | null;
+  annualDiscountPercent?: number | null;
+  billingLabelMonthly?: string | null;
+  billingLabelAnnual?: string | null;
+  currency?: string | null;
+  trialDays?: number | null;
+  monthlyOrderLimit?: number | null;
+  maxConnectedStores?: number | null;
+  sortOrder?: number | null;
+  badges?: string[] | null;
+  contactSalesEnabled?: boolean | null;
+  contactSalesEmail?: string | null;
+  contactSalesUrl?: string | null;
+  stripePriceIdLegacy?: string | null;
+  isActive?: boolean | null;
+  features: AdminPlanFeatureDto[];
+  createdAt?: string | null;
+  updatedAt?: string | null;
+}
+
+export interface UpsertPlanFeatureRequest {
+  id?: string | null;
+  label: string;
+  included?: boolean | null;
+  highlight?: boolean | null;
+  displayOrder: number;
+}
+
+export interface UpsertPlanRequest {
+  displayName: string;
+  description?: string | null;
+  monthlyPriceCents?: number | null;
+  annualPriceCents?: number | null;
+  annualDiscountPercent?: number | null;
+  billingLabelMonthly?: string | null;
+  billingLabelAnnual?: string | null;
+  currency?: string | null;
+  trialDays?: number | null;
+  monthlyOrderLimit?: number | null;
+  maxConnectedStores?: number | null;
+  sortOrder?: number | null;
+  badgesCsv?: string | null;
+  contactSalesEnabled?: boolean | null;
+  contactSalesEmail?: string | null;
+  contactSalesUrl?: string | null;
+  isActive?: boolean | null;
+  features: UpsertPlanFeatureRequest[];
+}
+
 export interface StoreSubscriptionCancelResult {
   storeId: string;
   canceled: boolean;
@@ -204,6 +267,45 @@ export class SubscriptionPlanService {
         ?? (typeof err?.message === 'string' ? err.message : null)
         ?? 'Could not cancel subscription. Please try again or contact support.';
       return { storeId, canceled: false, error };
+    }
+  }
+
+  async getAdminPlans(): Promise<AdminPlanDto[]> {
+    try {
+      const res = await firstValueFrom(
+        this.http.get<AdminPlanDto[]>('/api/admin/subscription-plans')
+      );
+      return Array.isArray(res) ? res : [];
+    } catch (err: any) {
+      const message =
+        (typeof err?.error?.message === 'string' ? err.error.message : null)
+        ?? (typeof err?.error === 'string' ? err.error : null)
+        ?? (typeof err?.message === 'string' ? err.message : null)
+        ?? 'Could not load subscription plans.';
+      throw new Error(message);
+    }
+  }
+
+  async upsertAdminPlan(
+    planCode: 'PRO' | 'CUSTOM' | string,
+    body: UpsertPlanRequest
+  ): Promise<AdminPlanDto> {
+    try {
+      const res = await firstValueFrom(
+        this.http.put<AdminPlanDto>(
+          `/api/admin/subscription-plans/${encodeURIComponent(planCode)}`,
+          body
+        )
+      );
+      return res as AdminPlanDto;
+    } catch (err: any) {
+      const message =
+        (typeof err?.error?.message === 'string' ? err.error.message : null)
+        ?? (typeof err?.error?.error === 'string' ? err.error.error : null)
+        ?? (typeof err?.error === 'string' ? err.error : null)
+        ?? (typeof err?.message === 'string' ? err.message : null)
+        ?? 'Could not save subscription plan.';
+      throw new Error(message);
     }
   }
 }

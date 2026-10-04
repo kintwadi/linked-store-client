@@ -56,18 +56,15 @@ import { AuthService } from '../../services/auth.service';
       padding: 20px;
     }
 
-    .navbar {
+    .brand-wrap {
       width: 100%;
       max-width: 1200px;
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      padding: 20px 0;
-      margin-bottom: 20px;
+      padding: 16px 0 10px 0;
+      margin-bottom: 12px;
     }
 
-    .logo {
-      display: flex;
+    .brand {
+      display: inline-flex;
       align-items: center;
       gap: 12px;
       color: #111827;
@@ -77,7 +74,7 @@ import { AuthService } from '../../services/auth.service';
       cursor: pointer;
       user-select: none;
     }
-    .logo-icon {
+    .brand-icon {
       width: 32px;
       height: 32px;
       background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%);
@@ -87,28 +84,12 @@ import { AuthService } from '../../services/auth.service';
       justify-content: center;
       box-shadow: 0 4px 12px rgba(79, 70, 229, 0.3);
     }
-    .logo-icon::after {
+    .brand-icon::after {
       content: '';
       width: 16px;
       height: 16px;
       background: white;
       border-radius: 50%;
-    }
-
-    .nav-link {
-      color: #4b5563;
-      text-decoration: none;
-      font-weight: 500;
-      font-size: 16px;
-      transition: all 0.2s;
-      padding: 8px 16px;
-      border-radius: 8px;
-      cursor: pointer;
-      user-select: none;
-    }
-    .nav-link:hover {
-      color: #4f46e5;
-      background: #eef2ff;
     }
 
     .login-container {
@@ -351,12 +332,12 @@ import { AuthService } from '../../services/auth.service';
     <div class="bg-orb orb-3" aria-hidden="true"></div>
 
     <div class="page">
-      <nav class="navbar">
-        <a class="logo" routerLink="/">
-          <span class="logo-icon" aria-hidden="true"></span>
+      <div class="brand-wrap">
+        <a class="brand" routerLink="/">
+          <span class="brand-icon" aria-hidden="true"></span>
           Linked-Store
         </a>
-      </nav>
+      </div>
 
       <div class="login-container">
         <button type="button" class="back-link" (click)="goHome()">
