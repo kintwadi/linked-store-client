@@ -11,6 +11,13 @@ import {
   SubscriptionCheckoutResult,
   StoreSubscriptionState,
 } from '../../services/subscription-plan.service';
+import {
+  resolveApiBase,
+  resolveApiBasePublic,
+  resolvePublicOrigin,
+  PROD_FRONTEND_HOSTNAME,
+  PROD_BACKEND_ORIGIN,
+} from '../../shared/utils/origins.helper';
 
 type StoreRow = any & {
   _onboardingUrl?: string | null;
@@ -67,48 +74,7 @@ const COUNTRY_OPTIONS: readonly { code: string; label: string; currency: string 
   { code: 'LI', label: 'Liechtenstein',                   currency: 'CHF' },
 ];
 
-const DEFAULT_PUBLIC_ORIGIN = 'https://linked-store.app';
-
-function resolvePublicOrigin(): string {
-  if (typeof window === 'undefined') return DEFAULT_PUBLIC_ORIGIN;
-  if (window.__FRONTEND_PUBLIC_ORIGIN__) {
-    try {
-      return new URL(window.__FRONTEND_PUBLIC_ORIGIN__).origin;
-    } catch {
-      return window.__FRONTEND_PUBLIC_ORIGIN__.replace(/\/+$/, '');
-    }
-  }
-  if (
-    window.location?.hostname &&
-    !['localhost', '127.0.0.1', '::1', ''].includes(window.location.hostname)
-  ) {
-    return window.location.origin;
-  }
-  return DEFAULT_PUBLIC_ORIGIN;
-}
-
-function resolveApiBase(): string {
-  if (typeof window === 'undefined' || !window.location?.hostname) return '/api';
-  const host = window.location.hostname;
-  if (['localhost', '127.0.0.1', '::1', ''].includes(host)) return '/api';
-  const override = window.__API_BASE_ORIGIN__;
-  if (override) {
-    try {
-      const u = new URL(override);
-      return `${u.origin.replace(/\/+$/, '')}/api`;
-    } catch {
-      return `${override.replace(/\/+$/, '')}/api`;
-    }
-  }
-  return `${window.location.protocol}//${host}:8080/api`;
-}
-
-declare global {
-  interface Window {
-    __FRONTEND_PUBLIC_ORIGIN__?: string;
-    __API_BASE_ORIGIN__?: string;
-  }
-}
+const DEFAULT_PUBLIC_ORIGIN = 'https://dinretail.com';
 
 function guessCountryCode(store: any): string | null {
   const knowns: Array<[RegExp, string]> = [

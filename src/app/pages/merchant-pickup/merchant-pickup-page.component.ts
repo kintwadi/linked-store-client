@@ -4,28 +4,12 @@ import { RouterLink } from '@angular/router';
 import { HttpClient } from '@angular/common/http';
 import { firstValueFrom } from 'rxjs';
 import { ProductService } from '../../services/product.service';
-
-function resolveApiBase(): string {
-  if (typeof window === 'undefined' || !window.location?.hostname) return '/api';
-  const host = window.location.hostname;
-  if (['localhost', '127.0.0.1', '::1', ''].includes(host)) return '/api';
-  const override = window.__API_BASE_ORIGIN__;
-  if (override) {
-    try {
-      const u = new URL(override);
-      return `${u.origin.replace(/\/+$/, '')}/api`;
-    } catch {
-      return `${override.replace(/\/+$/, '')}/api`;
-    }
-  }
-  return `${window.location.protocol}//${host}:8080/api`;
-}
-
-declare global {
-  interface Window {
-    __API_BASE_ORIGIN__?: string;
-  }
-}
+import {
+  resolveApiBase,
+  resolveApiBasePublic,
+  PROD_FRONTEND_HOSTNAME,
+  PROD_BACKEND_ORIGIN,
+} from '../../shared/utils/origins.helper';
 
 @Component({
   selector: 'app-merchant-pickup-page',

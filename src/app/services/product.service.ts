@@ -3,63 +3,19 @@ import { HttpClient } from '@angular/common/http';
 import { BehaviorSubject, firstValueFrom, from, Observable, of } from 'rxjs';
 import { delay, map, tap } from 'rxjs/operators';
 import { Product, SimilarProductsResult } from '../shared/models/product.model';
+import {
+  resolveApiBase,
+  resolveApiBasePublic,
+  resolvePublicOrigin,
+  PROD_FRONTEND_HOSTNAME,
+  PROD_BACKEND_ORIGIN,
+} from '../shared/utils/origins.helper';
 
 export const API_BASE_URL = new InjectionToken<string>('API_BASE_URL', {
-  factory: () => '/api',
+  factory: () => resolveApiBase(),
 });
 
-declare global {
-  interface Window {
-    __FRONTEND_PUBLIC_ORIGIN__?: string;
-    __API_BASE_ORIGIN__?: string;
-  }
-}
-
-const DEFAULT_PUBLIC_ORIGIN = 'https://linked-store.app';
-
-function resolvePublicOrigin(): string {
-  if (typeof window === 'undefined') return DEFAULT_PUBLIC_ORIGIN;
-  if (window.__FRONTEND_PUBLIC_ORIGIN__) {
-    try {
-      return new URL(window.__FRONTEND_PUBLIC_ORIGIN__).origin;
-    } catch {
-      return window.__FRONTEND_PUBLIC_ORIGIN__.replace(/\/+$/, '');
-    }
-  }
-  if (
-    window.location?.hostname &&
-    !['localhost', '127.0.0.1', '::1', ''].includes(window.location.hostname)
-  ) {
-    return window.location.origin;
-  }
-  return DEFAULT_PUBLIC_ORIGIN;
-}
-
-/**
- * Resolve the absolute REST API base URL.
- *  - When the page is loaded from localhost/127.0.0.1 → keep "/api" (uses
- *    the Angular CLI dev-server proxy to localhost:8080).
- *  - When the page is loaded from any other origin (smartphone, LAN,
- *    tunnel) → use window.__API_BASE_ORIGIN__ if set, otherwise fall back
- *    to the current page's origin on port 8080. Phones and other remote
- *    browsers cannot reach the Angular proxy; they must hit Spring
- *    directly.
- */
-function resolveApiBase(): string {
-  if (typeof window === 'undefined' || !window.location?.hostname) return '/api';
-  const host = window.location.hostname;
-  if (['localhost', '127.0.0.1', '::1', ''].includes(host)) return '/api';
-  const override = window.__API_BASE_ORIGIN__;
-  if (override) {
-    try {
-      const u = new URL(override);
-      return `${u.origin.replace(/\/+$/, '')}/api`;
-    } catch {
-      return `${override.replace(/\/+$/, '')}/api`;
-    }
-  }
-  return `${window.location.protocol}//${host}:8080/api`;
-}
+const DEFAULT_PUBLIC_ORIGIN = 'https://dinretail.com';
 
 /* ---- mock data seed (used until real backend endpoints return product data) ---- */
 

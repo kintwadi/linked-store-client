@@ -2,6 +2,13 @@ import { Injectable } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { BehaviorSubject, firstValueFrom } from 'rxjs';
 import { Router } from '@angular/router';
+import {
+  resolveApiBase,
+  resolveApiBasePublic,
+  resolvePublicOrigin,
+  PROD_FRONTEND_HOSTNAME,
+  PROD_BACKEND_ORIGIN,
+} from '../shared/utils/origins.helper';
 
 export interface AuthUser {
   userId: string;
@@ -19,12 +26,6 @@ export interface TokenPair {
   refreshExpiresAt: number;
   tokenType: string;
   user: AuthUser;
-}
-
-declare global {
-  interface Window {
-    __API_BASE_ORIGIN__?: string;
-  }
 }
 
 const ACCESS_TOKEN_KEY = 'ls.access_token';
@@ -49,20 +50,19 @@ export class AuthService {
     }
   }
 
+  /** Public helper — delegates to the shared origins helper. */
+  resolveApiBasePublic(): string {
+    return resolveApiBasePublic();
+  }
+
+  /** Public helper — delegates to the shared origins helper. */
+  resolvePublicOrigin(): string {
+    return resolvePublicOrigin();
+  }
+
+  /** Keep as private alias to avoid changing every call site inside this service. */
   private resolveApiBase(): string {
-    if (typeof window === 'undefined' || !window.location?.hostname) return '/api';
-    const host = window.location.hostname;
-    if (['localhost', '127.0.0.1', '::1', ''].includes(host)) return '/api';
-    const override = window.__API_BASE_ORIGIN__;
-    if (override) {
-      try {
-        const u = new URL(override);
-        return `${u.origin.replace(/\/+$/, '')}/api`;
-      } catch {
-        return `${override.replace(/\/+$/, '')}/api`;
-      }
-    }
-    return `${window.location.protocol}//${host}:8080/api`;
+    return resolveApiBase();
   }
 
   private clearStorage(): void {
@@ -182,9 +182,5 @@ export class AuthService {
       return;
     }
     void this.router.navigate(['/']);
-  }
-
-  resolveApiBasePublic(): string {
-    return this.resolveApiBase();
   }
 }

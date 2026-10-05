@@ -12,17 +12,28 @@
   </head>
   <body>
     <script>
-      // Override the public origin that is encoded into the QR code.
-      // Use the REAL WiFi / LAN adapter IP of this PC (NOT VMware/VMnet virtual adapters).
-      // Your PC's current WiFi IPv4 is 192.168.178.114 on subnet 192.168.178.0/24.
-      //  - 192.168.137.1 was a VMware VMnet8 host-only adapter — unreachable from phones.
-      window.__FRONTEND_PUBLIC_ORIGIN__ = 'http://192.168.178.114:4200';
-
-      // Override the REST API origin for smartphones / remote browsers.
-      // The Angular dev proxy (/api → localhost:8080) only works when loading
-      // the page from localhost:4200. Any other client (phone, different PC)
-      // must hit the Spring backend directly at its LAN IP + port.
-      window.__API_BASE_ORIGIN__ = 'http://192.168.178.114:8080';
+      // ------- PRODUCTION DEFAULT -------
+      // When the page is served from dinretail.com the shared origins helper
+      // (shared/utils/origins.helper.ts) will automatically:
+      //   • Use https://vicinity24api.com as the backend origin for ALL
+      //     REST calls (/api/**, /products/**).
+      //   • Use https://dinretail.com as the public origin encoded into
+      //     QR codes / email links.
+      // You do NOT need to set the window overrides below in production.
+      //
+      // ------- LOCAL / LAN / PHONE TESTING -------
+      // Only uncomment / adapt these two variables when:
+      //   * you are testing from a smartphone on your WiFi LAN (the phone
+      //     cannot reach localhost:8080 / the Angular CLI dev proxy), or
+      //   * your PC's WiFi adapter IP is NOT the default guessed below.
+      //
+      // 1. QR codes must point to a URL reachable by the scanner's browser
+      //    (usually your PC's WiFi LAN IPv4, NOT localhost).
+      // window.__FRONTEND_PUBLIC_ORIGIN__ = 'http://192.168.178.114:4200';
+      //
+      // 2. The Angular CLI proxy only works from localhost. Remote browsers
+      //    (phone, tablet, another PC) need a direct backend URL.
+      // window.__API_BASE_ORIGIN__ = 'http://192.168.178.114:8080';
     </script>
     <app-root></app-root>
   </body>
