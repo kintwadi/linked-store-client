@@ -12,28 +12,47 @@
   </head>
   <body>
     <script>
-      // ------- PRODUCTION DEFAULT -------
-      // When the page is served from dinretail.com the shared origins helper
-      // (shared/utils/origins.helper.ts) will automatically:
-      //   • Use https://vicinity24api.com as the backend origin for ALL
-      //     REST calls (/api/**, /products/**).
-      //   • Use https://dinretail.com as the public origin encoded into
-      //     QR codes / email links.
-      // You do NOT need to set the window overrides below in production.
+      // ====================================================================
+      //  PRODUCTION DEFAULT — Render with custom domains:
+      //    • Frontend public URL  = https://dinretail.com  (also www.)
+      //    • Backend REST API     = https://vicinity24api.com
       //
-      // ------- LOCAL / LAN / PHONE TESTING -------
-      // Only uncomment / adapt these two variables when:
-      //   * you are testing from a smartphone on your WiFi LAN (the phone
-      //     cannot reach localhost:8080 / the Angular CLI dev proxy), or
-      //   * your PC's WiFi adapter IP is NOT the default guessed below.
+      //  The origins helper (shared/utils/origins.helper.ts) already
+      //  picks these exact values whenever the page host resolves to
+      //  `dinretail.com` or `www.dinretail.com`, so you don't need to
+      //  uncomment anything on Render.
       //
-      // 1. QR codes must point to a URL reachable by the scanner's browser
-      //    (usually your PC's WiFi LAN IPv4, NOT localhost).
+      //  DURING DEPLOYMENT the nginx entrypoint (docker/entrypoint.sh)
+      //  injects server-side variables below by substituting two
+      //  placeholder tokens (__NGINX_API_BASE_ORIGIN__ and
+      //  __NGINX_FRONTEND_PUBLIC_ORIGIN__) with the values it received
+      //  via the runtime env vars API_PROXY_URL and FRONTEND_PUBLIC_ORIGIN.
+      //  That means API_PROXY_URL becomes the single source of truth
+      //  both for the nginx /api proxy target AND for Angular's
+      //  resolveApiBase() — no mismatches possible.
+      // ====================================================================
+      (function () {
+        // ---- SERVER-SIDE INJECTION (nginx) — leave in place ----
+        var INJECTED_API = '__NGINX_API_BASE_ORIGIN__';
+        var INJECTED_PUB = '__NGINX_FRONTEND_PUBLIC_ORIGIN__';
+        var injectedApi = (INJECTED_API && INJECTED_API.indexOf('__NGINX_') !== 0) ? INJECTED_API : null;
+        var injectedPub = (INJECTED_PUB && INJECTED_PUB.indexOf('__NGINX_') !== 0) ? INJECTED_PUB : null;
+        if (injectedApi && typeof window.__API_BASE_ORIGIN__ === 'undefined') {
+          window.__API_BASE_ORIGIN__ = injectedApi;
+        }
+        if (injectedPub && typeof window.__FRONTEND_PUBLIC_ORIGIN__ === 'undefined') {
+          window.__FRONTEND_PUBLIC_ORIGIN__ = injectedPub;
+        }
+      })();
+
+      // ====================================================================
+      //  LOCAL / LAN / PHONE TESTING — only touch below this block if you
+      //  are testing from a smartphone on your WiFi LAN.
+      //  When uncommented these take precedence over both (a) nginx
+      //  injection and (b) the hostname-based default (origins helper).
+      // ====================================================================
       // window.__FRONTEND_PUBLIC_ORIGIN__ = 'http://192.168.178.114:4200';
-      //
-      // 2. The Angular CLI proxy only works from localhost. Remote browsers
-      //    (phone, tablet, another PC) need a direct backend URL.
-      // window.__API_BASE_ORIGIN__ = 'http://192.168.178.114:8080';
+      // window.__API_BASE_ORIGIN__       = 'http://192.168.178.114:8080';
     </script>
     <app-root></app-root>
   </body>

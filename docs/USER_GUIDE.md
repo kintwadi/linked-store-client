@@ -174,18 +174,32 @@ into the nginx config just before nginx starts.
 # build
 docker build -t linked-store-frontend frontend
 
-# run with proxy to the backend (replace URL with your API)
+# run with proxy to the backend (replace URL with your API; in Render
+# production with custom domains set this to https://vicinity24api.com)
 docker run --rm -it -p 8081:80 \
-  -e API_PROXY_URL=https://your-linked-store-api.onrender.com \
+  -e API_PROXY_URL=https://vicinity24api.com \
   linked-store-frontend
 ```
 
-### One-click Render deploy
+### Render deploy (Dashboard, 2-separate-repo setup)
 
-Push the repo, then open the root `render.yaml` in Render's Blueprints UI
-— the service `linked-store-frontend` is created for you, and its
-`API_PROXY_URL` env var is automatically wired to the sibling
-`linked-store-api` service URL.
+Backend and frontend are deployed as **two independent Render Web
+Services** plus one Postgres database (no shared Blueprint YAML).
+
+1. Deploy the backend first — it exposes the API at
+   `https://vicinity24api.com` after Custom Domain provisioning. (Follow
+   the steps in `backend/README.md §9.2`.)
+2. Deploy the frontend — Dashboard → **Web Services** → **New Web Service**
+   → connect `kintwadi/linked-store-client.git`, branch = `main`.
+   Runtime = **Docker**, Dockerfile = `./Dockerfile`, plan = Starter,
+   Health Check Path = `/`.
+3. Frontend env vars (Environment tab on the service):
+   - `API_PROXY_URL=https://vicinity24api.com`
+   (Temporary fallback while Custom Domain DNS/SSL is still provisioning:
+    paste the backend service's `*.onrender.com` URL instead.)
+4. Settings → **Custom Domains**: add `dinretail.com` + `www.dinretail.com`.
+   Follow Render's DNS instructions for your host; wait for the green
+   "Active → Connected" badge and TLS cert issuance before testing.
 
 Build artefact size ≈ 20 MB (compressed) per deploy.
 
