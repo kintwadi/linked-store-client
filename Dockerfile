@@ -3,7 +3,17 @@
 # ============================================================
 #  FRONTEND (Angular 18) — Multi-Stage Dockerfile
 #  Build : Node 20 Alpine + @angular/cli (production build)
-#  Run   : nginx:stable-alpine with /api + /products reverse proxy
+#  Run   : nginx:1.27-alpine with /api + /products reverse proxy
+#
+#  EXPLICIT / NO-MAGIC DEPLOY MODE (requested by operator):
+#
+#  There are NO ENV defaults baked into this Dockerfile for
+#  API_PROXY_URL or FRONTEND_PUBLIC_ORIGIN. Every variable the
+#  application needs at runtime MUST be set in the Render
+#  Dashboard → linked-store-frontend → Environment.
+#
+#  If any required var is missing the entrypoint aborts with a
+#  clear error listing exactly what is missing.
 # ============================================================
 
 # ---------- Stage 1: Angular Prod Build ----------
@@ -51,8 +61,11 @@ COPY docker/entrypoint.sh   /docker-entrypoint.d/99-linked-store.sh
 RUN chmod 0755 /docker-entrypoint.d/99-linked-store.sh
 COPY --from=builder /src/dist/linked-store-frontend/browser /usr/share/nginx/html
 
-# Document env vars the entrypoint / config consume
-ENV API_PROXY_URL="http://127.0.0.1:8080"
+# ----------------------------------------------------------------
+#  NO DEFAULT ENV VALUES.
+#  The operator must set every required value in the Render UI.
+#  Entrypoint fails fast with clear help text if anything is missing.
+# ----------------------------------------------------------------
 
 EXPOSE 80
 
