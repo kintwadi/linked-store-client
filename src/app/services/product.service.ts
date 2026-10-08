@@ -7,15 +7,11 @@ import {
   resolveApiBase,
   resolveApiBasePublic,
   resolvePublicOrigin,
-  PROD_FRONTEND_HOSTNAME,
-  PROD_BACKEND_ORIGIN,
 } from '../shared/utils/origins.helper';
 
 export const API_BASE_URL = new InjectionToken<string>('API_BASE_URL', {
   factory: () => resolveApiBase(),
 });
-
-const DEFAULT_PUBLIC_ORIGIN = 'https://dinretail.com';
 
 /* ---- mock data seed (used until real backend endpoints return product data) ---- */
 

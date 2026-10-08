@@ -2,38 +2,52 @@
 //  origins.helper.ts
 //  Shared helpers for resolving:
 //    1. API_BASE_ORIGIN — where the backend REST API lives
-//       (backend = vicinity24api.com in production, localhost:8080 in dev)
+//       (absolute origin only needed when the Angular dev proxy / nginx
+//       reverse proxy cannot reach the backend — see PRIORITY list below)
 //    2. FRONTEND_PUBLIC_ORIGIN — the customer-facing URL (for QR codes,
 //       email links, return URLs).
-//       (frontend = dinretail.com in production, localhost:4200 in dev)
+//
+//  100% PORTABLE DEPLOYMENT (no hardcoded hostnames in code):
+//
+//  The bundled Angular app is deliberately hostname-agnostic. It can be
+//  served from ANY origin — dinretail.com, any custom domain, any
+//  *.onrender.com staging hostname, a LAN IP, or localhost — WITHOUT
+//  changing a single line of source code or environment in the browser.
+//
+//  How the backend is reached in each deployment:
+//
+//    Dev server (ng serve localhost:4200):
+//      proxy.conf.json → /api forwarded to http://localhost:8080
+//      → helper returns empty-string origin → relative "/api" URL
+//
+//    Render / Docker / any nginx reverse proxy (PRODUCTION):
+//      nginx config proxies /api, /products, /stream, /stripe → backend
+//      origin set in API_PROXY_URL container env var (set by operator in
+//      Render Environment panel). The browser only ever talks to the
+//      SAME ORIGIN it loaded the SPA from. → helper returns "" →
+//      relative "/api" URL, perfectly portable across any domain.
+//
+//    Smartphone / remote browser over a LAN IP (192.168.x, 10.x, 172.16-31.x):
+//      The Angular dev server proxy does NOT listen on the public LAN
+//      adapter, so a relative /api URL from a phone visiting
+//      192.168.1.5:4200 cannot reach localhost dev proxy on the laptop.
+//      In this case ONLY we fall back to absolute same-host:8080 origin
+//      where the Spring Boot backend listens publicly on 0.0.0.0:8080.
 //
 //  SOURCE OF TRUTH ORDER (highest priority first):
-//    1. Window overrides injected by nginx at render time on the server
-//       (window.__API_BASE_ORIGIN__ / __FRONTEND_PUBLIC_ORIGIN__).
-//    2. Explicit host match against the KNOWN PRODUCTION hostnames below.
-//    3. Local / LAN / staging hostname heuristics.
+//    1. Window overrides (window.__API_BASE_ORIGIN__ /
+//       __FRONTEND_PUBLIC_ORIGIN__). Kept for future compatibility —
+//       any operator that wants to supply absolute origins server-side
+//       (via a config endpoint, index.html preprocessing, etc.) can
+//       always set these two globals and they win.
+//    2. LAN-IP heuristic → absolute host:8080 (dev server proxy unreachable
+//       case described above).
+//    3. Default (everything else: localhost, www.ANYTHING.com, any
+//       *.onrender.com staging, any custom domain, any K8s/Vercel/Cloudflare
+//       Pages origin): EMPTY ORIGIN → relative /api path. The reverse
+//       proxy / dev proxy is responsible for forwarding to the real
+//       backend. This is THE portable behaviour.
 // =========================================================================
-
-export const PROD_FRONTEND_HOSTNAME = 'dinretail.com';
-export const PROD_FRONTEND_WWW_HOSTNAME = `www.${PROD_FRONTEND_HOSTNAME}`;
-export const PROD_BACKEND_HOSTNAME = 'vicinity24api.com';
-export const PROD_BACKEND_WWW_HOSTNAME = `www.${PROD_BACKEND_HOSTNAME}`;
-export const PROD_BACKEND_ORIGIN = `https://${PROD_BACKEND_HOSTNAME}`;
-export const PROD_BACKEND_WWW_ORIGIN = `https://${PROD_BACKEND_WWW_HOSTNAME}`;
-export const PROD_FRONTEND_ORIGIN = `https://${PROD_FRONTEND_HOSTNAME}`;
-export const PROD_FRONTEND_WWW_ORIGIN = `https://${PROD_FRONTEND_WWW_HOSTNAME}`;
-
-/** Known frontend hostnames in the live Render production deploy. */
-const PROD_FRONTEND_HOSTNAMES: ReadonlySet<string> = new Set([
-  PROD_FRONTEND_HOSTNAME,
-  PROD_FRONTEND_WWW_HOSTNAME,
-]);
-
-/** Known backend hostnames in the live Render production deploy. */
-const PROD_BACKEND_HOSTNAMES: ReadonlySet<string> = new Set([
-  PROD_BACKEND_HOSTNAME,
-  PROD_BACKEND_WWW_HOSTNAME,
-]);
 
 declare global {
   interface Window {
@@ -50,25 +64,26 @@ const LOCAL_HOSTNAMES: ReadonlySet<string> = new Set([
 ]);
 
 /**
- * True if the page is being served from a developer machine or a LAN IP
- * (i.e. NOT the production dinretail.com / vicinity24api.com sites).
+ * True if the page is being served from a developer machine hostname
+ * (localhost/loopback) OR from a private LAN adapter IP / VPN host where
+ * the Angular dev server proxy cannot be reached by a visiting browser.
+ *
+ * This function deliberately does NOT reference any production domain
+ * names. Any hostname that is not explicitly loopback/LAN-private is
+ * treated as "behind a reverse proxy", which is the portable default.
  */
 export function isLocalHostname(host: string | undefined | null): boolean {
   if (!host) return true;
   if (LOCAL_HOSTNAMES.has(host)) return true;
-  if (PROD_FRONTEND_HOSTNAMES.has(host) || PROD_BACKEND_HOSTNAMES.has(host)) {
-    return false;
-  }
   // RFC1918 private IPv4 ranges / Docker bridge / Tailscale ULA etc.
   if (
     host.startsWith('192.168.') ||
     host.startsWith('10.') ||
     /^172\.(1[6-9]|2\d|3[01])\./.test(host) ||
-    // Render / fly.io / onrender.com staging subdomains are "not prod"
-    host.endsWith('.onrender.com') ||
-    host.endsWith('.trycloudflare.com') ||
-    host.endsWith('.ngrok-free.app') ||
-    host.endsWith('.ngrok.io')
+    // IPv6 loopback / ULA / Docker IPv6.
+    host.startsWith('::') ||
+    host.startsWith('fc') ||
+    host.startsWith('fd')
   ) {
     return true;
   }
@@ -89,18 +104,20 @@ function normalizeOrigin(raw: string | undefined | null): string | null {
  * Absolute ORIGIN of the backend API (scheme + host, NO path suffix).
  * Callers append "/api" themselves or use resolveApiBaseWithPath().
  *
- * Priority order:
- *   1. window.__API_BASE_ORIGIN__ — injected by nginx entrypoint at render
- *      time from the API_PROXY_URL env var. Single source of truth in prod.
- *   2. production frontend hostnames (dinretail.com / www.dinretail.com)
- *      → PROD_BACKEND_ORIGIN = https://vicinity24api.com
- *   3. production backend hostnames (vicinity24api.com / www. — rare case,
- *      frontend served from backend host) → PROD_BACKEND_ORIGIN
- *   4. local hostnames → "" (empty) so that relative URLs "/api" work via
- *      the Angular dev proxy OR the nginx Docker proxy in Render.
- *   5. anything else (LAN adapter IPs, VM guest browsers, VPN clients) →
- *      same scheme/host but with port 8080 appended, because the Angular
- *      dev proxy is unreachable from those clients.
+ * Priority order — fully portable across ANY host the SPA runs on:
+ *
+ *   1. window.__API_BASE_ORIGIN__ override (if set by the operator).
+ *
+ *   2. LAN / private hostnames (smartphone visiting 192.168.x.y:4200,
+ *      VM guest, Tailscale/VPN clients) → same host but port 8080,
+ *      because the Angular dev proxy (proxy.conf.json) only listens on
+ *      loopback and is unreachable from remote clients.
+ *
+ *   3. EVERYTHING ELSE (localhost loopback, *.onrender.com staging,
+ *      ANY custom domain dinretail.com / anything.example.com / …) →
+ *      empty string ("") so browser uses relative "/api" URL, perfectly
+ *      portable, relies on Angular dev proxy (localhost) / nginx proxy
+ *      (production Render / any reverse proxy) to reach the backend.
  */
 export function resolveApiBaseOrigin(): string {
   if (typeof window === 'undefined' || !window.location?.hostname) return '';
@@ -109,34 +126,29 @@ export function resolveApiBaseOrigin(): string {
   const override = normalizeOrigin(window.__API_BASE_ORIGIN__);
   if (override) return override;
 
-  if (
-    PROD_FRONTEND_HOSTNAMES.has(host) ||
-    PROD_BACKEND_HOSTNAMES.has(host)
-  ) {
-    return PROD_BACKEND_ORIGIN;
-  }
-
   if (isLocalHostname(host)) {
-    return '';
+    if (LOCAL_HOSTNAMES.has(host)) {
+      // Local loopback → dev proxy works, use relative URL.
+      return '';
+    }
+    // LAN adapter IP / VPN host → dev proxy is unreachable.
+    // Fall back to same host but port 8080 (Spring default).
+    return `${window.location.protocol}//${host}:8080`;
   }
 
-  // Smartphone / remote browser on a LAN adapter IP or any other origin
-  // where the Angular dev-server proxy cannot reach. Fall back to same host
-  // + port 8080 (the Spring Boot app listens on all interfaces by default).
-  return `${window.location.protocol}//${host}:8080`;
+  // Default portable behaviour: same-origin reverse proxy.
+  return '';
 }
 
 /**
  * Full base URL path for backend REST calls — always ends in "/api".
  *
- * Examples:
- *   - ng serve on localhost:4200 → "/api" (dev proxy resolves to :8080)
- *   - Render PROD on dinretail.com or www.dinretail.com
- *                              → "https://vicinity24api.com/api"
- *   - smartphone on 192.168.178.114:4200
- *                              → "http://192.168.178.114:8080/api"
- *       (provided window.__API_BASE_ORIGIN__ was not already set earlier
- *        by the nginx entrypoint injection or index.html uncomment.)
+ * Examples (all resolve correctly without any hostname in source code):
+ *
+ *   ng serve on localhost:4200         → "/api" (dev proxy)
+ *   production on ANY custom domain    → "/api" (nginx proxy forwards)
+ *   staging on frontend.onrender.com   → "/api" (nginx proxy forwards)
+ *   phone on 192.168.1.5:4200          → "http://192.168.1.5:8080/api"
  */
 export function resolveApiBase(): string {
   const origin = resolveApiBaseOrigin();
@@ -147,37 +159,32 @@ export function resolveApiBase(): string {
  * Public reachable origin of the Angular frontend — for QR codes,
  * email magic links, post-Connect-onboarding returns, etc.
  *
- * Priority order:
- *   1. window.__FRONTEND_PUBLIC_ORIGIN__ override (nginx-injected at
- *      render time from the FRONTEND_PUBLIC_ORIGIN env var).
- *   2. production frontend hostnames → PROD_FRONTEND_ORIGIN
- *   3. production backend hostnames → still serve PROD_FRONTEND_ORIGIN
- *      because QR links need to point the customer at dinretail.com even
- *      if the current page is being debugged from vicinity24api.com.
- *   4. any non-local browser → window.location.origin
- *   5. local dev → hard-coded PROD_FRONTEND_ORIGIN placeholder so QR
- *      build still returns a plausible URL.
+ * Priority order (100% portable / no production hostnames in code):
+ *
+ *   1. window.__FRONTEND_PUBLIC_ORIGIN__ override (if the operator
+ *      injects one — guaranteed correct across load-balanced hosts).
+ *
+ *   2. Any browser environment: window.location.origin. This is the
+ *      actual origin the customer typed into their browser address bar
+ *      — so it automatically matches dinretail.com, staging.onrender.com,
+ *      a LAN IP, a custom vanity domain, etc. without code changes.
+ *
+ *   3. Pure SSR / Node build without a browser (rare fallback):
+ *      empty string so the caller can handle it or throw.
  */
 export function resolvePublicOrigin(): string {
-  if (typeof window === 'undefined') return PROD_FRONTEND_ORIGIN;
-
-  const override = normalizeOrigin(window.__FRONTEND_PUBLIC_ORIGIN__);
+  const override = normalizeOrigin(window?.__FRONTEND_PUBLIC_ORIGIN__);
   if (override) return override;
 
-  const host = window.location.hostname;
   if (
-    PROD_FRONTEND_HOSTNAMES.has(host) ||
-    PROD_BACKEND_HOSTNAMES.has(host)
+    typeof window !== 'undefined' &&
+    typeof window.location?.origin === 'string'
   ) {
-    return PROD_FRONTEND_ORIGIN;
-  }
-
-  if (window.location?.hostname && !isLocalHostname(host)) {
     return window.location.origin.replace(/\/+$/, '');
   }
 
-  // Last fallback for pure localhost.
-  return PROD_FRONTEND_ORIGIN;
+  // No browser context (build-time / SSR) — caller must decide fallback.
+  return '';
 }
 
 /** Same as resolveApiBase() — used by legacy pages that alias the name. */

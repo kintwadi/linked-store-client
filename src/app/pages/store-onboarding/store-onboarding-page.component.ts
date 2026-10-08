@@ -15,8 +15,6 @@ import {
   resolveApiBase,
   resolveApiBasePublic,
   resolvePublicOrigin,
-  PROD_FRONTEND_HOSTNAME,
-  PROD_BACKEND_ORIGIN,
 } from '../../shared/utils/origins.helper';
 
 type StoreRow = any & {
@@ -73,8 +71,6 @@ const COUNTRY_OPTIONS: readonly { code: string; label: string; currency: string 
   { code: 'IS', label: 'Iceland',                         currency: 'ISK' },
   { code: 'LI', label: 'Liechtenstein',                   currency: 'CHF' },
 ];
-
-const DEFAULT_PUBLIC_ORIGIN = 'https://dinretail.com';
 
 function guessCountryCode(store: any): string | null {
   const knowns: Array<[RegExp, string]> = [

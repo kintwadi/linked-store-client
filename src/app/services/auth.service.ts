@@ -6,8 +6,6 @@ import {
   resolveApiBase,
   resolveApiBasePublic,
   resolvePublicOrigin,
-  PROD_FRONTEND_HOSTNAME,
-  PROD_BACKEND_ORIGIN,
 } from '../shared/utils/origins.helper';
 
 export interface AuthUser {
