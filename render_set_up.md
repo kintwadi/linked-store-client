@@ -175,26 +175,26 @@ A complete **example `.env` copy/paste reference** is kept locally in
 > status dot, you'll see a URL like `https://<service-slug>.onrender.com`.
 > This is the hostname you must point your DNS to. The frontend service
 > used in this guide is named so its URL is
-> **`https://vicinity-frontend.onrender.com`** (verify it loads the SPA
+> **`https://dinretail-client.onrender.com`** (verify it loads the SPA
 > with title "Vicinity - AI-Powered Local Marketplace" before doing DNS).
 > If you have multiple Render services, make sure you attach the custom
 > domains to THIS one — pointing DNS at the wrong service is the #1 cause
 > of a plain-text "Not Found" page.
 
-1. In Render → your frontend service (`vicinity-frontend`) → **Settings → Custom Domains**.
+1. In Render → your frontend service (`dinretail-client`) → **Settings → Custom Domains**.
 2. Add **both** domains (www + apex):
    - `dinretail.com`
    - `www.dinretail.com`
 3. Render shows two DNS records to add at your DNS provider
    (Cloudflare / Hostinger / etc.). Use the **exact values Render gives
-   you** for this service. For the `vicinity-frontend` service they are:
+   you** for this service. For the `dinretail-client` service they are:
 
    | Host record | Type | Value |
    | --- | --- | --- |
-   | `dinretail.com` (apex) | **ALIAS / ANAME** (preferred) **or A** | `vicinity-frontend.onrender.com` (or the A-record IP Render shows, currently `216.24.57.1`) |
-   | `www.dinretail.com` | **CNAME** | `vicinity-frontend.onrender.com` |
+   | `dinretail.com` (apex) | **ALIAS / ANAME** (preferred) **or A** | `dinretail-client.onrender.com` (or the A-record IP Render shows, currently `216.24.57.1`) |
+   | `www.dinretail.com` | **CNAME** | `dinretail-client.onrender.com` |
 
-   ⚠️ The `www` CNAME **must** target `vicinity-frontend.onrender.com`.
+   ⚠️ The `www` CNAME **must** target `dinretail-client.onrender.com`.
    Pointing it at a different Render service (e.g. `vicinity-client.onrender.com`)
    makes Render's edge return a plain-text **`Not Found`** for
    `www.dinretail.com` because that host is not registered on the
@@ -244,9 +244,9 @@ Fix checklist:
    and show **Verified**. If either is missing, add it.
 3. At your DNS provider, confirm the records point at the **correct**
    service hostname:
-   - `www.dinretail.com` CNAME → `vicinity-frontend.onrender.com`
+   - `www.dinretail.com` CNAME → `dinretail-client.onrender.com`
      (NOT `vicinity-client.onrender.com` or any other service).
-   - `dinretail.com` apex → ALIAS/ANAME to `vicinity-frontend.onrender.com`
+   - `dinretail.com` apex → ALIAS/ANAME to `dinretail-client.onrender.com`
      (or A → `216.24.57.1`).
 4. After correcting DNS, click **Verify** again in Render and wait for
    `HTTPS Active`.
