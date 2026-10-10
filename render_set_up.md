@@ -1,55 +1,49 @@
 # Linked-Store Frontend — Render Setup Guide (Step by Step)
 
-This guide walks you through deploying the **Angular 18 + official nginx Docker** frontend on Render.com.
+This guide walks you through deploying the **Angular 18 frontend as a Render Static Site**.
 
-## Design Principles (what makes this deploy portable)
+## Design Principles
 
-- **Zero custom shell scripts** in the repo. No `docker/entrypoint.sh`, no
-  custom hacks on top of nginx.
-- **100% portable**: the same Docker image works on Render, ECS, K8s,
-  fly.io, docker-compose, a random VPS, localhost, `*.onrender.com`
-  staging, and the production custom domain `https://dinretail.com` —
-  **without recompiling**.
-- Relies only on the built-in feature shipped by every
-  `nginx:1.27-alpine` image: `/docker-entrypoint.d/20-envsubst-on-templates.sh`.
-  Any `*.template` file under `/etc/nginx/templates/` is auto-run
-  through `envsubst` and written to `/etc/nginx/conf.d/` **before nginx
-  starts**.
-- All production hostnames are resolved dynamically in the browser:
-  `resolvePublicOrigin()` returns `window.location.origin`, and API
-  requests use **relative `/api/*` URLs** that go through the same host
-  that served the SPA, then are reverse-proxied by nginx to your backend.
-  This means **zero code changes** are ever required to switch domain.
+- **Static Site deployment** (free tier supported). The Angular app is built
+  with `npm run build` and the generated `dist/linked-store-frontend/browser/`
+  directory is published as static files. **No Docker, no nginx, no reverse
+  proxy.**
+- **Build-time backend injection.** Because a static site has no reverse
+  proxy, the browser cannot use relative `/api` URLs — it must call the
+  backend directly. The backend origin is baked into the bundle at build
+  time via the `API_BASE_URL` environment variable (set in the Render Static
+  Site Environment tab). See [scripts/write-env.js](file:///c:/Users/core101/Desktop/autocode/linked_store/frontend/scripts/write-env.js).
+- **Portable across hosts.** Public-facing URLs (QR codes, Stripe Connect
+  return URLs, email links) use `window.location.origin`, so the same
+  bundle works on `dinretail.com`, `*.onrender.com` staging, or any future
+  domain.
+- **Local dev unchanged.** On localhost the app still uses relative `/api`
+  via the Angular dev proxy (`proxy.conf.json` → `127.0.0.1:8080`). Only
+  production builds get the absolute backend URL injected.
 
 ---
 
 ## 0. Prerequisites
 
-Before you start, confirm all of the following are ready:
-
 1. **Backend deployed & healthy.**
    - Repo: `kintwadi/linked-store-api` on branch `_home_dev`.
-   - Backend Render Web Service must be fully booted with **no errors**
-     and **Health Check → HTTP 200** before you deploy the frontend.
-   - Backend public origin for production: `https://vicinity24api.com`
-     (also reachable at `https://www.vicinity24api.com` once DNS is ready).
-2. **Frontend repo pushed** with the portable refactor.
+   - Backend Render Web Service fully booted, **Health Check → HTTP 200**.
+   - Backend public origin for production: `https://vicinity24api.com`.
+2. **Backend CORS whitelist includes the frontend origin.**
+   - `https://dinretail.com` and `https://www.dinretail.com` must be in the
+     backend `SecurityConfig.setAllowedOriginPatterns(...)`. (Already
+     configured.)
+3. **Frontend repo pushed** with the static-site refactor.
    - Repo: `kintwadi/linked-store-client` on branch `main`.
-   - Minimum commit: `cd80b55` or later ("feat(frontend): 100% portable
-     deploy - zero custom shell scripts").
-3. **Render account** and **GitHub connected**.
-4. **Custom domains** (production only, optional while validating):
+4. **Render account** and **GitHub connected**.
+5. **Custom domains** (production only, optional while validating):
    - Frontend: `dinretail.com`, `www.dinretail.com`
-   - Backend: `vicinity24api.com`, `www.vicinity24api.com`
-   - (You can deploy first on the free `*.onrender.com` hostnames and
-     add DNS/custom domains later — the portable app pattern will work
-     without changes.)
 
 ---
 
-## 1. Create the Render Web Service for the frontend
+## 1. Create the Render Static Site for the frontend
 
-1. Log in to Render dashboard → **New → Web Service**.
+1. Log in to Render dashboard → **New → Static Site**.
 2. In **"Connect a repository"**:
    - Pick `kintwadi/linked-store-client` (the frontend repo).
    - Click **Connect**.
@@ -57,137 +51,100 @@ Before you start, confirm all of the following are ready:
 
    | Field | Value |
    | --- | --- |
-   | **Name** | `linked-store-frontend` |
-   | **Region** | Oregon (US West) — must match your Postgres region to keep `linked-store-db` backend ↔ DB RTT low. The frontend itself is static-like, but the proxy latency to the backend still benefits from same-region deploy. |
+   | **Name** | `dinretail-client` (or any name you like) |
    | **Branch** | `main` |
-   | **Root Directory** | *(leave empty)* — repo root contains the `Dockerfile`. Do **not** set it to `frontend/`; Render auto-detects the Dockerfile at repo root. |
-   | **Runtime** | **Docker** (NOT Node, NOT Static Site). The `Dockerfile` at the repo root handles the Angular build + nginx runtime in two stages. |
-   | **Build Command** | *(leave empty — Dockerfile performs the build inside its Stage 1 `node` container, before Render runs the runtime image)* |
-   | **Start Command** | *(leave empty — stock nginx image uses its own ENTRYPOINT/CMD)* |
-   | **Instance Type** | Starter → 0.5 GB RAM is plenty (the runtime is only nginx serving ~1.2 MB of static files + a tiny reverse proxy). Upgrade only if you see OOM. |
-   | **Auto-Deploy** | Yes (`git push origin main` → auto rebuild). Turn off if you want manual-only deploys. |
+   | **Root Directory** | *(leave empty)* — repo root contains `package.json`. |
+   | **Build Command** | `npm install; npm run build` |
+   | **Publish Directory** | `dist/linked-store-frontend/browser` ⚠️ **must include `/browser`** — the Angular `application` builder outputs the SPA here, not at `dist/linked-store-frontend`. |
 
-4. **Do NOT click "Create Web Service" yet** — first set the environment variables in §2, then create.
+4. **Do NOT click "Create Static Site" yet** — first set the environment
+   variable in §2, then create.
 
 ---
 
 ## 2. Environment Variables
 
-On the **same page**, scroll down to **Environment Variables** and add the keys below **exactly as written** (do not add extra quotes in Render value fields; Render handles quoting for you, the `"..."` in this file is only shell syntax).
+On the **same page**, scroll down to **Environment Variables** and add the
+key below **exactly as written** (no extra quotes in the Render value field).
 
-### 2a. REQUIRED (1 key) — copy/paste exactly one row into Render
+### 2a. REQUIRED (1 key) — copy/paste exactly one row
 
 | Key | Value for Production | Value for Staging (*.onrender.com) |
 | --- | --- | --- |
-| **`API_PROXY_URL`** | `https://vicinity24api.com` | `https://<your-backend-onrender-host>.onrender.com` |
+| **`API_BASE_URL`** | `https://vicinity24api.com` | `https://<your-backend-onrender-host>.onrender.com` |
 
-- `API_PROXY_URL` is the **backend REST origin** (no trailing `/api`). nginx
-  in the frontend container reverse-proxies these 4 routes to it:
-  - `/api/*`        → `${API_PROXY_URL}/api/*`
-  - `/products/*`   → `${API_PROXY_URL}/products/*`
-  - `/stream/*`     → `${API_PROXY_URL}/stream/*` (SSE, no buffering, 1 h timeout)
-  - `/stripe/*`     → `${API_PROXY_URL}/stripe/*` (webhooks)
-- If you forget this key, envsubst substitutes an empty string and every
-  `/api` request returns **502 Bad Gateway** — that is the intentional
-  fail-fast signal for a misconfigured deploy.
+- `API_BASE_URL` is the **backend REST origin** (no trailing `/api`). The
+  Angular app appends `/api` to it at runtime, so the browser calls
+  `https://vicinity24api.com/api/...` directly.
+- This is a **build-time** variable: it is read by
+  [scripts/write-env.js](file:///c:/Users/core101/Desktop/autocode/linked_store/frontend/scripts/write-env.js)
+  during `npm run build` and written into
+  `src/environments/environment.prod.ts`, which is then bundled into the
+  JavaScript. **Changing it requires a re-deploy** (a new build).
+- If `API_BASE_URL` is empty/unset, the app falls back to relative `/api`
+  URLs, which will **fail** on a plain Static Site (there is no reverse
+  proxy). Always set it.
 
-### 2b. INFRASTRUCTURE DEFAULT (do NOT paste into Render UI)
-
-| Key | Default value (set automatically) |
-| --- | --- |
-| `NGINX_RESOLVER` | `127.0.0.11` |
-
-- This is the **Docker embedded DNS resolver**. It is hard-coded as
-  `ENV NGINX_RESOLVER=127.0.0.11` inside the [Dockerfile](file:///c:/Users/core101/Desktop/autocode/linked_store/frontend/Dockerfile)
-  and is the correct value **inside every Docker environment** (Render,
-  docker-compose, K8s, ECS, EKS, Nomad).
-- Only override it if you ever run the frontend nginx **outside Docker**
-  directly on a bare-metal VPS (a rare scenario); leave it out of Render
-  Environment under normal conditions.
-
-### 2c. INFORMATIONAL MIRRORS (optional, never executed by the container)
-
-These two keys are convenient to add **only if you use Render
-Environment Groups** and want a single place showing both services'
-origins. The frontend container ignores them completely.
-
-| Key | Value (production) | Purpose |
-| --- | --- | --- |
-| `BACKEND_PUBLIC_ORIGIN` | `https://vicinity24api.com` | Mirror of `API_PROXY_URL` (same value, different name for Env Group readability). |
-| `API_BASE_URL` | `https://vicinity24api.com/api` | Backend-side equivalent (if you share an Env Group with the backend service). |
-
-A complete **example `.env` copy/paste reference** is kept locally in
-[render.env](file:///c:/Users/core101/Desktop/autocode/linked_store/frontend/render.env)
-(gitignored; never pushed).
+> A complete example copy/paste reference is kept locally in
+> [render.env](file:///c:/Users/core101/Desktop/autocode/linked_store/frontend/render.env)
+> (gitignored; never pushed).
 
 ---
 
-## 3. Create, deploy, and validate the service
+## 3. Create, deploy, and validate the site
 
-1. Click **Create Web Service**.
+1. Click **Create Static Site**.
 2. Render will:
    1. Clone `kintwadi/linked-store-client:main`.
-   2. Run the two-stage `Dockerfile`: Stage 1 `npm ci && npx ng build
-      --configuration=production` (this produces `dist/linked-store-frontend/browser`),
-      Stage 2 `nginx:1.27-alpine` copies the built bundle and the
-      envsubst template [docker/nginx.conf](file:///c:/Users/core101/Desktop/autocode/linked_store/frontend/docker/nginx.conf)
-      into `/etc/nginx/templates/default.conf.template`.
-3. Watch the **Events → Live Tail**. A healthy deploy ends with:
+   2. Run `npm install; npm run build`.
+   3. The build script runs `node scripts/write-env.js` (reads
+      `API_BASE_URL`, writes `environment.prod.ts`), then `ng build
+      --configuration=production`.
+   4. Publish `dist/linked-store-frontend/browser/` as static files.
+3. Watch the **Events → Live Tail**. A healthy build ends with:
 
    ```
-   ==> Starting service with '/docker-entrypoint.sh nginx -g daemon off;'
+   ✔  Browser application bundle generation complete.
+   ✔  Copying assets complete.
+   ✔  Index html generation complete.
    ```
 
-   There is **no custom script output**; all you see is standard nginx.
-   The built-in `20-envsubst-on-templates.sh` ran silently in the
-   background and produced the final `/etc/nginx/conf.d/default.conf`
-   with your `API_PROXY_URL` baked in.
+   and the status dot turns **green → Live**.
 
-4. Once the status dot turns **green → Live**:
+4. Once live:
 
-   - Open `https://linked-store-frontend.onrender.com/` (or your custom
-     domain if already set).
-   - Expect: **HTTP 200** returning the Angular `index.html`, then
-     CSS/JS bundles load from the same host with immutable long-cache
-     for hashed filenames.
+   - Open `https://dinretail-client.onrender.com/` (or your custom domain).
+   - Expect: **HTTP 200** returning the Angular `index.html`, then CSS/JS
+     bundles load.
    - Open DevTools → **Network** → filter `Fetch/XHR`. Navigate to the
      login page (`/login`) → submit any credentials.
-   - Expect: one request `POST /api/auth/login` sent to **the same
-     host** (relative URL) → nginx proxies it to `vicinity24api.com` →
-     you receive HTTP 200 or HTTP 401 from the backend **with no CORS
-     error** (backend `SecurityConfig` whitelists `dinretail.com`,
-     `*.onrender.com`, `localhost:*`, and RFC1918 ranges).
-   - If you see **502 Bad Gateway** on the `POST /api/…` call:
-     1. Double-check `API_PROXY_URL` spelling in the Render
-        Environment tab (no trailing slash, `https://`, exact host).
-     2. Confirm the backend origin itself returns HTTP 200 in a direct
-        browser tab (i.e. backend service is healthy).
-     3. After changing any env var, use **Manual Deploy → Clear build
-        cache & deploy** (nginx config changes take effect only after a
-        fresh container starts — the template is processed at boot).
+   - Expect: one request `POST https://vicinity24api.com/api/auth/login`
+     (absolute URL, baked in at build time) → HTTP 200 or 401 **with no
+     CORS error** (backend `SecurityConfig` whitelists `dinretail.com`,
+     `*.onrender.com`, `localhost:*`, RFC1918 ranges).
+   - If you see a **CORS error**:
+     1. Confirm the backend CORS whitelist contains the exact origin you
+        are visiting (e.g. `https://www.dinretail.com`).
+     2. Push a backend update if needed, rebuild the backend service.
 
 ---
 
 ## 4. (Production) Attach custom domains & enable HTTPS
 
-> **First find your service's real onrender.com hostname.**
-> In Render → your frontend service → top of the page, next to the
+> **Find your site's real onrender.com hostname first.**
+> In Render → your frontend static site → top of the page, next to the
 > status dot, you'll see a URL like `https://<service-slug>.onrender.com`.
-> This is the hostname you must point your DNS to. The frontend service
-> used in this guide is named so its URL is
-> **`https://dinretail-client.onrender.com`** (verify it loads the SPA
-> with title "Vicinity - AI-Powered Local Marketplace" before doing DNS).
-> If you have multiple Render services, make sure you attach the custom
-> domains to THIS one — pointing DNS at the wrong service is the #1 cause
-> of a plain-text "Not Found" page.
+> For the service named `dinretail-client` it is
+> **`https://dinretail-client.onrender.com`**. Verify it loads the Vicinity
+> SPA before doing DNS.
 
-1. In Render → your frontend service (`dinretail-client`) → **Settings → Custom Domains**.
+1. In Render → your frontend static site (`dinretail-client`) → **Settings → Custom Domains**.
 2. Add **both** domains (www + apex):
    - `dinretail.com`
    - `www.dinretail.com`
-3. Render shows two DNS records to add at your DNS provider
-   (Cloudflare / Hostinger / etc.). Use the **exact values Render gives
-   you** for this service. For the `dinretail-client` service they are:
+3. Render shows two DNS records to add at your DNS provider. Use the
+   **exact values Render gives you**. For the `dinretail-client` site they
+   are:
 
    | Host record | Type | Value |
    | --- | --- | --- |
@@ -195,77 +152,53 @@ A complete **example `.env` copy/paste reference** is kept locally in
    | `www.dinretail.com` | **CNAME** | `dinretail-client.onrender.com` |
 
    ⚠️ The `www` CNAME **must** target `dinretail-client.onrender.com`.
-   Pointing it at a different Render service (e.g. `vicinity-client.onrender.com`)
-   makes Render's edge return a plain-text **`Not Found`** for
-   `www.dinretail.com` because that host is not registered on the
-   service the CNAME resolves to.
+   Pointing it at a different Render service makes Render's edge return a
+   plain-text **`Not Found`**.
 
-4. Add both records at your DNS provider. If using Cloudflare, keep the
-   proxy **orange-cloud ON** (Render supports Cloudflare in front; the
-   response in this guide was served through Cloudflare as confirmed by
-   the `cf-ray` / `server: cloudflare` headers).
+4. Add both records at your DNS provider. With Cloudflare, keep the proxy
+   **orange-cloud ON** (Render supports Cloudflare in front).
 5. Back in Render → Custom Domains, wait for both rows to turn
-   **`Verified | HTTPS Active`**. If a row stays "Awaiting DNS", wait
-   for TTL to expire (5–10 minutes with Cloudflare proxy; up to 1 h on
-   other providers) and click **Verify** again.
+   **`Verified | HTTPS Active`**. If a row stays "Awaiting DNS", wait for
+   TTL to expire and click **Verify** again.
 6. Test once both are verified:
-   - `https://dinretail.com/login` → POST `/api/auth/login` → no CORS.
+   - `https://dinretail.com/login` → POST `https://vicinity24api.com/api/auth/login` → no CORS.
    - `https://www.dinretail.com/login` → identical result.
-
-> **No code change required.** The portable frontend pattern uses
-> `window.location.origin` for absolute public URLs (QR codes, Stripe
-> Connect return URLs) and relative `/api` for API calls — the same
-> container image works on the `onrender.com` staging host AND on the
-> production custom domains at the same time.
 
 ### 4a. How to recognise a "wrong service / custom domain not attached" error
 
-If you visit `https://dinretail.com` or `https://www.dinretail.com` and
-see exactly this:
+If you visit `https://dinretail.com` or `https://www.dinretail.com` and see
+exactly this as **plain text** (HTTP 404, headers contain `cf-ray` and
+`rndr-id`):
 
 ```
 Not Found
 ```
 
-as **plain text** (no CSS, no browser 404 styling, HTTP status **404**,
-response headers contain `server: cloudflare` and a `cf-ray:…` and
-`rndr-id` header), that is **Render's edge proxy**, not your nginx, not
-your Angular app, not CORS. It means:
-
-- The DNS record reaches Render's network, **but**
-- Render cannot find a service that has this host registered as a
-  custom domain → Render returns its generic 404.
+that is **Render's edge proxy**, not your Angular app, not CORS. It means
+the DNS reaches Render but Render cannot find a site that has this host
+registered as a custom domain.
 
 Fix checklist:
-1. Open the correct frontend service in Render (the one whose
-   `*.onrender.com` URL loads the Vicinity SPA) →
-   **Settings → Custom Domains**.
-2. Confirm **both** `dinretail.com` and `www.dinretail.com` are listed
-   and show **Verified**. If either is missing, add it.
-3. At your DNS provider, confirm the records point at the **correct**
-   service hostname:
-   - `www.dinretail.com` CNAME → `dinretail-client.onrender.com`
-     (NOT `vicinity-client.onrender.com` or any other service).
-   - `dinretail.com` apex → ALIAS/ANAME to `dinretail-client.onrender.com`
-     (or A → `216.24.57.1`).
-4. After correcting DNS, click **Verify** again in Render and wait for
-   `HTTPS Active`.
+1. Open the correct frontend static site in Render → **Settings → Custom Domains**.
+2. Confirm **both** `dinretail.com` and `www.dinretail.com` are listed and
+   show **Verified**. If either is missing, add it.
+3. At your DNS provider, confirm the records point at `dinretail-client.onrender.com`.
+4. Click **Verify** again and wait for `HTTPS Active`.
 
 ---
 
 ## 5. (Production) Stripe Connect return & refresh URLs
 
 Once the frontend is live on `https://dinretail.com`, open the Stripe
-Dashboard → Connect → Settings and set these two values:
+Dashboard → Connect → Settings and set:
 
 | Stripe field | Value |
 | --- | --- |
 | **Return URL** | `https://dinretail.com/admin` |
 | **Refresh URL** | `https://dinretail.com/admin` |
 
-(If you are testing on `*.onrender.com` staging, temporarily use the
-Render-generated origin instead; the portable app will detect the
-actual host automatically.)
+(If testing on `*.onrender.com` staging, temporarily use the
+Render-generated origin instead.)
 
 ---
 
@@ -273,34 +206,37 @@ actual host automatically.)
 
 1. Push code changes to `kintwadi/linked-store-client:main`.
 2. Render triggers auto-deploy if enabled. Otherwise:
-   - Render dashboard → `linked-store-frontend` → **Manual Deploy** →
-     pick:
-     - **Latest commit** (fast, if only code / envvar-substitution
-       template changed).
-     - **Clear build cache & deploy** (always safe; use this if Docker
-       layers are stale, you upgraded Node/npm, you changed an env var
-       that must take effect inside the built bundle, or you see
-       mysterious build failures).
-3. Watch Live Tail until you see the green status and the familiar
-   `Starting service with '/docker-entrypoint.sh nginx -g daemon off;'`
-   line.
+   - Render dashboard → `dinretail-client` → **Manual Deploy** →
+     - **Latest commit** (fast, for code-only changes).
+     - **Clear build cache & deploy** (use if you changed `API_BASE_URL`,
+       upgraded Node/npm, or see stale build output).
+3. Watch the build log until green.
+
+> ⚠️ Because `API_BASE_URL` is baked into the bundle at build time,
+> **changing it in the Environment tab requires a new deploy** — the
+> running site keeps using the old value until rebuilt.
 
 ---
 
 ## 7. Local sanity test (before you push to Render)
 
-To simulate the exact same deploy on your own machine, right from the
-repo root:
+To simulate the production build locally:
 
 ```bash
-docker build -t linked-store-frontend frontend
-docker run --rm -p 8081:80 \
-  -e API_PROXY_URL="https://vicinity24api.com" \
-  linked-store-frontend
+cd frontend
+API_BASE_URL=https://vicinity24api.com npm run build
+# (Windows PowerShell:  $env:API_BASE_URL="https://vicinity24api.com"; npm run build)
 ```
 
-Open `http://localhost:8081` — you see the SPA exactly as Render serves
-it, proxying `/api` to the live backend.
+Then serve the output:
+
+```bash
+npx http-server dist/linked-store-frontend/browser -p 8081
+```
+
+Open `http://localhost:8081` and confirm the login page POSTs to
+`https://vicinity24api.com/api/auth/login` (absolute URL) with no CORS
+error (localhost is in the backend CORS whitelist).
 
 ---
 
@@ -308,17 +244,21 @@ it, proxying `/api` to the live backend.
 
 | Symptom | Cause | Fix |
 | --- | --- | --- |
-| All `/api/*` requests → `502 Bad Gateway` | `API_PROXY_URL` not set in Render Environment **or** value has a typo / trailing slash / is unreachable. | Open the Render Environment tab, correct the value, run **Clear build cache & deploy**. |
-| `502` only for `/stream/*` (SSE) | Same root cause as above, OR backend is restarting during the 1 h SSE read timeout. | Fix `API_PROXY_URL` first; check backend Live Tail. |
-| Login page loads, but `POST /api/auth/login` → CORS error in DevTools. | Backend SecurityConfig whitelist does not contain the actual host you're visiting. Add the exact origin to backend `SecurityConfig.setAllowedOriginPatterns`, push backend `_home_dev`, rebuild backend. The frontend itself never controls CORS policy (it's a backend setting for allowed origins with `credentials: true`). | Update backend CORS list, rebuild backend. |
-| Build fails in Render Stage 1 `npm ci` / `ng build`. | Node engine mismatch OR broken import in TypeScript. Run locally `cd frontend && npm ci && npx ng build --configuration=production` — if it fails locally it will also fail on Render. | Fix the TypeScript issue locally, commit, push, re-deploy. |
-| Build succeeds but Live Tail shows "nginx: [emerg] invalid number of arguments in "set" directive" | A broken template — `$$` escape mismatch in `docker/nginx.conf`. Run the local docker test in §7. It will fail with the same exact error before you push. | Fix `$$` vs `$` escaping in the template. Only `${API_PROXY_URL}` and `${NGINX_RESOLVER}` use a single `$` in the template. |
+| Root `/` returns plain-text `Not Found` (HTTP 404) | **Publish Directory is wrong.** The Angular `application` builder outputs `index.html` to `dist/linked-store-frontend/browser/`, not `dist/linked-store-frontend/`. | Set Publish Directory to `dist/linked-store-frontend/browser`. |
+| Root `/` returns plain-text `Not Found` from Render edge (`rndr-id` header) | Custom domain not attached to this site, or DNS points at the wrong service. | See §4a. |
+| All `/api/*` requests fail (404 / connection error) | `API_BASE_URL` not set, or wrong value, or backend down. | Check the Environment tab; confirm backend is healthy; re-deploy. |
+| `POST /api/...` → CORS error in DevTools. | Backend `SecurityConfig` whitelist does not contain the visiting origin. | Add the exact origin to backend `setAllowedOriginPatterns`, push `_home_dev`, rebuild backend. |
+| Build fails in Render. | Node engine mismatch or broken TypeScript import. | Run `npm ci && npx ng build --configuration=production` locally; fix what fails there, then push. |
+| Login works on `dinretail-client.onrender.com` but fails on `dinretail.com` with CORS. | Backend whitelist missing the production origin. | Add `https://dinretail.com` and `https://www.dinretail.com` to backend CORS, rebuild backend. |
 
 ---
 
 ## 9. Files involved in this deploy
 
-- [Dockerfile](file:///c:/Users/core101/Desktop/autocode/linked_store/frontend/Dockerfile) — two-stage build: Node build → nginx runtime + ENV `NGINX_RESOLVER=127.0.0.11`.
-- [docker/nginx.conf](file:///c:/Users/core101/Desktop/autocode/linked_store/frontend/docker/nginx.conf) — envsubst template. Only `${API_PROXY_URL}` / `${NGINX_RESOLVER}` substituted; everything else is `$$`-escaped for nginx-native variables. Contains proxy rules `/api`, `/products`, `/stream` (SSE, 1 h timeout, no buffering), `/stripe`, SPA fallback `try_files`, gzip, immutable cache for hashed bundles, no-cache `index.html`.
-- [origins.helper.ts](file:///c:/Users/core101/Desktop/autocode/linked_store/frontend/src/app/shared/utils/origins.helper.ts) — 100% hostname-agnostic helper; no `dinretail.com` / `vicinity24api.com` constants anywhere. Resolves public origin = `window.location.origin`, API base = relative `/api` (LAN IPs are the only absolute path, because the Angular dev proxy only binds `127.0.0.1`).
-- [render.env](file:///c:/Users/core101/Desktop/autocode/linked_store/frontend/render.env) — LOCAL ONLY `.env` copy of the Render key/value list. Gitignored; never pushed. Serves as the operator's paste/checklist when editing the Render Environment UI.
+- [package.json](file:///c:/Users/core101/Desktop/autocode/linked_store/frontend/package.json) — `build` script runs `node scripts/write-env.js && ng build`.
+- [scripts/write-env.js](file:///c:/Users/core101/Desktop/autocode/linked_store/frontend/scripts/write-env.js) — reads `API_BASE_URL` from the build environment and generates `src/environments/environment.prod.ts`.
+- [src/environments/environment.ts](file:///c:/Users/core101/Desktop/autocode/linked_store/frontend/src/environments/environment.ts) — dev environment (`apiBaseUrl: ''` → relative `/api`, uses Angular dev proxy).
+- `src/environments/environment.prod.ts` — **auto-generated** at build time (gitignored).
+- [angular.json](file:///c:/Users/core101/Desktop/autocode/linked_store/frontend/angular.json) — production config uses `fileReplacements` to swap `environment.ts` → `environment.prod.ts`.
+- [origins.helper.ts](file:///c:/Users/core101/Desktop/autocode/linked_store/frontend/src/app/shared/utils/origins.helper.ts) — `resolveApiBase()` returns `${environment.apiBaseUrl}/api` when `apiBaseUrl` is set; otherwise falls back to relative `/api` (localhost) or LAN `host:8080` (phone testing).
+- [render.env](file:///c:/Users/core101/Desktop/autocode/linked_store/frontend/render.env) — LOCAL ONLY copy of the Render key/value list. Gitignored; never pushed.

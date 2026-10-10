@@ -3,6 +3,9 @@ dist/
 .angular/
 node_modules/
 
+# Auto-generated prod environment (written by scripts/write-env.js at build time)
+src/environments/environment.prod.ts
+
 # IDE / Editor
 .idea/
 .vscode/

@@ -49,6 +49,10 @@
 //       backend. This is THE portable behaviour.
 // =========================================================================
 
+import { environment } from '../../../environments/environment';
+
+const BUILD_TIME_API_BASE = (environment.apiBaseUrl || '').replace(/\/+$/, '');
+
 declare global {
   interface Window {
     __API_BASE_ORIGIN__?: string;
@@ -106,20 +110,29 @@ function normalizeOrigin(raw: string | undefined | null): string | null {
  *
  * Priority order — fully portable across ANY host the SPA runs on:
  *
- *   1. window.__API_BASE_ORIGIN__ override (if set by the operator).
+ *   1. BUILD-TIME injection (environment.apiBaseUrl, set via the
+ *      API_BASE_URL env var during `npm run build`). Used when the app
+ *      is deployed as a STATIC SITE with no reverse proxy (e.g. Render
+ *      Static Sites, Vercel, Cloudflare Pages) — the browser must call
+ *      the backend directly, so the backend origin is baked into the
+ *      bundle at build time. If empty, fall through to the rules below.
  *
- *   2. LAN / private hostnames (smartphone visiting 192.168.x.y:4200,
+ *   2. window.__API_BASE_ORIGIN__ override (if set by the operator).
+ *
+ *   3. LAN / private hostnames (smartphone visiting 192.168.x.y:4200,
  *      VM guest, Tailscale/VPN clients) → same host but port 8080,
  *      because the Angular dev proxy (proxy.conf.json) only listens on
  *      loopback and is unreachable from remote clients.
  *
- *   3. EVERYTHING ELSE (localhost loopback, *.onrender.com staging,
+ *   4. EVERYTHING ELSE (localhost loopback, *.onrender.com staging,
  *      ANY custom domain dinretail.com / anything.example.com / …) →
  *      empty string ("") so browser uses relative "/api" URL, perfectly
  *      portable, relies on Angular dev proxy (localhost) / nginx proxy
  *      (production Render / any reverse proxy) to reach the backend.
  */
 export function resolveApiBaseOrigin(): string {
+  if (BUILD_TIME_API_BASE) return BUILD_TIME_API_BASE;
+
   if (typeof window === 'undefined' || !window.location?.hostname) return '';
   const host = window.location.hostname;
 
