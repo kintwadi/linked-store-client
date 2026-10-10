@@ -170,17 +170,45 @@ A complete **example `.env` copy/paste reference** is kept locally in
 
 ## 4. (Production) Attach custom domains & enable HTTPS
 
-1. In Render → `linked-store-frontend` → **Settings → Custom Domains**.
+> **First find your service's real onrender.com hostname.**
+> In Render → your frontend service → top of the page, next to the
+> status dot, you'll see a URL like `https://<service-slug>.onrender.com`.
+> This is the hostname you must point your DNS to. The frontend service
+> used in this guide is named so its URL is
+> **`https://vicinity-frontend.onrender.com`** (verify it loads the SPA
+> with title "Vicinity - AI-Powered Local Marketplace" before doing DNS).
+> If you have multiple Render services, make sure you attach the custom
+> domains to THIS one — pointing DNS at the wrong service is the #1 cause
+> of a plain-text "Not Found" page.
+
+1. In Render → your frontend service (`vicinity-frontend`) → **Settings → Custom Domains**.
 2. Add **both** domains (www + apex):
    - `dinretail.com`
    - `www.dinretail.com`
-3. Render will show you two DNS records:
-   - **Apex** `dinretail.com` → Render ALIAS / ANAME record shown.
-   - **`www`** → Render CNAME record shown.
-4. Add both at your DNS provider (Cloudflare, Hostinger, etc.).
-5. Wait for DNS propagation, then click **Verify** on each row until
-   Render issues the free Let's Encrypt certificates.
-6. Once both domains show `Verified | HTTPS Active`, test:
+3. Render shows two DNS records to add at your DNS provider
+   (Cloudflare / Hostinger / etc.). Use the **exact values Render gives
+   you** for this service. For the `vicinity-frontend` service they are:
+
+   | Host record | Type | Value |
+   | --- | --- | --- |
+   | `dinretail.com` (apex) | **ALIAS / ANAME** (preferred) **or A** | `vicinity-frontend.onrender.com` (or the A-record IP Render shows, currently `216.24.57.1`) |
+   | `www.dinretail.com` | **CNAME** | `vicinity-frontend.onrender.com` |
+
+   ⚠️ The `www` CNAME **must** target `vicinity-frontend.onrender.com`.
+   Pointing it at a different Render service (e.g. `vicinity-client.onrender.com`)
+   makes Render's edge return a plain-text **`Not Found`** for
+   `www.dinretail.com` because that host is not registered on the
+   service the CNAME resolves to.
+
+4. Add both records at your DNS provider. If using Cloudflare, keep the
+   proxy **orange-cloud ON** (Render supports Cloudflare in front; the
+   response in this guide was served through Cloudflare as confirmed by
+   the `cf-ray` / `server: cloudflare` headers).
+5. Back in Render → Custom Domains, wait for both rows to turn
+   **`Verified | HTTPS Active`**. If a row stays "Awaiting DNS", wait
+   for TTL to expire (5–10 minutes with Cloudflare proxy; up to 1 h on
+   other providers) and click **Verify** again.
+6. Test once both are verified:
    - `https://dinretail.com/login` → POST `/api/auth/login` → no CORS.
    - `https://www.dinretail.com/login` → identical result.
 
@@ -189,6 +217,39 @@ A complete **example `.env` copy/paste reference** is kept locally in
 > Connect return URLs) and relative `/api` for API calls — the same
 > container image works on the `onrender.com` staging host AND on the
 > production custom domains at the same time.
+
+### 4a. How to recognise a "wrong service / custom domain not attached" error
+
+If you visit `https://dinretail.com` or `https://www.dinretail.com` and
+see exactly this:
+
+```
+Not Found
+```
+
+as **plain text** (no CSS, no browser 404 styling, HTTP status **404**,
+response headers contain `server: cloudflare` and a `cf-ray:…` and
+`rndr-id` header), that is **Render's edge proxy**, not your nginx, not
+your Angular app, not CORS. It means:
+
+- The DNS record reaches Render's network, **but**
+- Render cannot find a service that has this host registered as a
+  custom domain → Render returns its generic 404.
+
+Fix checklist:
+1. Open the correct frontend service in Render (the one whose
+   `*.onrender.com` URL loads the Vicinity SPA) →
+   **Settings → Custom Domains**.
+2. Confirm **both** `dinretail.com` and `www.dinretail.com` are listed
+   and show **Verified**. If either is missing, add it.
+3. At your DNS provider, confirm the records point at the **correct**
+   service hostname:
+   - `www.dinretail.com` CNAME → `vicinity-frontend.onrender.com`
+     (NOT `vicinity-client.onrender.com` or any other service).
+   - `dinretail.com` apex → ALIAS/ANAME to `vicinity-frontend.onrender.com`
+     (or A → `216.24.57.1`).
+4. After correcting DNS, click **Verify** again in Render and wait for
+   `HTTPS Active`.
 
 ---
 
