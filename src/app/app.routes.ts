@@ -1,5 +1,4 @@
 import { Routes } from '@angular/router';
-import { HomePageComponent } from './pages/home/home-page.component';
 import { ProductDetailPageComponent } from './pages/product-detail/product-detail-page.component';
 import { ProductQrSharePageComponent } from './pages/product-detail/product-qr-share-page.component';
 import { CheckoutPageComponent } from './pages/checkout/checkout-page.component';
@@ -26,7 +25,7 @@ import { ContactSalesPageComponent } from './pages/contact-sales/contact-sales-p
 export const routes: Routes = [
   { path: 'pricing',                 component: PricingPageComponent,           title: 'Pricing | Linked-Store' },
   { path: 'contact-sales',           component: ContactSalesPageComponent,      title: 'Contact Sales | Linked-Store' },
-  { path: '',                        component: HomePageComponent,              title: 'Linked-Store' },
+  { path: '',                        redirectTo: 'login',             pathMatch: 'full' },
   { path: 'p/:productId',            component: ProductDetailPageComponent,     title: 'Product' },
   { path: 'p/:productId/qr',         component: ProductQrSharePageComponent,    title: 'Product QR · Share' },
   { path: 'checkout',                component: CheckoutPageComponent,           title: 'Checkout' },
