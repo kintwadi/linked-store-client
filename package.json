@@ -4,7 +4,7 @@
   "scripts": {
     "ng": "ng",
     "start": "ng serve --proxy-config proxy.conf.json --host 0.0.0.0",
-    "build": "node scripts/write-env.js && ng build && node -e \"require('fs').copyFileSync('dist/linked-store-frontend/browser/index.html','dist/linked-store-frontend/browser/404.html')\"",
+    "build": "node scripts/write-env.js && ng build && node scripts/copy-404.js",
     "watch": "ng build --watch --configuration development",
     "dev": "ng serve --proxy-config proxy.conf.json --host 0.0.0.0 --port 4200"
   },
