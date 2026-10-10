@@ -336,7 +336,7 @@ interface StoreCard {
       <header>
         <div class="brand">
           <span class="brand-icon"></span>
-          <span>Vicinity</span>
+          <span>DinRetail</span>
         </div>
         <div class="nav-actions">
           <a class="btn-secondary" routerLink="/signup">Sign up</a>
@@ -345,10 +345,11 @@ interface StoreCard {
       </header>
 
       <section class="hero">
-        <h1>Discover stores near you</h1>
-        <p>Browse connected local stores, their products, and shop with confidence through a single hyperlocal network.</p>
+        <h1>Collaborate Locally. Sell Confidently.</h1>
+        <p>Join a unified hyperlocal network where independent stores team up to multiply their sales. Gain the benefits of shared local marketing without sharing your inventory data with anyone else.</p>
       </section>
 
+      @if (loading() || stores().length > 0) {
       <section class="section">
         <div class="section-title">
           <h2>Connected Stores</h2>
@@ -362,11 +363,6 @@ interface StoreCard {
             <div class="state">
               <div class="spinner"></div>
               <h3>Loading stores…</h3>
-            </div>
-          } @else if (stores().length === 0) {
-            <div class="state">
-              <h3>No connected stores yet</h3>
-              <p>Check back soon — new stores join the network every day.</p>
             </div>
           } @else {
             @for (store of stores(); track store.id) {
@@ -400,6 +396,7 @@ interface StoreCard {
           }
         </div>
       </section>
+      }
     </div>
   `,
 })
