@@ -1,7 +1,10 @@
 import { Component, OnInit, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { RouterLink } from '@angular/router';
+import { HttpClient } from '@angular/common/http';
+import { firstValueFrom } from 'rxjs';
 import { ProductService } from '../../services/product.service';
+import { resolveApiBase } from '../../shared/utils/origins.helper';
 
 interface StoreCard {
   id: string;
@@ -336,7 +339,7 @@ interface StoreCard {
       <header>
         <div class="brand">
           <span class="brand-icon"></span>
-          <span>DinRetail</span>
+          <span>{{ brandName() }}</span>
         </div>
         <div class="nav-actions">
           <a class="btn-secondary" routerLink="/signup">Sign up</a>
@@ -403,10 +406,15 @@ interface StoreCard {
 export class LandingPageComponent implements OnInit {
   readonly stores = signal<StoreCard[]>([]);
   readonly loading = signal<boolean>(true);
+  readonly brandName = signal<string>('DinRetail');
 
-  constructor(private readonly products: ProductService) {}
+  constructor(
+    private readonly products: ProductService,
+    private readonly http: HttpClient,
+  ) {}
 
   async ngOnInit(): Promise<void> {
+    void this.loadBrand();
     try {
       const all = await this.products.getStores();
       const connected = (Array.isArray(all) ? all : [])
@@ -441,5 +449,18 @@ export class LandingPageComponent implements OnInit {
 
   locationLine(store: StoreCard): string {
     return [store.address, store.postalCode].filter((v) => !!v).join(', ');
+  }
+
+  private async loadBrand(): Promise<void> {
+    try {
+      const api = resolveApiBase();
+      const res: any = await firstValueFrom(
+        this.http.get(`${api}/public/brand`),
+      );
+      if (res && typeof res.displayName === 'string' && res.displayName.trim()) {
+        this.brandName.set(res.displayName.trim());
+      }
+    } catch {
+    }
   }
 }
