@@ -3,6 +3,7 @@ import { CommonModule } from '@angular/common';
 import { FormsModule, ReactiveFormsModule, FormBuilder, FormGroup, Validators } from '@angular/forms';
 import { Router, RouterLink } from '@angular/router';
 import { AuthService } from '../../services/auth.service';
+import { BrandService } from '../../services/brand.service';
 
 @Component({
   selector: 'app-login-page',
@@ -335,7 +336,7 @@ import { AuthService } from '../../services/auth.service';
       <div class="brand-wrap">
         <a class="brand" routerLink="/">
           <span class="brand-icon" aria-hidden="true"></span>
-          Linked-Store
+          {{ brand() }}
         </a>
       </div>
 
@@ -417,11 +418,13 @@ export class LoginPageComponent {
   readonly loginForm: FormGroup;
   readonly submitting = signal(false);
   readonly errorMessage = signal<string | null>(null);
+  readonly brand = this.brandService.displayName;
 
   constructor(
     private readonly fb: FormBuilder,
     private readonly authService: AuthService,
     private readonly router: Router,
+    private readonly brandService: BrandService,
   ) {
     this.loginForm = this.fb.group({
       email: ['', [Validators.required, Validators.email]],

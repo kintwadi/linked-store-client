@@ -1,4 +1,5 @@
-import { Component } from '@angular/core';
+import { Component, inject } from '@angular/core';
+import { BrandService } from '../../services/brand.service';
 
 @Component({
   selector: 'app-footer',
@@ -6,11 +7,12 @@ import { Component } from '@angular/core';
   template: `
     <footer class="footer">
       <div class="container">
-        © {{ year }} Linked-Store. Hyperlocal Omnichannel Retail Network.
+        © {{ year }} {{ brand() }}. Hyperlocal Omnichannel Retail Network.
       </div>
     </footer>
   `,
 })
 export class FooterComponent {
   year = new Date().getFullYear();
+  readonly brand = inject(BrandService).displayName;
 }

@@ -3,6 +3,7 @@ import { CommonModule } from '@angular/common';
 import { FormsModule, ReactiveFormsModule, FormBuilder, FormGroup, Validators } from '@angular/forms';
 import { Router, RouterLink } from '@angular/router';
 import { AuthService } from '../../services/auth.service';
+import { BrandService } from '../../services/brand.service';
 
 @Component({
   selector: 'app-store-staff-login-page',
@@ -465,7 +466,7 @@ import { AuthService } from '../../services/auth.service';
               <polyline points="9 22 9 12 15 12 15 22"/>
             </svg>
           </span>
-          Linked-Store
+          {{ brand() }}
         </a>
       </div>
 
@@ -628,11 +629,13 @@ export class StoreStaffLoginPageComponent {
   readonly loginForm: FormGroup;
   readonly submitting = signal(false);
   readonly errorMessage = signal<string | null>(null);
+  readonly brand = this.brandService.displayName;
 
   constructor(
     private readonly fb: FormBuilder,
     private readonly authService: AuthService,
     private readonly router: Router,
+    private readonly brandService: BrandService,
   ) {
     this.loginForm = this.fb.group({
       email: ['', [Validators.required, Validators.email]],

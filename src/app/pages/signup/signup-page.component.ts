@@ -5,6 +5,7 @@ import { Router, RouterLink, ActivatedRoute } from '@angular/router';
 import { HttpClient } from '@angular/common/http';
 import { firstValueFrom } from 'rxjs';
 import { AuthService } from '../../services/auth.service';
+import { BrandService } from '../../services/brand.service';
 
 const COUNTRIES: { code: string; name: string }[] = [
   { code: 'AT', name: 'Austria' },
@@ -559,14 +560,14 @@ interface InvitePreviewResponse {
       <div class="brand-wrap">
         <a class="brand" routerLink="/">
           <span class="brand-icon"></span>
-          Linked-Store
+          {{ brand() }}
         </a>
       </div>
 
       <div class="signup-container">
         <div class="form-header">
           <h1>Create your account</h1>
-          <p>Join Linked-Store and start managing your business</p>
+          <p>Join {{ brand() }} and start managing your business</p>
         </div>
 
         @if (inviteBannerValid() || inviteBannerInvalid()) {
@@ -830,6 +831,8 @@ export class SignupPageComponent implements OnInit {
 
   private readonly fb = inject(FormBuilder);
   private readonly authService = inject(AuthService);
+  private readonly brandService = inject(BrandService);
+  readonly brand = this.brandService.displayName;
   private readonly router = inject(Router);
   private readonly route = inject(ActivatedRoute);
   private readonly http = inject(HttpClient);

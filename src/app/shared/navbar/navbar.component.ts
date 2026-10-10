@@ -1,6 +1,7 @@
 import { Component, computed, inject } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { AuthService } from '../../services/auth.service';
+import { BrandService } from '../../services/brand.service';
 
 @Component({
   selector: 'app-navbar',
@@ -47,12 +48,12 @@ import { AuthService } from '../../services/auth.service';
       @if (isRunner()) {
         <span class="brand plain">
           <span class="brand-dot"></span>
-          Linked-Store
+          {{ brand() }}
         </span>
       } @else {
         <a class="brand" routerLink="/">
           <span class="brand-dot"></span>
-          Linked-Store
+          {{ brand() }}
         </a>
       }
     </div>
@@ -60,7 +61,9 @@ import { AuthService } from '../../services/auth.service';
 })
 export class NavbarComponent {
   private readonly authService = inject(AuthService);
+  private readonly brandService = inject(BrandService);
 
+  readonly brand = this.brandService.displayName;
   readonly isRunner = computed(() => this.authService.currentUser$?.getValue()?.role === 'RUNNER');
   readonly isAuthenticated = computed(() => this.authService.isLoggedIn());
 }

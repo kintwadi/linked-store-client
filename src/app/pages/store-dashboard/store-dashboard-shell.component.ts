@@ -4,6 +4,7 @@ import { RouterLink, RouterOutlet, ActivatedRoute, Router, NavigationEnd } from 
 import { HttpClient } from '@angular/common/http';
 import { firstValueFrom, Subscription } from 'rxjs';
 import { AuthService } from '../../services/auth.service';
+import { BrandService } from '../../services/brand.service';
 import { PermissionService } from '../../services/permission.service';
 import {
   SubscriptionPlanService,
@@ -1316,10 +1317,10 @@ interface PaginatedInspections {
                     <div class="upsell-copy">
                       <span class="upsell-kicker">
                         <svg viewBox="0 0 24 24"><path d="M12 2l2.39 7.36H22l-6.2 4.51L18.18 21 12 16.77 5.82 21l2.38-7.13L2 9.36h7.61z"/></svg>
-                        Unlock Linked-Store Pro
+                        Unlock {{ brand() }} Pro
                       </span>
                       <h3 class="upsell-headline">
-                        Grow revenue with a <span class="accent">Linked-Store subscription</span> for your store.
+                        Grow revenue with a <span class="accent">{{ brand() }} subscription</span> for your store.
                       </h3>
                       <p class="upsell-sub">
                         Get unlimited product catalogs, premium QR sharing, higher order volume, and the full Stripe-powered payment stack — designed to help multi-store teams move faster and sell more.
@@ -1373,7 +1374,7 @@ interface PaginatedInspections {
                         </span>
                         <span style="font-size:11px;color:#c4b5fd;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;">Most popular</span>
                       </div>
-                      <div class="plan-preview-name">Linked-Store Professional</div>
+                      <div class="plan-preview-name">{{ brand() }} Professional</div>
                       <div class="plan-preview-price">
                         <span class="plan-price-currency">€</span>
                         <span class="plan-price-amount">49</span>
@@ -1469,6 +1470,8 @@ interface PaginatedInspections {
 export class StoreDashboardShellComponent implements OnInit, OnDestroy {
   private readonly http = inject(HttpClient);
   private readonly authService = inject(AuthService);
+  private readonly brandService = inject(BrandService);
+  readonly brand = this.brandService.displayName;
   private readonly cdr = inject(ChangeDetectorRef);
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);

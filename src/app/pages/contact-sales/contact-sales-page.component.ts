@@ -5,6 +5,7 @@ import { Router, RouterLink, ActivatedRoute } from '@angular/router';
 import { HttpClient } from '@angular/common/http';
 import { firstValueFrom } from 'rxjs';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
+import { BrandService } from '../../services/brand.service';
 
 export interface ContactSalesRequest {
   fullName: string;
@@ -267,7 +268,7 @@ const PLAN_OPTIONS: { value: string; label: string; hint?: string }[] = [
       <div class="brand-wrap">
         <a class="brand" routerLink="/">
           <span class="brand-chip">LS</span>
-          Linked-Store
+          {{ brand() }}
         </a>
       </div>
 
@@ -275,7 +276,7 @@ const PLAN_OPTIONS: { value: string; label: string; hint?: string }[] = [
         <div class="hero-copy fade-in">
           <h1>
             <span class="gradient-text">Talk to the team behind</span><br>
-            <span class="white">Linked-Store.</span>
+            <span class="white">{{ brand() }}.</span>
           </h1>
           <p class="lede">
             Whether you're scaling from 1 store to 100+, evaluating Custom enterprise terms, or just have a quick question —
@@ -462,9 +463,12 @@ const PLAN_OPTIONS: { value: string; label: string; hint?: string }[] = [
 export class ContactSalesPageComponent implements OnInit {
   private readonly fb = inject(FormBuilder);
   private readonly http = inject(HttpClient);
+  private readonly brandService = inject(BrandService);
   private readonly router = inject(Router);
   private readonly route = inject(ActivatedRoute);
   private readonly destroyRef = inject(DestroyRef);
+
+  readonly brand = this.brandService.displayName;
 
   readonly form: FormGroup = this.fb.group({
     fullName: ['', [Validators.required]],

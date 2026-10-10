@@ -6,6 +6,7 @@ import { HttpClient, HttpErrorResponse } from '@angular/common/http';
 import { DomSanitizer, SafeUrl } from '@angular/platform-browser';
 import { firstValueFrom } from 'rxjs';
 import { AuthService, AuthUser } from '../../services/auth.service';
+import { BrandService } from '../../services/brand.service';
 import { CanPipe } from '../../pipes/can.pipe';
 import { PermissionService } from '../../services/permission.service';
 import {
@@ -2196,7 +2197,7 @@ interface PaginatedInspections {
         <span class="brand-dot">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>
         </span>
-        Linked-Store
+        {{ brand() }}
       </a>
     </div>
 
@@ -4006,6 +4007,8 @@ export class AdminDashboardPageComponent implements OnInit, OnDestroy {
   readonly fb = inject(FormBuilder);
   readonly http = inject(HttpClient);
   readonly authService = inject(AuthService);
+  readonly brandService = inject(BrandService);
+  readonly brand = this.brandService.displayName;
   readonly router = inject(Router);
   readonly permissionService = inject(PermissionService);
   readonly subscriptionPlanService = inject(SubscriptionPlanService);

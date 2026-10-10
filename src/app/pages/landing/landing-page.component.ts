@@ -1,10 +1,8 @@
 import { Component, OnInit, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { RouterLink } from '@angular/router';
-import { HttpClient } from '@angular/common/http';
-import { firstValueFrom } from 'rxjs';
 import { ProductService } from '../../services/product.service';
-import { resolveApiBase } from '../../shared/utils/origins.helper';
+import { BrandService } from '../../services/brand.service';
 
 interface StoreCard {
   id: string;
@@ -406,15 +404,14 @@ interface StoreCard {
 export class LandingPageComponent implements OnInit {
   readonly stores = signal<StoreCard[]>([]);
   readonly loading = signal<boolean>(true);
-  readonly brandName = signal<string>('DinRetail');
+  readonly brandName = this.brandService.displayName;
 
   constructor(
     private readonly products: ProductService,
-    private readonly http: HttpClient,
+    private readonly brandService: BrandService,
   ) {}
 
   async ngOnInit(): Promise<void> {
-    void this.loadBrand();
     try {
       const all = await this.products.getStores();
       const connected = (Array.isArray(all) ? all : [])
@@ -449,18 +446,5 @@ export class LandingPageComponent implements OnInit {
 
   locationLine(store: StoreCard): string {
     return [store.address, store.postalCode].filter((v) => !!v).join(', ');
-  }
-
-  private async loadBrand(): Promise<void> {
-    try {
-      const api = resolveApiBase();
-      const res: any = await firstValueFrom(
-        this.http.get(`${api}/public/brand`),
-      );
-      if (res && typeof res.displayName === 'string' && res.displayName.trim()) {
-        this.brandName.set(res.displayName.trim());
-      }
-    } catch {
-    }
   }
 }
