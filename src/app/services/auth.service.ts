@@ -1,4 +1,4 @@
-import { Injectable } from '@angular/core';
+import { Injectable, Injector, inject } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { BehaviorSubject, firstValueFrom } from 'rxjs';
 import { Router } from '@angular/router';
@@ -34,9 +34,14 @@ const CURRENT_USER_KEY = 'ls.current_user';
 export class AuthService {
   readonly currentUser$ = new BehaviorSubject<AuthUser | null>(null);
 
+  private readonly injector = inject(Injector);
+
+  private get router(): Router {
+    return this.injector.get(Router);
+  }
+
   constructor(
     private readonly http: HttpClient,
-    private readonly router: Router,
   ) {
     const stored = localStorage.getItem(CURRENT_USER_KEY);
     if (stored) {
