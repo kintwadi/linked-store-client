@@ -4297,6 +4297,7 @@ export class AdminDashboardPageComponent implements OnInit, OnDestroy {
    *   - STORE_REPRESENTATIVE / CLERK / RUNNER: never allowed
    */
   readonly canAccessSubscription = computed(() => {
+    if (this.platformContractService.isFeeBased) return false;
     const u = this.currentUser();
     if (!u) return false;
     return this.permissionService.canAccessSubscription(u.storeId || undefined);
@@ -4472,6 +4473,7 @@ export class AdminDashboardPageComponent implements OnInit, OnDestroy {
       void this.loadReturns();
       void this.loadAdminPlans();
       void this.loadPlatformContract();
+      void this.platformContractService.fetchPublic().catch(() => undefined);
     });
   }
 

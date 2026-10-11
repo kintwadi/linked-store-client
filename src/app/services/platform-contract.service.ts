@@ -59,7 +59,13 @@ export class PlatformContractService {
 
   async getAdmin(): Promise<PlatformContractAdmin> {
     const url = `${resolveApiBase()}/platform-contract/admin`;
-    return firstValueFrom(this.http.get<PlatformContractAdmin>(url));
+    const data = await firstValueFrom(this.http.get<PlatformContractAdmin>(url));
+    this.contract.set({
+      mode: data.mode,
+      feePercentage: data.feePercentage,
+      isConfigured: data.isConfigured,
+    });
+    return data;
   }
 
   async updateAdmin(
