@@ -82,4 +82,11 @@ export class PlatformContractService {
     });
     return saved;
   }
+
+  async createPlatformOnboardingLink(): Promise<{ url: string; status: string; stripeConnectId: string }> {
+    const url = `${resolveApiBase()}/platform-contract/admin/platform-onboarding`;
+    return firstValueFrom(
+      this.http.post<{ url: string; status: string; stripeConnectId: string }>(url, {})
+    );
+  }
 }

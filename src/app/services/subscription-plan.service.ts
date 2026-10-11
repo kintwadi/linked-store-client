@@ -1,6 +1,7 @@
 import { Injectable, inject } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { BehaviorSubject, firstValueFrom } from 'rxjs';
+import { resolveApiBase } from '../shared/utils/origins.helper';
 
 export interface PricingPlanFeature {
   label: string;
@@ -136,7 +137,7 @@ export class SubscriptionPlanService {
   async getPlans(): Promise<PricingPlan[]> {
     try {
       return await firstValueFrom(
-        this.http.get<PricingPlan[]>('/api/subscription/v1/plans')
+        this.http.get<PricingPlan[]>(`${resolveApiBase()}/subscription/v1/plans`)
       );
     } catch {
       throw new Error('Failed to load subscription plans');
@@ -184,7 +185,7 @@ export class SubscriptionPlanService {
     try {
       const res = await firstValueFrom(
         this.http.post<SubscriptionCheckoutResult>(
-          '/api/subscription/v1/checkout-session',
+          `${resolveApiBase()}/subscription/v1/checkout-session`,
           body
         )
       );
@@ -232,7 +233,7 @@ export class SubscriptionPlanService {
     if (!storeId) return empty;
     try {
       const res = await firstValueFrom(
-        this.http.get<StoreSubscriptionState>(`/api/subscription/v1/store/${storeId}`)
+        this.http.get<StoreSubscriptionState>(`${resolveApiBase()}/subscription/v1/store/${storeId}`)
       );
       return res ?? empty;
     } catch (err: any) {
@@ -255,7 +256,7 @@ export class SubscriptionPlanService {
     try {
       const res = await firstValueFrom(
         this.http.post<StoreSubscriptionCancelResult>(
-          `/api/subscription/v1/store/${storeId}/cancel`,
+          `${resolveApiBase()}/subscription/v1/store/${storeId}/cancel`,
           null
         )
       );
@@ -273,7 +274,7 @@ export class SubscriptionPlanService {
   async getAdminPlans(): Promise<AdminPlanDto[]> {
     try {
       const res = await firstValueFrom(
-        this.http.get<AdminPlanDto[]>('/api/admin/subscription-plans')
+        this.http.get<AdminPlanDto[]>(`${resolveApiBase()}/admin/subscription-plans`)
       );
       return Array.isArray(res) ? res : [];
     } catch (err: any) {
@@ -293,7 +294,7 @@ export class SubscriptionPlanService {
     try {
       const res = await firstValueFrom(
         this.http.put<AdminPlanDto>(
-          `/api/admin/subscription-plans/${encodeURIComponent(planCode)}`,
+          `${resolveApiBase()}/admin/subscription-plans/${encodeURIComponent(planCode)}`,
           body
         )
       );

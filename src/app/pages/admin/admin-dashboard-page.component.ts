@@ -2488,7 +2488,7 @@ interface PaginatedInspections {
               Subscription
             </a>
           }
-          @if (isGlobalAdmin()) {
+          @if (isGlobalAdmin() && !platformContractService.isFeeBased) {
             <button class="tab" [class.active]="activeTab() === 'plans'" (click)="activeTab.set('plans')">
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="1" y="4" width="22" height="16" rx="2"/><path d="M1 10h22"/><path d="M7 15h2"/><path d="M12 15h5"/></svg>
               Plans
@@ -4103,11 +4103,20 @@ interface PaginatedInspections {
                           </span>
                         </div>
                         <div class="form-field">
-                          <label>Platform payout Stripe Connect ID</label>
-                          <input type="text" formControlName="platformPayoutConnectId" placeholder="acct_...">
+                          <label>Platform payout Stripe Connect account</label>
+                          <div style="display: flex; gap: 8px; align-items: center;">
+                            <input type="text" formControlName="platformPayoutConnectId" placeholder="acct_..." style="flex: 1;">
+                            <button type="button" class="btn btn-secondary"
+                                    [disabled]="contractOnboarding()"
+                                    (click)="onboardPlatformAccount()">
+                              @if (contractOnboarding()) { ⟳ }
+                              @else if (contractAdmin()?.platformPayoutConnectId) { Manage }
+                              @else { Connect }
+                            </button>
+                          </div>
                           <span style="font-size: 11px; color: #6b7280;">
                             The connected account that receives platform service fee payouts.
-                            Leave blank to use the platform's default Stripe account.
+                            Click "Connect" to create and onboard a Stripe Express account for the platform.
                           </span>
                         </div>
                       </div>
@@ -4263,6 +4272,7 @@ export class AdminDashboardPageComponent implements OnInit, OnDestroy {
   readonly contractError = signal<string | null>(null);
   readonly contractSuccess = signal<string | null>(null);
   readonly contractSaving = signal(false);
+  readonly contractOnboarding = signal(false);
   readonly contractForm = this.fb.group({
     mode: this.fb.control<PlatformContractMode>('FEE_BASED', { nonNullable: true }),
     feePercentage: this.fb.control<number>(10, { nonNullable: true }),
@@ -5195,6 +5205,29 @@ export class AdminDashboardPageComponent implements OnInit, OnDestroy {
       this.contractError.set(err?.error?.message ?? err?.error ?? err?.message ?? 'Failed to save platform contract.');
     } finally {
       this.contractSaving.set(false);
+    }
+  }
+
+  async onboardPlatformAccount() {
+    if (!this.isGlobalAdmin()) return;
+    this.contractOnboarding.set(true);
+    this.contractError.set(null);
+    try {
+      const res = await this.platformContractService.createPlatformOnboardingLink();
+      if (res?.url) {
+        this.contractForm.patchValue({ platformPayoutConnectId: res.stripeConnectId });
+        const current = this.contractAdmin();
+        if (current) {
+          this.contractAdmin.set({ ...current, platformPayoutConnectId: res.stripeConnectId });
+        }
+        window.location.href = res.url;
+      } else {
+        this.contractError.set('Stripe could not create an onboarding session.');
+      }
+    } catch (err: any) {
+      this.contractError.set(err?.error?.message ?? err?.error ?? err?.message ?? 'Failed to start platform onboarding.');
+    } finally {
+      this.contractOnboarding.set(false);
     }
   }
 
