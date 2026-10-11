@@ -16,8 +16,13 @@ import {
   UpsertPlanRequest,
   UpsertPlanFeatureRequest,
 } from '../../services/subscription-plan.service';
+import {
+  PlatformContractService,
+  PlatformContractAdmin,
+  PlatformContractMode,
+} from '../../services/platform-contract.service';
 
-type TabKey = 'stores' | 'users' | 'transactions' | 'returns' | 'subscription' | 'plans';
+type TabKey = 'stores' | 'users' | 'transactions' | 'returns' | 'subscription' | 'plans' | 'contract';
 
 interface SseEventShape {
   eventId?: string | null;
@@ -2488,6 +2493,10 @@ interface PaginatedInspections {
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="1" y="4" width="22" height="16" rx="2"/><path d="M1 10h22"/><path d="M7 15h2"/><path d="M12 15h5"/></svg>
               Plans
             </button>
+            <button class="tab" [class.active]="activeTab() === 'contract'" (click)="activeTab.set('contract')">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="9" y1="15" x2="15" y2="15"/></svg>
+              Contract
+            </button>
           }
         </div>
 
@@ -4000,6 +4009,156 @@ interface PaginatedInspections {
           </div>
         }
 
+        <!-- ============ CONTRACT TAB (GLOBAL ADMIN ONLY) ============ -->
+        @if (activeTab() === 'contract' && isGlobalAdmin()) {
+          <section class="panel">
+            <div class="panel-head">
+              <div style="display: flex; align-items: center; gap: 10px;">
+                <div class="section-icon">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="9" y1="15" x2="15" y2="15"/></svg>
+                </div>
+                <div class="section-title-wrap">
+                  <h2>Platform Revenue Contract</h2>
+                  <span class="muted">Choose how stores are allowed to transact. The two modes are mutually exclusive.</span>
+                </div>
+              </div>
+            </div>
+            <div class="panel-body">
+              <div style="padding: 24px; display: grid; gap: 20px;">
+                @if (contractError()) {
+                  <div class="banner danger">
+                    <div class="banner-ico">!</div>
+                    <div class="banner-text">
+                      <div class="banner-title">Could not load contract</div>
+                      <div class="banner-msg">{{ contractError() }}</div>
+                    </div>
+                  </div>
+                }
+                @if (contractSuccess()) {
+                  <div class="banner success">
+                    <div class="banner-ico">✓</div>
+                    <div class="banner-text">
+                      <div class="banner-title">Saved</div>
+                      <div class="banner-msg">{{ contractSuccess() }}</div>
+                    </div>
+                  </div>
+                }
+
+                <form [formGroup]="contractForm" (ngSubmit)="savePlatformContract()">
+                  <div class="form-panel">
+                    <div class="form-panel-head">
+                      <div class="form-panel-title">
+                        <span class="ico">⚖</span> Revenue Model
+                      </div>
+                      <span class="badge" [class.badge-success]="contractAdmin()?.isConfigured">
+                        {{ contractAdmin()?.isConfigured ? 'Configured' : 'Not configured' }}
+                      </span>
+                    </div>
+
+                    <div style="display: grid; gap: 14px;">
+                      <label style="display: flex; align-items: flex-start; gap: 10px; padding: 14px; border: 1px solid #e5e7eb; border-radius: 12px; cursor: pointer; transition: border-color .15s;"
+                             [style.border-color]="contractForm.get('mode')?.value === 'FEE_BASED' ? '#4f46e5' : '#e5e7eb'">
+                        <input type="radio" formControlName="mode" value="FEE_BASED" style="margin-top: 3px;">
+                        <div style="flex: 1;">
+                          <div style="font-weight: 700; font-size: 14px; color: #111827;">Fee-based contract</div>
+                          <div style="font-size: 12px; color: #6b7280; margin-top: 2px;">
+                            The platform takes a percentage service fee on the originating store's arbitrage margin.
+                            No store subscription is required — the Subscription tab is hidden in store dashboards.
+                          </div>
+                        </div>
+                      </label>
+
+                      <label style="display: flex; align-items: flex-start; gap: 10px; padding: 14px; border: 1px solid #e5e7eb; border-radius: 12px; cursor: pointer; transition: border-color .15s;"
+                             [style.border-color]="contractForm.get('mode')?.value === 'SUBSCRIPTION' ? '#4f46e5' : '#e5e7eb'">
+                        <input type="radio" formControlName="mode" value="SUBSCRIPTION" style="margin-top: 3px;">
+                        <div style="flex: 1;">
+                          <div style="font-weight: 700; font-size: 14px; color: #111827;">Subscription-based contract</div>
+                          <div style="font-size: 12px; color: #6b7280; margin-top: 2px;">
+                            No platform service fee is collected. Every store must hold an active subscription
+                            (ACTIVE / TRIALING / PAST_DUE) to transact. The Subscription tab is visible in store dashboards.
+                          </div>
+                        </div>
+                      </label>
+
+                      <label style="display: flex; align-items: flex-start; gap: 10px; padding: 14px; border: 1px solid #e5e7eb; border-radius: 12px; cursor: pointer; transition: border-color .15s;"
+                             [style.border-color]="contractForm.get('mode')?.value === 'NONE' ? '#4f46e5' : '#e5e7eb'">
+                        <input type="radio" formControlName="mode" value="NONE" style="margin-top: 3px;">
+                        <div style="flex: 1;">
+                          <div style="font-weight: 700; font-size: 14px; color: #111827;">Disabled (no transactions)</div>
+                          <div style="font-size: 12px; color: #6b7280; margin-top: 2px;">
+                            Neither fee nor subscription is configured. All store transactions are blocked
+                            until a contract mode is selected.
+                          </div>
+                        </div>
+                      </label>
+                    </div>
+
+                    @if (contractForm.get('mode')?.value === 'FEE_BASED') {
+                      <div class="form-grid-2">
+                        <div class="form-field">
+                          <label>Service fee percentage <span class="req">*</span></label>
+                          <input type="number" min="0" max="100" step="0.01" formControlName="feePercentage">
+                          <span style="font-size: 11px; color: #6b7280;">
+                            Percentage of the originating store's arbitrage margin (0–100). Collected at checkout.
+                          </span>
+                        </div>
+                        <div class="form-field">
+                          <label>Platform payout Stripe Connect ID</label>
+                          <input type="text" formControlName="platformPayoutConnectId" placeholder="acct_...">
+                          <span style="font-size: 11px; color: #6b7280;">
+                            The connected account that receives platform service fee payouts.
+                            Leave blank to use the platform's default Stripe account.
+                          </span>
+                        </div>
+                      </div>
+                    }
+
+                    @if (contractForm.get('mode')?.value === 'SUBSCRIPTION') {
+                      <div class="banner info">
+                        <div class="banner-ico">i</div>
+                        <div class="banner-text">
+                          <div class="banner-title">Subscription mode</div>
+                          <div class="banner-msg">
+                            No platform service fee is collected. Stores must have an active subscription
+                            (ACTIVE / TRIALING / PAST_DUE) to originate or fulfill transactions.
+                            The Subscription tab is shown in every store dashboard.
+                          </div>
+                        </div>
+                      </div>
+                    }
+
+                    @if (contractForm.get('mode')?.value === 'NONE') {
+                      <div class="banner warn">
+                        <div class="banner-ico">!</div>
+                        <div class="banner-text">
+                          <div class="banner-title">Transactions disabled</div>
+                          <div class="banner-msg">
+                            No revenue contract is active. All store transactions are blocked until you select
+                            either Fee-based or Subscription-based.
+                          </div>
+                        </div>
+                      </div>
+                    }
+
+                    <div class="form-footer">
+                      <button type="submit" class="btn btn-primary" [disabled]="contractSaving() || contractLoading()">
+                        @if (contractSaving()) { <span class="ico">⟳</span> Saving… }
+                        @else { <span class="ico">✓</span> Save contract }
+                      </button>
+                    </div>
+                  </div>
+                </form>
+
+                @if (contractAdmin()?.updatedAt) {
+                  <div style="font-size: 12px; color: #9ca3af; text-align: right;">
+                    Last updated: {{ contractAdmin()?.updatedAt | date:'medium' }}
+                  </div>
+                }
+              </div>
+            </div>
+          </section>
+        }
+
     </div>
   `,
 })
@@ -4012,6 +4171,7 @@ export class AdminDashboardPageComponent implements OnInit, OnDestroy {
   readonly router = inject(Router);
   readonly permissionService = inject(PermissionService);
   readonly subscriptionPlanService = inject(SubscriptionPlanService);
+  readonly platformContractService = inject(PlatformContractService);
 
   readonly activeTab = signal<TabKey>('stores');
   readonly currentUser = signal<AuthUser | null>(null);
@@ -4096,6 +4256,18 @@ export class AdminDashboardPageComponent implements OnInit, OnDestroy {
   readonly planEditSaving = signal(false);
   readonly planEditError = signal<string | null>(null);
   readonly planEditForm: FormGroup;
+
+  // --- Contract tab ---
+  readonly contractAdmin = signal<PlatformContractAdmin | null>(null);
+  readonly contractLoading = signal(false);
+  readonly contractError = signal<string | null>(null);
+  readonly contractSuccess = signal<string | null>(null);
+  readonly contractSaving = signal(false);
+  readonly contractForm = this.fb.group({
+    mode: this.fb.control<PlatformContractMode>('FEE_BASED', { nonNullable: true }),
+    feePercentage: this.fb.control<number>(10, { nonNullable: true }),
+    platformPayoutConnectId: this.fb.control<string>(''),
+  });
 
   readonly isGlobalAdmin = computed(() => {
     const u = this.currentUser();
@@ -4299,6 +4471,7 @@ export class AdminDashboardPageComponent implements OnInit, OnDestroy {
       void this.loadTransactions();
       void this.loadReturns();
       void this.loadAdminPlans();
+      void this.loadPlatformContract();
     });
   }
 
@@ -4308,6 +4481,9 @@ export class AdminDashboardPageComponent implements OnInit, OnDestroy {
     }
     if (this.activeTab() === 'plans') {
       void this.loadAdminPlans();
+    }
+    if (this.activeTab() === 'contract') {
+      void this.loadPlatformContract();
     }
   });
 
@@ -4971,6 +5147,52 @@ export class AdminDashboardPageComponent implements OnInit, OnDestroy {
       this.adminPlans.set([]);
     } finally {
       this.plansLoading.set(false);
+    }
+  }
+
+  private async loadPlatformContract(): Promise<void> {
+    if (!this.isGlobalAdmin()) return;
+    this.contractLoading.set(true);
+    this.contractError.set(null);
+    try {
+      const data = await this.platformContractService.getAdmin();
+      this.contractAdmin.set(data);
+      this.contractForm.patchValue({
+        mode: data.mode,
+        feePercentage: data.feePercentage,
+        platformPayoutConnectId: data.platformPayoutConnectId ?? '',
+      });
+    } catch (err: any) {
+      this.contractError.set(err?.error?.message ?? err?.error ?? err?.message ?? 'Failed to load platform contract.');
+    } finally {
+      this.contractLoading.set(false);
+    }
+  }
+
+  async savePlatformContract(): Promise<void> {
+    if (!this.isGlobalAdmin()) return;
+    const raw = this.contractForm.getRawValue();
+    const feePct = Number(raw.feePercentage ?? 0);
+    if (Number.isNaN(feePct) || feePct < 0 || feePct > 100) {
+      this.contractError.set('Fee percentage must be between 0 and 100.');
+      return;
+    }
+    this.contractSaving.set(true);
+    this.contractError.set(null);
+    this.contractSuccess.set(null);
+    try {
+      const saved = await this.platformContractService.updateAdmin({
+        mode: raw.mode,
+        feePercentage: feePct,
+        platformPayoutConnectId: (raw.platformPayoutConnectId ?? '').trim() || null,
+      });
+      this.contractAdmin.set(saved);
+      this.contractSuccess.set('Platform contract saved successfully.');
+      setTimeout(() => this.contractSuccess.set(null), 4000);
+    } catch (err: any) {
+      this.contractError.set(err?.error?.message ?? err?.error ?? err?.message ?? 'Failed to save platform contract.');
+    } finally {
+      this.contractSaving.set(false);
     }
   }
 

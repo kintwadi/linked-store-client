@@ -11,6 +11,7 @@ import {
   StoreSubscriptionState,
   StoreSubscriptionCancelResult
 } from '../../services/subscription-plan.service';
+import { PlatformContractService } from '../../services/platform-contract.service';
 
 interface Store {
   id: string;
@@ -1477,6 +1478,7 @@ export class StoreDashboardShellComponent implements OnInit, OnDestroy {
   private readonly router = inject(Router);
   private readonly permissionService = inject(PermissionService);
   private readonly subscriptionPlanService = inject(SubscriptionPlanService);
+  readonly platformContractService = inject(PlatformContractService);
 
   readonly store = signal<Store | null>(null);
   readonly storeLoading = signal(true);
@@ -1534,6 +1536,7 @@ export class StoreDashboardShellComponent implements OnInit, OnDestroy {
   private routeSub?: Subscription;
 
   readonly canAccessSubscription = computed(() => {
+    if (this.platformContractService.isFeeBased) return false;
     const s = this.store();
     const u = this.authService.currentUser$.getValue();
     if (!u) return false;
@@ -1558,6 +1561,7 @@ export class StoreDashboardShellComponent implements OnInit, OnDestroy {
     this.trackActiveTab();
     this.watchActiveTabSubscription();
     this.watchActiveTabReturns();
+    void this.platformContractService.fetchPublic().catch(() => undefined);
 
     this.routeSub = this.route.queryParams.subscribe(qp => {
       const v = typeof qp?.['subscription'] === 'string' ? qp['subscription'] : '';

@@ -3,6 +3,7 @@ import { CommonModule } from '@angular/common';
 import { Router, RouterLink } from '@angular/router';
 import { Product } from '../../shared/models/product.model';
 import { ProductService } from '../../services/product.service';
+import { PlatformContractService } from '../../services/platform-contract.service';
 
 type CheckoutStatus = 'reserved' | 'loading' | 'confirmed' | 'error';
 
@@ -184,6 +185,12 @@ type CheckoutStatus = 'reserved' | 'loading' | 'confirmed' | 'error';
             <div class="row"><span>Subtotal</span><span>{{ formattedPrice() }}</span></div>
             <div class="row"><span>Tax (estimated)</span><span>{{ formatPrice(0, product()?.currency ?? 'USD') }}</span></div>
             <div class="row"><span>Delivery</span><span>Free</span></div>
+            @if (isFeeBased() && platformFeeCents() > 0) {
+              <div class="row" style="color: var(--color-muted);">
+                <span>Platform service fee ({{ platformFeePercentage() }}%)</span>
+                <span>{{ formattedPlatformFee() }}</span>
+              </div>
+            }
             <div class="row total"><span>Total</span><span>{{ formattedPrice() }}</span></div>
           </div>
         </section>
@@ -268,6 +275,22 @@ export class CheckoutPageComponent implements OnInit {
   readonly formattedTax   = computed(() => this.formatPrice(0, this.product()?.currency ?? 'USD'));
   readonly formattedTotal = computed(() => this.formatPrice(this.cents(), this.product()?.currency ?? 'USD'));
 
+  readonly isFeeBased = computed(() => this.platformContractService.isFeeBased);
+  readonly platformFeePercentage = computed(() => this.platformContractService.feePercentage);
+  readonly platformFeeCents = computed(() => {
+    if (!this.platformContractService.isFeeBased) return 0;
+    const p = this.product();
+    if (!p) return 0;
+    const retail = Number(p.retailPriceCents ?? 0);
+    const wholesale = Number((p as any)?.wholesalePriceCents ?? 0);
+    const margin = Math.max(0, retail - wholesale);
+    const pct = this.platformContractService.feePercentage;
+    return Math.round((margin * pct) / 100);
+  });
+  readonly formattedPlatformFee = computed(() =>
+    this.formatPrice(this.platformFeeCents(), this.product()?.currency ?? 'USD')
+  );
+
   formatPrice(cents: number, currency = 'USD'): string {
     return new Intl.NumberFormat('en-US', {
       style: 'currency',
@@ -279,9 +302,11 @@ export class CheckoutPageComponent implements OnInit {
   constructor(
     private readonly router: Router,
     private readonly productService: ProductService,
+    private readonly platformContractService: PlatformContractService,
   ) {}
 
   async ngOnInit(): Promise<void> {
+    void this.platformContractService.fetchPublic().catch(() => undefined);
     const nav = this.router.getCurrentNavigation();
     const navState: any = (nav?.extras?.state as any) ?? {};
     const historyState: any = (history.state as any) ?? {};
