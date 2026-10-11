@@ -4105,6 +4105,28 @@ interface PaginatedInspections {
                           </span>
                         </div>
                         <div class="form-field">
+                          <label>Payout country</label>
+                          <select formControlName="payoutCountry" (change)="onPayoutCountryChange($event)">
+                            @for (c of payoutCountries; track c.code) {
+                              <option [value]="c.code">{{ c.label }}</option>
+                            }
+                          </select>
+                          <span style="font-size: 11px; color: #6b7280;">
+                            Stripe Connect payout country. Selecting a country auto-suggests its default currency.
+                          </span>
+                        </div>
+                        <div class="form-field">
+                          <label>Payout currency</label>
+                          <select formControlName="payoutCurrency">
+                            @for (cur of payoutCurrencies; track cur.code) {
+                              <option [value]="cur.code">{{ cur.label }}</option>
+                            }
+                          </select>
+                          <span style="font-size: 11px; color: #6b7280;">
+                            Currency for the platform Stripe Connect payouts. Must match the selected country's supported currency.
+                          </span>
+                        </div>
+                        <div class="form-field">
                           <label>Platform payout Stripe Connect account</label>
                           <div style="display: flex; gap: 8px; align-items: center;">
                             <input type="text" formControlName="platformPayoutConnectId" placeholder="acct_..." style="flex: 1;">
@@ -4275,10 +4297,68 @@ export class AdminDashboardPageComponent implements OnInit, OnDestroy {
   readonly contractSuccess = signal<string | null>(null);
   readonly contractSaving = signal(false);
   readonly contractOnboarding = signal(false);
+  readonly payoutCountries: { code: string; label: string }[] = [
+    { code: 'US', label: 'United States (USD)' },
+    { code: 'CA', label: 'Canada (CAD)' },
+    { code: 'AU', label: 'Australia (AUD)' },
+    { code: 'NZ', label: 'New Zealand (NZD)' },
+    { code: 'GB', label: 'United Kingdom (GBP)' },
+    { code: 'AT', label: 'Austria (EUR)' },
+    { code: 'BE', label: 'Belgium (EUR)' },
+    { code: 'BG', label: 'Bulgaria (BGN)' },
+    { code: 'HR', label: 'Croatia (HRK)' },
+    { code: 'CY', label: 'Cyprus (EUR)' },
+    { code: 'CZ', label: 'Czech Republic (CZK)' },
+    { code: 'DK', label: 'Denmark (DKK)' },
+    { code: 'EE', label: 'Estonia (EUR)' },
+    { code: 'FI', label: 'Finland (EUR)' },
+    { code: 'FR', label: 'France (EUR)' },
+    { code: 'DE', label: 'Germany (EUR)' },
+    { code: 'GR', label: 'Greece (EUR)' },
+    { code: 'HU', label: 'Hungary (HUF)' },
+    { code: 'IE', label: 'Ireland (EUR)' },
+    { code: 'IT', label: 'Italy (EUR)' },
+    { code: 'LV', label: 'Latvia (EUR)' },
+    { code: 'LT', label: 'Lithuania (EUR)' },
+    { code: 'LU', label: 'Luxembourg (EUR)' },
+    { code: 'MT', label: 'Malta (EUR)' },
+    { code: 'NL', label: 'Netherlands (EUR)' },
+    { code: 'NO', label: 'Norway (NOK)' },
+    { code: 'PL', label: 'Poland (PLN)' },
+    { code: 'PT', label: 'Portugal (EUR)' },
+    { code: 'RO', label: 'Romania (RON)' },
+    { code: 'SK', label: 'Slovakia (EUR)' },
+    { code: 'SI', label: 'Slovenia (EUR)' },
+    { code: 'ES', label: 'Spain (EUR)' },
+    { code: 'SE', label: 'Sweden (SEK)' },
+    { code: 'CH', label: 'Switzerland (CHF)' },
+    { code: 'IS', label: 'Iceland (EUR)' },
+    { code: 'LI', label: 'Liechtenstein (CHF)' },
+  ];
+  readonly payoutCurrencies: { code: string; label: string }[] = [
+    { code: 'USD', label: 'US Dollar (USD)' },
+    { code: 'EUR', label: 'Euro (EUR)' },
+    { code: 'GBP', label: 'British Pound (GBP)' },
+    { code: 'CAD', label: 'Canadian Dollar (CAD)' },
+    { code: 'AUD', label: 'Australian Dollar (AUD)' },
+    { code: 'NZD', label: 'New Zealand Dollar (NZD)' },
+    { code: 'CHF', label: 'Swiss Franc (CHF)' },
+    { code: 'DKK', label: 'Danish Krone (DKK)' },
+    { code: 'NOK', label: 'Norwegian Krone (NOK)' },
+    { code: 'SEK', label: 'Swedish Krona (SEK)' },
+    { code: 'PLN', label: 'Polish Zloty (PLN)' },
+    { code: 'CZK', label: 'Czech Koruna (CZK)' },
+    { code: 'HUF', label: 'Hungarian Forint (HUF)' },
+    { code: 'RON', label: 'Romanian Leu (RON)' },
+    { code: 'BGN', label: 'Bulgarian Lev (BGN)' },
+    { code: 'HRK', label: 'Croatian Kuna (HRK)' },
+  ];
   readonly contractForm = this.fb.group({
     mode: this.fb.control<PlatformContractMode>('FEE_BASED', { nonNullable: true }),
     feePercentage: this.fb.control<number>(10, { nonNullable: true }),
     platformPayoutConnectId: this.fb.control<string>(''),
+    payoutCountry: this.fb.control<string>('US'),
+    payoutCurrency: this.fb.control<string>('USD'),
   });
 
   readonly isGlobalAdmin = computed(() => {
@@ -5215,7 +5295,11 @@ export class AdminDashboardPageComponent implements OnInit, OnDestroy {
     this.contractOnboarding.set(true);
     this.contractError.set(null);
     try {
-      const res = await this.platformContractService.createPlatformOnboardingLink();
+      const raw = this.contractForm.getRawValue();
+      const res = await this.platformContractService.createPlatformOnboardingLink({
+        country: raw.payoutCountry || undefined,
+        defaultCurrency: raw.payoutCurrency || undefined,
+      });
       if (res?.url) {
         this.contractForm.patchValue({ platformPayoutConnectId: res.stripeConnectId });
         const current = this.contractAdmin();
@@ -5231,6 +5315,17 @@ export class AdminDashboardPageComponent implements OnInit, OnDestroy {
     } finally {
       this.contractOnboarding.set(false);
     }
+  }
+
+  onPayoutCountryChange(event: Event) {
+    const country = (event.target as HTMLSelectElement).value;
+    const currencyMap: Record<string, string> = {
+      US: 'USD', CA: 'CAD', AU: 'AUD', NZ: 'NZD', GB: 'GBP',
+      CH: 'CHF', DK: 'DKK', NO: 'NOK', SE: 'SEK', PL: 'PLN',
+      CZ: 'CZK', HU: 'HUF', RO: 'RON', BG: 'BGN', HR: 'HRK',
+    };
+    const suggested = currencyMap[country] ?? 'EUR';
+    this.contractForm.patchValue({ payoutCurrency: suggested });
   }
 
   private buildFeatureFormGroup(feat: AdminPlanFeatureDto | null, order: number): FormGroup {

@@ -83,10 +83,10 @@ export class PlatformContractService {
     return saved;
   }
 
-  async createPlatformOnboardingLink(): Promise<{ url: string; status: string; stripeConnectId: string }> {
+  async createPlatformOnboardingLink(payload?: { country?: string; defaultCurrency?: string }): Promise<{ url: string; status: string; stripeConnectId: string }> {
     const url = `${resolveApiBase()}/platform-contract/admin/platform-onboarding`;
     return firstValueFrom(
-      this.http.post<{ url: string; status: string; stripeConnectId: string }>(url, {})
+      this.http.post<{ url: string; status: string; stripeConnectId: string }>(url, payload ?? {})
     );
   }
 }
