@@ -4,8 +4,9 @@ import { ReactiveFormsModule, FormBuilder, FormGroup } from '@angular/forms';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { HttpClient, HttpErrorResponse } from '@angular/common/http';
 import { firstValueFrom } from 'rxjs';
+import { resolveApiBasePublic } from '../../shared/utils/origins.helper';
 
-const api = '/api';
+const api = resolveApiBasePublic();
 
 @Component({
   selector: 'app-admin-refund-page',
