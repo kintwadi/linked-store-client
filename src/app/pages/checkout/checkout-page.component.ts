@@ -185,13 +185,13 @@ type CheckoutStatus = 'reserved' | 'loading' | 'confirmed' | 'error';
             <div class="row"><span>Subtotal</span><span>{{ formattedPrice() }}</span></div>
             <div class="row"><span>Tax (estimated)</span><span>{{ formatPrice(0, product()?.currency ?? 'USD') }}</span></div>
             <div class="row"><span>Delivery</span><span>Free</span></div>
-            @if (isFeeBased() && platformFeeCents() > 0) {
+            @if (isFeeBased()) {
               <div class="row" style="color: var(--color-muted);">
                 <span>Platform service fee ({{ platformFeePercentage() }}%)</span>
                 <span>{{ formattedPlatformFee() }}</span>
               </div>
             }
-            <div class="row total"><span>Total</span><span>{{ formattedPrice() }}</span></div>
+            <div class="row total"><span>Total</span><span>{{ formattedTotal() }}</span></div>
           </div>
         </section>
 
@@ -273,22 +273,33 @@ export class CheckoutPageComponent implements OnInit {
   });
   readonly formattedPrice = computed(() => this.formatPrice(this.cents()));
   readonly formattedTax   = computed(() => this.formatPrice(0, this.product()?.currency ?? 'USD'));
-  readonly formattedTotal = computed(() => this.formatPrice(this.cents(), this.product()?.currency ?? 'USD'));
 
   readonly isFeeBased = computed(() => this.platformContractService.isFeeBased);
   readonly platformFeePercentage = computed(() => this.platformContractService.feePercentage);
   readonly platformFeeCents = computed(() => {
     if (!this.platformContractService.isFeeBased) return 0;
-    const p = this.product();
-    if (!p) return 0;
-    const retail = Number(p.retailPriceCents ?? 0);
-    const wholesale = Number((p as any)?.wholesalePriceCents ?? 0);
-    const margin = Math.max(0, retail - wholesale);
+    const tx = this.transaction();
+    let margin = 0;
+    if (tx && typeof tx.arbitrageMarginCents === 'number' && tx.arbitrageMarginCents > 0) {
+      margin = tx.arbitrageMarginCents;
+    } else {
+      const p = this.product();
+      if (p) {
+        const retail = Number(p.retailPriceCents ?? 0);
+        const wholesale = Number((p as any)?.wholesalePriceCents ?? 0);
+        margin = Math.max(0, retail - wholesale);
+      }
+    }
+    if (margin <= 0) return 0;
     const pct = this.platformContractService.feePercentage;
     return Math.round((margin * pct) / 100);
   });
   readonly formattedPlatformFee = computed(() =>
     this.formatPrice(this.platformFeeCents(), this.product()?.currency ?? 'USD')
+  );
+  readonly totalCents = computed(() => this.cents() + this.platformFeeCents());
+  readonly formattedTotal = computed(() =>
+    this.formatPrice(this.totalCents(), this.product()?.currency ?? 'USD')
   );
 
   formatPrice(cents: number, currency = 'USD'): string {
