@@ -366,14 +366,20 @@ export class StoreTransactionsListComponent implements OnInit, OnDestroy {
     };
     const nextStatus = ev.status || (ev.type ? mapTypeToStatus[ev.type] : null) || null;
     if (txId) {
+      const terminal = new Set(['CANCELED', 'CANCELLED', 'EXPIRED']);
+      const isTerminal = nextStatus ? terminal.has(nextStatus.toUpperCase()) : false;
       const existing = this.transactions().find(t => t.id === txId);
       if (existing) {
-        const patch: Partial<Transaction> & { id: string } = { id: txId };
-        if (nextStatus) patch.status = nextStatus;
-        if (ev.expiresAt) patch.expiresAt = ev.expiresAt;
-        this.mergeIncomingTx(patch);
-        this.pulseRow(txId);
-      } else {
+        if (isTerminal) {
+          this.transactions.update(list => list.filter(t => t.id !== txId));
+        } else {
+          const patch: Partial<Transaction> & { id: string } = { id: txId };
+          if (nextStatus) patch.status = nextStatus;
+          if (ev.expiresAt) patch.expiresAt = ev.expiresAt;
+          this.mergeIncomingTx(patch);
+          this.pulseRow(txId);
+        }
+      } else if (!isTerminal) {
         void this.loadTransactions();
       }
     }
@@ -410,7 +416,12 @@ export class StoreTransactionsListComponent implements OnInit, OnDestroy {
         )
       );
       const arr = Array.isArray(data) ? data : (data.items ?? data.data ?? []);
-      this.transactions.set(arr as Transaction[]);
+      const terminal = new Set(['CANCELED', 'CANCELLED', 'EXPIRED']);
+      const filtered = (arr as Transaction[]).filter(tx => {
+        const s = (tx.status || '').toUpperCase();
+        return !terminal.has(s);
+      });
+      this.transactions.set(filtered);
     } catch (err) {
       console.error('Failed to load transactions', err);
     } finally {
@@ -525,8 +536,7 @@ export class StoreTransactionsListComponent implements OnInit, OnDestroy {
       const url = `${api}/admin/stores/${pathPart}/transactions/${encodeURIComponent(tx.id)}/mark-unavailable`;
       const res = await firstValueFrom(this.http.post<any>(url, {}));
       if (res?.transactionId) {
-        this.mergeIncomingTx({ id: tx.id, status: res.status || 'CANCELED' });
-        this.pulseRow(tx.id);
+        this.transactions.update(list => list.filter(t => t.id !== tx.id));
       } else {
         await this.loadTransactions();
       }

@@ -306,26 +306,6 @@ export class CheckoutPageComponent implements OnInit {
       this.loading.set(true);
       try {
         const tx = await this.productService.getTransaction(txId);
-        const usp = new URLSearchParams(window.location.search);
-        const anyScanParam =
-          this.scanContextFromState() ||
-          !!usp.get('gateway') || !!usp.get('gatewayCode') || !!usp.get('token') ||
-          !!usp.get('storeId') || !!usp.get('store');
-        const txOrigin = String((tx as any)?.originatingStoreId ?? '');
-        const txFulfill = String((tx as any)?.fulfillingStoreId ?? '');
-        const sameStoreCorrupted = !!txOrigin && !!txFulfill && txOrigin === txFulfill;
-        const paid = (tx as any).status === 'PAID' || (tx as any).status === 'PICKED_UP';
-        const gw =
-          navState.scanGateway ?? historyState.scanGateway ??
-          usp.get('gateway') ?? usp.get('gatewayCode') ?? usp.get('token') ?? '';
-        if (sameStoreCorrupted && !paid && anyScanParam && tx.productId) {
-          const redirect = gw
-            ? `/p/${encodeURIComponent(String(tx.productId))}?gateway=${encodeURIComponent(gw)}`
-            : `/p/${encodeURIComponent(String(tx.productId))}`;
-          this.productService.clearBrowsingHostStore();
-          this.router.navigateByUrl(redirect, { replaceUrl: true });
-          return;
-        }
         this.transaction.set(tx);
 
         let mergedProduct: Product | null = null;
