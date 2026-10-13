@@ -656,9 +656,22 @@ export class AdminRequestDetailPageComponent implements OnInit, OnDestroy {
   }
 
   showActions(): boolean {
+    if (!this.txIsFulfillingScope()) return false;
     const s = this.tx()?.status;
     if (s === 'RESERVED' || s === 'PENDING_RESERVATION') return true;
     if (s === 'READY') return true;
+    return false;
+  }
+  txIsFulfillingScope(): boolean {
+    if (this.globalAdmin) return true;
+    const myStoreId = this.currentUser?.storeId;
+    if (!myStoreId) return false;
+    const tx = this.tx();
+    if (!tx) return false;
+    const fulfillId = tx.fulfillingStoreId;
+    const originId = tx.originatingStoreId;
+    if (originId && fulfillId && fulfillId === myStoreId) return true;
+    if (!originId && fulfillId === myStoreId) return true;
     return false;
   }
   showAcceptButtonActive(): boolean {

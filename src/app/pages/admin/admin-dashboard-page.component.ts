@@ -2347,7 +2347,7 @@ interface PaginatedInspections {
                                   }
                                 </div>
                               }
-                              @if (((ev.type === 'REQUESTED' && txIsFulfillingScope(ev)) || ev.type === 'RESERVED' || ev.type === 'READY') && !isSupersededBellEvent(ev)) {
+                              @if (((ev.type === 'REQUESTED' || ev.type === 'RESERVED' || ev.type === 'READY') && txIsFulfillingScope(ev)) && !isSupersededBellEvent(ev)) {
                                 <div class="bell-action-row" (click)="$event.stopPropagation()">
                                   <button type="button"
                                           class="bell-action-btn btn-primary"
@@ -6021,8 +6021,8 @@ export class AdminDashboardPageComponent implements OnInit, OnDestroy {
   }
 
   /** Dashboard Transactions tab: show Cancel (mark-unavailable) button for READY rows. */
-  txShowCancelReadyButton(tx: { status?: string | null | undefined } | null | undefined): boolean {
-    return tx?.status === 'READY';
+  txShowCancelReadyButton(tx: any): boolean {
+    return tx?.status === 'READY' && this.txIsFulfillingScope(tx);
   }
 
   async acceptTx(tx: any): Promise<void> {

@@ -554,7 +554,7 @@ interface SseEventShape {
                   }
                 </div>
 
-                @if (ev.type === 'REQUESTED' || ev.type === 'RESERVED' || ev.type === 'READY') {
+                @if ((ev.type === 'REQUESTED' || ev.type === 'RESERVED' || ev.type === 'READY') && this.txIsFulfillingScope(ev)) {
                   <div class="card-actions" (click)="$event.stopPropagation()">
                     <button type="button"
                             class="btn btn-primary"
@@ -926,6 +926,18 @@ export class AdminNotificationsPageComponent implements OnInit, OnDestroy {
   evDenyPending(ev: SseEventShape): boolean { return ev['_actionPending'] === 'deny'; }
   evActionPending(ev: SseEventShape): boolean { return !!ev['_actionPending']; }
   evAcceptDisabled(ev: SseEventShape): boolean { return this.evActionPending(ev) || this.evStockZero(ev); }
+
+  txIsFulfillingScope(tx: any): boolean {
+    if (!tx) return false;
+    if (this.globalAdmin) return true;
+    const myStoreId = this.currentUser?.storeId;
+    if (!myStoreId) return false;
+    const fulfillId = tx.fulfillingStoreId || tx.storeId;
+    const originId = tx.originatingStoreId;
+    if (originId && fulfillId && fulfillId === myStoreId) return true;
+    if (!originId && fulfillId === myStoreId) return true;
+    return false;
+  }
 
   private showSuccess(msg: string): void {
     this.toastSuccess.set(msg);
