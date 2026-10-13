@@ -886,6 +886,11 @@ interface VariantViewRow {
                           <input type="number" formControlName="stockQuantity" step="1" min="0" placeholder="100" />
                         </div>
                       </div>
+                      @if (variantWholesaleExceedsRetail(row.index)) {
+                        <div style="color:#b91c1c; font-size:0.85rem; margin-top:0.5rem;">
+                          Wholesale price cannot exceed retail price.
+                        </div>
+                      }
 
                       <!-- Description -->
                       <div class="variant-subsection">
@@ -1126,6 +1131,20 @@ export class StoreProductFormComponent implements OnInit {
     this.cdr.markForCheck();
   }
 
+  private wholesaleNotExceedsRetailValidator(group: FormGroup): { [key: string]: boolean } | null {
+    const w = Number(group.get('wholesalePrice')?.value ?? 0);
+    const r = Number(group.get('retailPrice')?.value ?? 0);
+    if (w > r) {
+      return { wholesaleExceedsRetail: true };
+    }
+    return null;
+  }
+
+  variantWholesaleExceedsRetail(index: number): boolean {
+    const g = this.variants.at(index) as FormGroup;
+    return g?.hasError('wholesaleExceedsRetail') === true;
+  }
+
   private newVariantRow(
     sku?: string, wholesalePrice?: number, retailPrice?: number, stockQuantity?: number,
     variantImageUrl?: string, variantDescription?: string,
@@ -1142,7 +1161,7 @@ export class StoreProductFormComponent implements OnInit {
       attributes: this.fb.array(
         (attributes ?? []).map(a => this.fb.group({ key: [a.key ?? ''], value: [a.value ?? ''] }))
       ),
-    });
+    }, { validators: this.wholesaleNotExceedsRetailValidator });
     const st = this._attachStateToControl(ctrl);
     if (initialGalleryUrls && initialGalleryUrls.length) {
       const items: GalleryItem[] = initialGalleryUrls.filter(u => u).map(url => ({
