@@ -185,7 +185,7 @@ type CheckoutStatus = 'reserved' | 'loading' | 'confirmed' | 'error';
             <div class="row"><span>Subtotal</span><span>{{ formattedPrice() }}</span></div>
             <div class="row"><span>Tax (estimated)</span><span>{{ formatPrice(0, product()?.currency ?? 'USD') }}</span></div>
             <div class="row"><span>Delivery</span><span>Free</span></div>
-            @if (isFeeBased()) {
+            @if (isFeeBased() && platformFeeCents() > 0) {
               <div class="row" style="color: var(--color-muted);">
                 <span>Platform service fee ({{ platformFeePercentage() }}%)</span>
                 <span>{{ formattedPlatformFee() }}</span>
