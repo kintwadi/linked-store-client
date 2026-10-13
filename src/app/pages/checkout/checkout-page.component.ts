@@ -442,11 +442,6 @@ export class CheckoutPageComponent implements OnInit {
     const origin = this.resolveOrigin();
     const successUrl = `${origin.replace(/\/+$/, '')}/checkout/success?session_id={CHECKOUT_SESSION_ID}`;
     const cancelUrl  = `${origin.replace(/\/+$/, '')}/checkout/cancel`;
-    const usp = new URLSearchParams(window.location.search);
-    const anyScanParam =
-      this.scanContextFromState() ||
-      !!usp.get('gateway') || !!usp.get('gatewayCode') || !!usp.get('token') ||
-      !!usp.get('storeId') || !!usp.get('store');
 
     const tx = this.transaction();
     let originatingStoreId: string | null = null;
@@ -462,21 +457,19 @@ export class CheckoutPageComponent implements OnInit {
         if (n.includes('downtown') || n.includes('kicks')) return 4;
         return 9;
       };
-      if (browsingHost) {
+      if (browsingHost && String(browsingHost) !== String(variantStoreId || '')) {
         originatingStoreId = browsingHost;
-      } else if (anyScanParam) {
-        const fallbackList = await this.productService.getStores();
-        const filtered = Array.isArray(fallbackList)
-          ? fallbackList
+      } else {
+        const allStores = await this.productService.getStores();
+        const otherStores = Array.isArray(allStores)
+          ? allStores
               .filter(s => s?.id && String(s.id) !== String(variantStoreId || ''))
               .sort((a, b) => priorityScore(a?.businessName) - priorityScore(b?.businessName))
           : [];
-        originatingStoreId = (filtered[0]?.id as string | undefined)
-          ?? ([...(Array.isArray(fallbackList) ? fallbackList : [])]
-              .sort((a, b) => priorityScore(a?.businessName) - priorityScore(b?.businessName))[0]?.id as string | undefined)
-          ?? variantStoreId;
-      } else {
-        originatingStoreId = variantStoreId;
+        originatingStoreId = (otherStores[0]?.id as string | undefined) ?? null;
+      }
+      if (!originatingStoreId) {
+        throw new Error('Self-store checkout is not available. Please browse from a different store to complete this purchase.');
       }
     }
 
