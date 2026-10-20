@@ -10,7 +10,11 @@ export const authGuard: CanActivateFn = (route): boolean | UrlTree => {
     return router.createUrlTree(['/login']);
   }
 
-  const data = route.data as { requireGlobalAdmin?: boolean; requireStoreAdmin?: boolean } | undefined;
+  const data = route.data as {
+    requireGlobalAdmin?: boolean;
+    requireStoreAdmin?: boolean;
+    requireStoreStaffAboveRunner?: boolean;
+  } | undefined;
   const user = authService.currentUser$.getValue();
 
   if (data?.requireGlobalAdmin) {
@@ -29,6 +33,17 @@ export const authGuard: CanActivateFn = (route): boolean | UrlTree => {
       user?.role === 'CLERK' ||
       user?.role === 'RUNNER';
     if (!isAdmin) {
+      return router.createUrlTree(['/']);
+    }
+  }
+
+  if (data?.requireStoreStaffAboveRunner) {
+    const allowed =
+      !!user &&
+      !user.isGlobalAdmin &&
+      !!user.storeId &&
+      user.role !== 'RUNNER';
+    if (!allowed) {
       return router.createUrlTree(['/']);
     }
   }
