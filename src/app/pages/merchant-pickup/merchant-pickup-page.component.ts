@@ -46,6 +46,20 @@ import {
       display: grid;
       gap: 8px;
     }
+    .eyebrow {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      width: fit-content;
+      padding: 6px 10px;
+      border-radius: 999px;
+      background: var(--color-primary-50);
+      color: var(--color-primary);
+      font-size: 12px;
+      font-weight: 700;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+    }
     .form-card {
       display: grid;
       gap: 14px;
@@ -80,43 +94,153 @@ import {
     }
     .result-card {
       display: grid;
-      gap: 12px;
+      gap: 18px;
     }
-    .result-card h3 {
+    .result-head {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+    .result-card h3,
+    .result-head h3 {
       margin: 0;
-      font-size: 16px;
+      font-size: 18px;
       font-weight: 600;
     }
-    .result-rows {
+    .result-subtitle {
+      margin: 6px 0 0;
+      font-size: 13px;
+      color: var(--color-muted);
+      line-height: 1.5;
+    }
+    .result-actions {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+    .btn-secondary {
+      background: #fff;
+      color: var(--color-ink);
+      border: 1px solid var(--color-border);
+    }
+    .result-summary {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 12px;
+    }
+    .summary-pill {
+      background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius-md);
+      padding: 14px;
+      display: grid;
+      gap: 6px;
+      min-width: 0;
+    }
+    .summary-pill .label {
+      font-size: 12px;
+      color: var(--color-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      font-weight: 700;
+    }
+    .summary-pill .value {
+      font-size: 20px;
+      font-weight: 700;
+      color: var(--color-ink);
+      line-height: 1.2;
+      word-break: break-word;
+    }
+    .settlement-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 14px;
+    }
+    .settlement-card {
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius-md);
+      background: #fff;
+      padding: 16px;
+      display: grid;
+      gap: 12px;
+      min-width: 0;
+    }
+    .settlement-card.highlight {
+      background: linear-gradient(180deg, #fcfcff 0%, #f7f5ff 100%);
+      border-color: #d9d6fe;
+    }
+    .settlement-card h4 {
+      margin: 0;
+      font-size: 15px;
+      font-weight: 700;
+      color: var(--color-ink);
+    }
+    .settlement-amount {
+      font-size: 24px;
+      font-weight: 800;
+      line-height: 1.1;
+      color: var(--color-ink);
+      word-break: break-word;
+    }
+    .settlement-copy {
       display: grid;
       gap: 8px;
     }
-    .result-row {
+    .settlement-meta {
       display: grid;
-      grid-template-columns: 140px 1fr;
-      gap: 12px;
-      font-size: 14px;
-      padding: 6px 0;
+      gap: 8px;
     }
-    .result-row .k {
+    .meta-row {
+      display: grid;
+      grid-template-columns: 128px minmax(0, 1fr);
+      gap: 12px;
+      align-items: start;
+    }
+    .meta-row .k {
       color: var(--color-muted);
       font-weight: 500;
     }
-    .result-row .v {
+    .meta-row .v {
       color: var(--color-ink);
       word-break: break-word;
+    }
+    .info-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 14px;
+    }
+    .info-card {
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius-md);
+      background: #fff;
+      padding: 16px;
+      display: grid;
+      gap: 12px;
+      min-width: 0;
+    }
+    .info-card h4 {
+      margin: 0;
+      font-size: 14px;
+      font-weight: 700;
+      color: var(--color-ink);
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
     }
     .mono {
       font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
       font-size: 12px;
       background: #f9fafb;
       padding: 3px 6px;
+      display: inline-block;
+      max-width: 100%;
+      overflow-wrap: anywhere;
       border-radius: 4px;
     }
     .status-badge {
       display: inline-flex;
       align-items: center;
-      padding: 4px 10px;
       border-radius: 999px;
       font-size: 12px;
       font-weight: 600;
@@ -154,12 +278,75 @@ import {
       background: var(--color-primary-50);
       color: var(--color-primary);
     }
+    .invoice-note {
+      font-size: 12px;
+      color: var(--color-muted);
+      line-height: 1.5;
+    }
+    @media (max-width: 640px) {
+      .wrap {
+        padding: 18px 12px 40px;
+        gap: 16px;
+      }
+      .page-title {
+        font-size: 24px;
+      }
+      .result-summary,
+      .settlement-grid,
+      .info-grid {
+        grid-template-columns: 1fr;
+      }
+      .meta-row {
+        grid-template-columns: 1fr;
+        gap: 4px;
+      }
+      .result-actions {
+        width: 100%;
+      }
+      .result-actions .btn {
+        flex: 1 1 100%;
+      }
+      .summary-pill .value,
+      .settlement-amount {
+        font-size: 22px;
+      }
+    }
+    @media print {
+      .back,
+      .form-card,
+      .error-box,
+      .print-hide {
+        display: none !important;
+      }
+      .wrap {
+        max-width: none;
+        margin: 0;
+        padding: 0;
+        gap: 16px;
+      }
+      .card,
+      .settlement-card,
+      .info-card,
+      .summary-pill {
+        box-shadow: none !important;
+        border-color: #d1d5db !important;
+        break-inside: avoid;
+      }
+      .result-card {
+        border: none !important;
+        padding: 0 !important;
+      }
+      .result-head {
+        margin-bottom: 8px;
+      }
+    }
   `],
   template: `
     <div class="wrap">
       <a class="back" [routerLink]="backLink()">← {{ backLabel() }}</a>
 
       <div class="header">
+        <span class="eyebrow">Pickup settlement</span>
         <h1 class="page-title">{{ pageTitle() }}</h1>
         <p class="page-subtitle">{{ pageSubtitle() }}</p>
       </div>
@@ -192,116 +379,139 @@ import {
 
       @if (result()) {
         <section class="card result-card">
-          <h3>Result</h3>
+          <div class="result-head">
+            <div>
+              <h3>Settlement receipt</h3>
+              <p class="result-subtitle">
+                Pickup has been verified. Use this receipt for handoff confirmation and invoice printing.
+              </p>
+            </div>
+            <div class="result-actions print-hide">
+              <button class="btn btn-secondary" type="button" (click)="printInvoice()">
+                Print invoice
+              </button>
+            </div>
+          </div>
 
-          <div class="result-rows">
-            <div class="result-row">
-              <span class="k">Status</span>
-              <span class="v">
+          <div class="result-summary">
+            <div class="summary-pill">
+              <span class="label">Verification</span>
+              <span class="value">
                 <span class="status-badge" [class]="statusClass(result()!.status)">
                   {{ result()!.status || '—' }}
                 </span>
               </span>
             </div>
-
-            @if (result()!.transactionId) {
-              <div class="result-row">
-                <span class="k">Transaction ID</span>
-                <span class="v"><span class="mono">{{ result()!.transactionId }}</span></span>
-              </div>
-            }
-
-            @if (result()!.transactionStatus) {
-              <div class="result-row">
-                <span class="k">Transaction Status</span>
-                <span class="v">
+            <div class="summary-pill">
+              <span class="label">Transaction status</span>
+              <span class="value">
+                @if (result()!.transactionStatus) {
                   <span class="status-badge" [class]="statusClass(result()!.transactionStatus)">
                     {{ result()!.transactionStatus }}
                   </span>
-                </span>
-              </div>
-            }
+                } @else {
+                  —
+                }
+              </span>
+            </div>
+            <div class="summary-pill">
+              <span class="label">Currency</span>
+              <span class="value">{{ result()!.currency || '—' }}</span>
+            </div>
+          </div>
 
-            @if (result()!.currency) {
-              <div class="result-row">
-                <span class="k">Currency</span>
-                <span class="v">{{ result()!.currency }}</span>
-              </div>
-            }
-
+          <div class="settlement-grid">
             @if (result()!.wholesaleAmountCents !== undefined && result()!.wholesaleAmountCents !== null) {
-              <div class="result-row">
-                <span class="k">Transfer A — Wholesale to Owner</span>
-                <span class="v">
-                  {{ formatMargin(result()!.wholesaleAmountCents, result()!.currency) }}
+              <section class="settlement-card highlight">
+                <h4>Transfer A: Wholesale to owner</h4>
+                <div class="settlement-amount">{{ formatMargin(result()!.wholesaleAmountCents, result()!.currency) }}</div>
+                <div class="settlement-meta">
                   @if (result()!.wholesaleToStoreId) {
-                    <span class="mono"> · {{ result()!.wholesaleToStoreId }}</span>
+                    <div class="meta-row">
+                      <span class="k">Store</span>
+                      <span class="v"><span class="mono">{{ result()!.wholesaleToStoreId }}</span></span>
+                    </div>
                   }
-                </span>
-              </div>
-              <div class="result-row">
-                <span class="k">Transfer A ID</span>
-                <span class="v">
-                  @if (result()!.wholesaleTransferId) {
-                    <span class="mono">{{ result()!.wholesaleTransferId }}</span>
-                  } @else {
-                    (transfer failed / pending)
-                  }
-                </span>
-              </div>
+                  <div class="meta-row">
+                    <span class="k">Transfer ID</span>
+                    <span class="v">
+                      @if (result()!.wholesaleTransferId) {
+                        <span class="mono">{{ result()!.wholesaleTransferId }}</span>
+                      } @else {
+                        transfer failed / pending
+                      }
+                    </span>
+                  </div>
+                </div>
+              </section>
             }
 
             @if (result()!.marginToOriginatingCents !== undefined && result()!.marginToOriginatingCents !== null) {
-              <div class="result-row">
-                <span class="k">Transfer B — Margin to Brokerage</span>
-                <span class="v">
-                  {{ formatMargin(result()!.marginToOriginatingCents, result()!.currency) }}
+              <section class="settlement-card">
+                <h4>Transfer B: Margin to brokerage</h4>
+                <div class="settlement-amount">{{ formatMargin(result()!.marginToOriginatingCents, result()!.currency) }}</div>
+                <div class="settlement-meta">
                   @if (result()!.marginToStoreId) {
-                    <span class="mono"> · {{ result()!.marginToStoreId }}</span>
+                    <div class="meta-row">
+                      <span class="k">Store</span>
+                      <span class="v"><span class="mono">{{ result()!.marginToStoreId }}</span></span>
+                    </div>
                   }
-                </span>
-              </div>
-              <div class="result-row">
-                <span class="k">Transfer B ID</span>
-                <span class="v">
-                  @if (result()!.stripeTransferId) {
-                    <span class="mono">{{ result()!.stripeTransferId }}</span>
-                  } @else {
-                    (transfer failed / pending)
-                  }
-                </span>
-              </div>
+                  <div class="meta-row">
+                    <span class="k">Transfer ID</span>
+                    <span class="v">
+                      @if (result()!.stripeTransferId) {
+                        <span class="mono">{{ result()!.stripeTransferId }}</span>
+                      } @else {
+                        transfer failed / pending
+                      }
+                    </span>
+                  </div>
+                </div>
+              </section>
             }
+          </div>
 
-            @if (result()!.platformFeeCents !== undefined && result()!.platformFeeCents !== null && result()!.platformFeeCents > 0) {
-              <div class="result-row">
-                <span class="k">Platform Fee Retained</span>
-                <span class="v">{{ formatMargin(result()!.platformFeeCents, result()!.currency) }}</span>
+          <div class="info-grid">
+            <section class="info-card">
+              <h4>Settlement details</h4>
+              <div class="settlement-copy">
+                @if (result()!.transactionId) {
+                  <div class="meta-row">
+                    <span class="k">Transaction ID</span>
+                    <span class="v"><span class="mono">{{ result()!.transactionId }}</span></span>
+                  </div>
+                }
+                @if (result()!.platformFeeCents !== undefined && result()!.platformFeeCents !== null && result()!.platformFeeCents > 0) {
+                  <div class="meta-row">
+                    <span class="k">Platform fee retained</span>
+                    <span class="v">{{ formatMargin(result()!.platformFeeCents, result()!.currency) }}</span>
+                  </div>
+                }
+                @if (result()!.arbitrageMarginCents !== undefined && result()!.arbitrageMarginCents !== null) {
+                  <div class="meta-row">
+                    <span class="k">Gross arbitrage margin</span>
+                    <span class="v">{{ formatMargin(result()!.arbitrageMarginCents, result()!.currency) }}</span>
+                  </div>
+                }
+                @if (result()!.qrScannedAt) {
+                  <div class="meta-row">
+                    <span class="k">Verified at</span>
+                    <span class="v">{{ formatDateTime(result()!.qrScannedAt) }}</span>
+                  </div>
+                }
               </div>
-            }
+            </section>
 
-            @if (result()!.arbitrageMarginCents !== undefined && result()!.arbitrageMarginCents !== null) {
-              <div class="result-row">
-                <span class="k">Gross Arbitrage Margin</span>
-                <span class="v">{{ formatMargin(result()!.arbitrageMarginCents, result()!.currency) }}</span>
+            <section class="info-card">
+              <h4>Invoice note</h4>
+              @if (result()!.message) {
+                <div class="message-box info">{{ result()!.message }}</div>
+              }
+              <div class="invoice-note">
+                Print this receipt for pickup records, store reconciliation, or internal accounting follow-up.
               </div>
-            }
-
-            @if (result()!.qrScannedAt) {
-              <div class="result-row">
-                <span class="k">QR Scanned At</span>
-                <span class="v">{{ result()!.qrScannedAt }}</span>
-              </div>
-            }
-
-            @if (result()!.message) {
-              <div class="result-row">
-                <span class="k">Message</span>
-                <span class="v">
-                  <span class="message-box info">{{ result()!.message }}</span>
-                </span>
-              </div>
-            }
+            </section>
           </div>
         </section>
       }
@@ -417,6 +627,22 @@ export class MerchantPickupPageComponent implements OnInit {
   formatMargin(cents: number, currency: string | undefined): string {
     const cur = currency || 'USD';
     return this.products.formatPrice(cents, cur);
+  }
+
+  formatDateTime(value: string): string {
+    const parsed = new Date(value);
+    if (Number.isNaN(parsed.getTime())) return value;
+    return new Intl.DateTimeFormat(undefined, {
+      year: 'numeric',
+      month: 'short',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+    }).format(parsed);
+  }
+
+  printInvoice(): void {
+    window.print();
   }
 
   statusClass(s: string): string {
