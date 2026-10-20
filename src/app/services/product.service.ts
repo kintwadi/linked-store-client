@@ -564,6 +564,11 @@ export class ProductService {
     marginToStoreId?: string;
     marginToStoreConnectId?: string;
     stripeTransferId?: string;
+    wholesaleAmountCents?: number;
+    wholesaleToStoreId?: string;
+    wholesaleTransferId?: string;
+    marginToOriginatingCents?: number;
+    platformFeeCents?: number;
     qrScannedAt?: string;
     message?: string;
   }> {

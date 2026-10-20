@@ -222,15 +222,6 @@ import {
               </div>
             }
 
-            @if (result()!.marginAmountCents !== undefined && result()!.marginAmountCents !== null) {
-              <div class="result-row">
-                <span class="k">Margin</span>
-                <span class="v">
-                  {{ formatMargin(result()!.marginAmountCents, result()!.currency) }}
-                </span>
-              </div>
-            }
-
             @if (result()!.currency) {
               <div class="result-row">
                 <span class="k">Currency</span>
@@ -238,23 +229,63 @@ import {
               </div>
             }
 
-            @if (result()!.marginToStoreId) {
+            @if (result()!.wholesaleAmountCents !== undefined && result()!.wholesaleAmountCents !== null) {
               <div class="result-row">
-                <span class="k">Margin to Store</span>
-                <span class="v"><span class="mono">{{ result()!.marginToStoreId }}</span></span>
+                <span class="k">Transfer A — Wholesale to Owner</span>
+                <span class="v">
+                  {{ formatMargin(result()!.wholesaleAmountCents, result()!.currency) }}
+                  @if (result()!.wholesaleToStoreId) {
+                    <span class="mono"> · {{ result()!.wholesaleToStoreId }}</span>
+                  }
+                </span>
+              </div>
+              <div class="result-row">
+                <span class="k">Transfer A ID</span>
+                <span class="v">
+                  @if (result()!.wholesaleTransferId) {
+                    <span class="mono">{{ result()!.wholesaleTransferId }}</span>
+                  } @else {
+                    (transfer failed / pending)
+                  }
+                </span>
               </div>
             }
 
-            <div class="result-row">
-              <span class="k">Stripe Transfer</span>
-              <span class="v">
-                @if (result()!.stripeTransferId) {
-                  <span class="mono">{{ result()!.stripeTransferId }}</span>
-                } @else {
-                  (transfer failed / pending)
-                }
-              </span>
-            </div>
+            @if (result()!.marginToOriginatingCents !== undefined && result()!.marginToOriginatingCents !== null) {
+              <div class="result-row">
+                <span class="k">Transfer B — Margin to Brokerage</span>
+                <span class="v">
+                  {{ formatMargin(result()!.marginToOriginatingCents, result()!.currency) }}
+                  @if (result()!.marginToStoreId) {
+                    <span class="mono"> · {{ result()!.marginToStoreId }}</span>
+                  }
+                </span>
+              </div>
+              <div class="result-row">
+                <span class="k">Transfer B ID</span>
+                <span class="v">
+                  @if (result()!.stripeTransferId) {
+                    <span class="mono">{{ result()!.stripeTransferId }}</span>
+                  } @else {
+                    (transfer failed / pending)
+                  }
+                </span>
+              </div>
+            }
+
+            @if (result()!.platformFeeCents !== undefined && result()!.platformFeeCents !== null && result()!.platformFeeCents > 0) {
+              <div class="result-row">
+                <span class="k">Platform Fee Retained</span>
+                <span class="v">{{ formatMargin(result()!.platformFeeCents, result()!.currency) }}</span>
+              </div>
+            }
+
+            @if (result()!.arbitrageMarginCents !== undefined && result()!.arbitrageMarginCents !== null) {
+              <div class="result-row">
+                <span class="k">Gross Arbitrage Margin</span>
+                <span class="v">{{ formatMargin(result()!.arbitrageMarginCents, result()!.currency) }}</span>
+              </div>
+            }
 
             @if (result()!.qrScannedAt) {
               <div class="result-row">
