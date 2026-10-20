@@ -123,12 +123,12 @@ export class CheckoutSuccessPageComponent implements OnInit {
     try {
       const res = await this.products.confirmSessionPaid(sid);
       if (res?.finalized) {
-        this.confirmMsg.set('Transaction finalized. Store dashboards updated live.');
+        this.confirmMsg.set('Payment confirmed. The item is now ready for pickup and available in the pickup queue.');
       } else if (res?.status === 'not_paid') {
         this.confirmMsg.set(res.message ?? 'Awaiting payment confirmation.');
         this.confirmError.set(true);
       } else {
-        this.confirmMsg.set(res.message ?? 'Payment confirmed; webhook will finalize shortly.');
+        this.confirmMsg.set(res.message ?? 'Payment confirmed; the item will appear in the pickup queue as soon as finalization completes.');
       }
     } catch (err: any) {
       this.confirmError.set(true);

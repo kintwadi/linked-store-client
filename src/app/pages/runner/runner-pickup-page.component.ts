@@ -6,7 +6,7 @@ import { ProductService } from '../../services/product.service';
 import { AuthService } from '../../services/auth.service';
 import { firstValueFrom } from 'rxjs';
 
-type PickupStatusFilter = 'PAID' | 'PICKED_UP' | 'READY';
+type PickupStatusFilter = 'READY_FOR_PICKUP' | 'PICKED_UP' | 'READY';
 
 type PickupTx = {
   id: string;
@@ -386,9 +386,9 @@ type PickupTx = {
           <button
             type="button"
             class="tab"
-            [class.active]="filter() === 'PAID'"
-            (click)="setFilter('PAID')">
-            Ready for pickup · {{ countFor('PAID') }}
+            [class.active]="filter() === 'READY_FOR_PICKUP'"
+            (click)="setFilter('READY_FOR_PICKUP')">
+            Ready for pickup · {{ countFor('READY_FOR_PICKUP') }}
           </button>
           <button
             type="button"
@@ -434,7 +434,7 @@ type PickupTx = {
             <h3>No pickups here 🎉</h3>
             <p>
               @switch (filter()) {
-                @case ('PAID') { Nothing is currently waiting to be picked up. When a customer pays, the item will appear here. }
+                @case ('READY_FOR_PICKUP') { Nothing is currently waiting to be picked up. Once payment is confirmed, the item will appear here with its pickup scan button. }
                 @case ('READY') { No stores have accepted a request yet — once they mark an item ready, it will show here until payment completes. }
                 @case ('PICKED_UP') { You haven't picked anything up yet in this window. Once you scan items at the store, they will appear here. }
               }
@@ -560,7 +560,7 @@ type PickupTx = {
 
           <div class="page-bar">
             <div class="page-info">
-              Showing {{ visible().length }} of {{ totalCount() }} {{ filter() }} items.
+              Showing {{ visible().length }} of {{ totalCount() }} {{ filterLabel(filter()) }} items.
             </div>
             <div style="display:flex; gap:8px;">
               <button
@@ -583,7 +583,7 @@ type PickupTx = {
 export class RunnerPickupPageComponent implements OnInit {
   readonly items = signal<PickupTx[]>([]);
   readonly loading = signal(true);
-  readonly filter = signal<PickupStatusFilter>('PAID');
+  readonly filter = signal<PickupStatusFilter>('READY_FOR_PICKUP');
   readonly page = signal(0);
   readonly pageSize = signal(50);
   readonly totalCount = signal(0);
@@ -681,8 +681,19 @@ export class RunnerPickupPageComponent implements OnInit {
     this.reload();
   }
 
+  filterLabel(filter: PickupStatusFilter): string {
+    switch (filter) {
+      case 'READY_FOR_PICKUP': return 'ready-for-pickup';
+      case 'READY': return 'awaiting-payment';
+      case 'PICKED_UP': return 'completed';
+    }
+  }
+
   countFor(status: PickupStatusFilter): number {
     if (status === this.filter()) return this.totalCount();
+    if (status === 'READY_FOR_PICKUP') {
+      return this.items().filter(i => i.status === 'PAID' || i.status === 'READY').length;
+    }
     return this.items().filter(i => i.status === status).length;
   }
 

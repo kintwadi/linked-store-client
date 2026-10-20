@@ -628,7 +628,7 @@ export class ProductService {
     hasPrevious: boolean;
   }> {
     const api = resolveApiBase();
-    const status = options?.status ?? 'PAID';
+    const status = options?.status ?? 'READY_FOR_PICKUP';
     const page = Math.max(0, options?.page ?? 0);
     const pageSize = Math.max(1, Math.min(200, options?.pageSize ?? 50));
     return firstValueFrom(
