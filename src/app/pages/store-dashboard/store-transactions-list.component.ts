@@ -9,7 +9,9 @@ interface Transaction {
   id: string;
   createdAt: string | null;
   originatingStoreId: string | null;
+  originatingStoreName?: string | null;
   fulfillingStoreId: string | null;
+  fulfillingStoreName?: string | null;
   status: string | null;
   totalAmountCents: number | null;
   totalRetailCents?: number | null;
@@ -20,6 +22,7 @@ interface Transaction {
   variantId?: string | null;
   productTitle?: string | null;
   sku?: string | null;
+  currency?: string | null;
 }
 
 @Component({
@@ -579,64 +582,152 @@ export class StoreTransactionsListComponent implements OnInit, OnDestroy {
           minute: '2-digit',
         }).format(new Date(tx.createdAt))
       : '—';
+    const printedAt = new Intl.DateTimeFormat('en-US', {
+      year: 'numeric',
+      month: 'short',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+    }).format(new Date());
     const totalCents = tx.totalAmountCents ?? tx.totalRetailCents ?? null;
-    const total = this.formatMoney(totalCents, 'USD');
+    const currency = tx.currency ?? 'USD';
+    const total = this.formatMoney(totalCents, currency);
     const role = this.isBoth(tx) ? 'Host and Fulfillment' : this.isHost(tx) ? 'Host store' : 'Fulfilling store';
     const productTitle = tx.productTitle || 'Store transaction';
     const sku = tx.sku || '—';
+    const qty = this.itemsCount(tx) || 1;
+    const originStore = tx.originatingStoreName || 'Origin store';
+    const fulfillStore = tx.fulfillingStoreName || 'Fulfilling store';
+    const statusClass = this.statusClass(tx.status);
     return `<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="utf-8" />
   <title>Invoice ${this.escapeHtml(tx.id)}</title>
   <style>
-    body { font-family: Arial, sans-serif; color: #111827; margin: 0; padding: 32px; background: #f8fafc; }
-    .sheet { max-width: 820px; margin: 0 auto; background: #fff; border: 1px solid #e5e7eb; border-radius: 18px; padding: 28px; }
-    .top { display: flex; justify-content: space-between; gap: 24px; flex-wrap: wrap; margin-bottom: 24px; }
-    .brand { font-size: 24px; font-weight: 800; margin: 0; }
-    .muted { color: #6b7280; font-size: 13px; }
-    .pill { display: inline-block; padding: 6px 10px; border-radius: 999px; background: #eef2ff; color: #4338ca; font-size: 12px; font-weight: 700; }
-    .grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; margin: 20px 0; }
-    .card { border: 1px solid #e5e7eb; border-radius: 14px; padding: 16px; background: #fff; }
-    .label { font-size: 12px; text-transform: uppercase; letter-spacing: 0.05em; color: #6b7280; margin-bottom: 6px; }
-    .value { font-size: 16px; font-weight: 700; word-break: break-word; }
-    table { width: 100%; border-collapse: collapse; margin-top: 18px; }
-    th, td { padding: 12px 0; border-bottom: 1px solid #e5e7eb; text-align: left; }
+    * { box-sizing: border-box; }
+    body { font-family: Inter, Arial, sans-serif; color: #0f172a; margin: 0; padding: 32px; background: linear-gradient(180deg, #eef2ff 0%, #f8fafc 100%); }
+    .sheet { max-width: 920px; margin: 0 auto; background: #ffffff; border: 1px solid #e2e8f0; border-radius: 28px; padding: 32px; box-shadow: 0 24px 48px rgba(15, 23, 42, 0.10); }
+    .hero { display: grid; grid-template-columns: minmax(0, 1.5fr) minmax(260px, 0.9fr); gap: 20px; align-items: stretch; margin-bottom: 24px; }
+    .hero-main { padding: 24px; border-radius: 24px; background: radial-gradient(circle at top left, rgba(99,102,241,0.18), transparent 45%), linear-gradient(135deg, #111827 0%, #312e81 100%); color: #ffffff; }
+    .eyebrow { display: inline-flex; padding: 6px 10px; border-radius: 999px; background: rgba(255,255,255,0.14); color: #e0e7ff; font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.08em; }
+    .brand { margin: 16px 0 8px; font-size: 30px; font-weight: 800; letter-spacing: -0.03em; }
+    .subtitle { margin: 0; font-size: 14px; line-height: 1.7; color: rgba(255,255,255,0.82); max-width: 540px; }
+    .hero-meta { margin-top: 22px; display: flex; flex-wrap: wrap; gap: 10px; }
+    .meta-chip { display: inline-flex; align-items: center; gap: 8px; padding: 9px 12px; border-radius: 999px; background: rgba(255,255,255,0.12); color: #f8fafc; font-size: 12px; font-weight: 700; }
+    .summary { border: 1px solid #e2e8f0; border-radius: 24px; padding: 24px; background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%); display: grid; gap: 16px; }
+    .summary-label { font-size: 12px; text-transform: uppercase; letter-spacing: 0.08em; color: #64748b; font-weight: 700; }
+    .summary-total { font-size: 34px; font-weight: 800; letter-spacing: -0.03em; color: #0f172a; }
+    .status-pill { display: inline-flex; width: fit-content; padding: 8px 12px; border-radius: 999px; font-size: 12px; font-weight: 800; letter-spacing: 0.04em; text-transform: uppercase; }
+    .status-pill.ok { background: #ecfdf5; color: #047857; }
+    .status-pill.warn { background: #fffbeb; color: #b45309; }
+    .status-pill.err { background: #fef2f2; color: #b91c1c; }
+    .status-pill.info { background: #eef2ff; color: #4338ca; }
+    .section { margin-top: 18px; border: 1px solid #e2e8f0; border-radius: 22px; padding: 22px; background: #ffffff; }
+    .section-title { margin: 0 0 16px; font-size: 13px; font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase; color: #64748b; }
+    .grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
+    .card { border: 1px solid #e2e8f0; border-radius: 18px; padding: 16px; background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%); min-width: 0; }
+    .label { font-size: 11px; text-transform: uppercase; letter-spacing: 0.08em; color: #64748b; margin-bottom: 8px; font-weight: 700; }
+    .value { font-size: 16px; font-weight: 700; word-break: break-word; color: #0f172a; }
+    .value.mono { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; font-size: 13px; }
+    .route-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
+    .route-card { border-radius: 18px; padding: 18px; background: #f8fafc; border: 1px solid #e2e8f0; }
+    .route-kicker { font-size: 11px; text-transform: uppercase; letter-spacing: 0.08em; color: #6366f1; font-weight: 800; margin-bottom: 8px; }
+    .route-name { font-size: 18px; font-weight: 800; color: #0f172a; }
+    table { width: 100%; border-collapse: collapse; }
+    th { text-align: left; padding: 12px 0; font-size: 11px; text-transform: uppercase; letter-spacing: 0.08em; color: #64748b; border-bottom: 1px solid #cbd5e1; }
+    td { padding: 16px 0; border-bottom: 1px solid #e2e8f0; vertical-align: top; color: #0f172a; }
     th:last-child, td:last-child { text-align: right; }
-    .total { margin-top: 18px; display: flex; justify-content: space-between; font-size: 22px; font-weight: 800; }
-    @media print { body { background: #fff; padding: 0; } .sheet { border: none; border-radius: 0; padding: 0; } }
+    .prod-title { font-weight: 800; margin-bottom: 4px; }
+    .prod-sub { font-size: 12px; color: #64748b; }
+    .totals { margin-top: 18px; margin-left: auto; width: min(320px, 100%); border-top: 1px solid #cbd5e1; padding-top: 14px; display: grid; gap: 10px; }
+    .totals-row { display: flex; justify-content: space-between; gap: 16px; font-size: 14px; color: #475569; }
+    .totals-row strong { color: #0f172a; }
+    .totals-row.grand { font-size: 24px; font-weight: 800; color: #0f172a; padding-top: 4px; }
+    .footer-note { margin-top: 18px; font-size: 12px; line-height: 1.7; color: #64748b; }
+    @media (max-width: 720px) {
+      body { padding: 14px; }
+      .sheet { padding: 18px; border-radius: 20px; }
+      .hero, .grid, .route-grid { grid-template-columns: 1fr; }
+      .summary-total { font-size: 30px; }
+    }
+    @media print {
+      body { background: #ffffff; padding: 0; }
+      .sheet { max-width: none; border: none; border-radius: 0; padding: 0; box-shadow: none; }
+      .hero-main { background: #111827 !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+      .summary, .card, .route-card, .section { break-inside: avoid; box-shadow: none; }
+    }
   </style>
 </head>
 <body>
   <div class="sheet">
-    <div class="top">
-      <div>
-        <p class="brand">DinRetail Invoice</p>
-        <div class="muted">Transaction receipt for store records</div>
+    <section class="hero">
+      <div class="hero-main">
+        <span class="eyebrow">Store Invoice</span>
+        <p class="brand">DinRetail Receipt</p>
+        <p class="subtitle">Clean printout for store-side reconciliation, pickup records, and internal accounting.</p>
+        <div class="hero-meta">
+          <span class="meta-chip">Transaction ${this.escapeHtml(tx.id.slice(0, 12))}</span>
+          <span class="meta-chip">Printed ${this.escapeHtml(printedAt)}</span>
+        </div>
       </div>
-      <div>
-        <div class="pill">${this.escapeHtml(tx.status || 'PENDING')}</div>
+      <div class="summary">
+        <div class="summary-label">Total amount</div>
+        <div class="summary-total">${this.escapeHtml(total)}</div>
+        <div class="status-pill ${statusClass}">${this.escapeHtml(tx.status || 'PENDING')}</div>
+        <div class="footer-note">Perspective: ${this.escapeHtml(role)}</div>
       </div>
-    </div>
-    <div class="grid">
-      <div class="card"><div class="label">Transaction ID</div><div class="value">${this.escapeHtml(tx.id)}</div></div>
-      <div class="card"><div class="label">Created</div><div class="value">${this.escapeHtml(createdAt)}</div></div>
-      <div class="card"><div class="label">Store role</div><div class="value">${this.escapeHtml(role)}</div></div>
-      <div class="card"><div class="label">Items</div><div class="value">${this.escapeHtml(String(this.itemsCount(tx) || 1))}</div></div>
-    </div>
-    <table>
-      <thead>
-        <tr><th>Product</th><th>SKU</th><th>Amount</th></tr>
-      </thead>
-      <tbody>
-        <tr>
-          <td>${this.escapeHtml(productTitle)}</td>
-          <td>${this.escapeHtml(sku)}</td>
-          <td>${this.escapeHtml(total)}</td>
-        </tr>
-      </tbody>
-    </table>
-    <div class="total"><span>Total</span><span>${this.escapeHtml(total)}</span></div>
+    </section>
+
+    <section class="section">
+      <h2 class="section-title">Transaction overview</h2>
+      <div class="grid">
+        <div class="card"><div class="label">Transaction ID</div><div class="value mono">${this.escapeHtml(tx.id)}</div></div>
+        <div class="card"><div class="label">Created at</div><div class="value">${this.escapeHtml(createdAt)}</div></div>
+        <div class="card"><div class="label">Currency</div><div class="value">${this.escapeHtml(currency)}</div></div>
+        <div class="card"><div class="label">Items</div><div class="value">${this.escapeHtml(String(qty))}</div></div>
+      </div>
+    </section>
+
+    <section class="section">
+      <h2 class="section-title">Store routing</h2>
+      <div class="route-grid">
+        <div class="route-card">
+          <div class="route-kicker">Origin store</div>
+          <div class="route-name">${this.escapeHtml(originStore)}</div>
+        </div>
+        <div class="route-card">
+          <div class="route-kicker">Fulfilling store</div>
+          <div class="route-name">${this.escapeHtml(fulfillStore)}</div>
+        </div>
+      </div>
+    </section>
+
+    <section class="section">
+      <h2 class="section-title">Invoice line</h2>
+      <table>
+        <thead>
+          <tr><th>Product</th><th>SKU</th><th>Qty</th><th>Amount</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>
+              <div class="prod-title">${this.escapeHtml(productTitle)}</div>
+              <div class="prod-sub">${this.escapeHtml(role)}</div>
+            </td>
+            <td>${this.escapeHtml(sku)}</td>
+            <td>${this.escapeHtml(String(qty))}</td>
+            <td>${this.escapeHtml(total)}</td>
+          </tr>
+        </tbody>
+      </table>
+      <div class="totals">
+        <div class="totals-row"><span>Subtotal</span><strong>${this.escapeHtml(total)}</strong></div>
+        <div class="totals-row"><span>Store record total</span><strong>${this.escapeHtml(total)}</strong></div>
+        <div class="totals-row grand"><span>Total</span><span>${this.escapeHtml(total)}</span></div>
+      </div>
+      <div class="footer-note">This document is generated from the transaction tab for operational and accounting reference.</div>
+    </section>
   </div>
 </body>
 </html>`;
