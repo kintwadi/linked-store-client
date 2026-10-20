@@ -3202,6 +3202,10 @@ interface PaginatedInspections {
                                 </button>
                               }
                               @if (tx.status === 'PAID' || tx.status === 'PICKED_UP') {
+                                <button type="button" class="btn btn-secondary" (click)="printTransactionInvoice(tx)">
+                                  <svg class="ico" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9V2h12v7"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><path d="M6 14h12v8H6z"/></svg>
+                                  Print Invoice
+                                </button>
                                 <a class="btn btn-secondary" routerLink="/admin/refunds/{{tx.id}}">
                                   <svg class="ico" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7v6h6"/><path d="M21 17a9 9 0 0 0-9-9 9 9 0 0 0-6.7 3L3 13"/></svg>
                                   Refund
@@ -6302,6 +6306,104 @@ export class AdminDashboardPageComponent implements OnInit, OnDestroy {
 
   navigateToRefund(txId: string): void {
     void this.router.navigate(['/admin', 'refunds', txId]);
+  }
+
+  printTransactionInvoice(tx: any): void {
+    const popup = window.open('', '_blank', 'noopener,noreferrer,width=960,height=720');
+    if (!popup) return;
+    const invoiceHtml = this.buildTransactionInvoiceHtml(tx);
+    popup.document.open();
+    popup.document.write(invoiceHtml);
+    popup.document.close();
+    popup.focus();
+    setTimeout(() => popup.print(), 150);
+  }
+
+  private buildTransactionInvoiceHtml(tx: any): string {
+    const createdAt = tx?.createdAt
+      ? new Intl.DateTimeFormat('en-US', {
+          year: 'numeric',
+          month: 'short',
+          day: '2-digit',
+          hour: '2-digit',
+          minute: '2-digit',
+        }).format(new Date(tx.createdAt))
+      : '—';
+    const total = this.formatMoney((tx?.perspectivePriceCents ?? tx?.totalRetailCents ?? tx?.totalCents ?? tx?.amountCents), tx?.currency);
+    const productTitle = tx?.productTitle || 'Store transaction';
+    const sku = tx?.sku || '—';
+    const role = tx?.role === 'BOTH'
+      ? 'Host and Fulfillment'
+      : tx?.role === 'HOST'
+        ? 'Host store'
+        : tx?.role === 'FULFILL'
+          ? 'Fulfilling store'
+          : 'Store transaction';
+    return `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>Invoice ${this.escapeInvoiceHtml(String(tx?.id ?? ''))}</title>
+  <style>
+    body { font-family: Arial, sans-serif; color: #111827; margin: 0; padding: 32px; background: #f8fafc; }
+    .sheet { max-width: 820px; margin: 0 auto; background: #fff; border: 1px solid #e5e7eb; border-radius: 18px; padding: 28px; }
+    .top { display: flex; justify-content: space-between; gap: 24px; flex-wrap: wrap; margin-bottom: 24px; }
+    .brand { font-size: 24px; font-weight: 800; margin: 0; }
+    .muted { color: #6b7280; font-size: 13px; }
+    .pill { display: inline-block; padding: 6px 10px; border-radius: 999px; background: #eef2ff; color: #4338ca; font-size: 12px; font-weight: 700; }
+    .grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; margin: 20px 0; }
+    .card { border: 1px solid #e5e7eb; border-radius: 14px; padding: 16px; background: #fff; }
+    .label { font-size: 12px; text-transform: uppercase; letter-spacing: 0.05em; color: #6b7280; margin-bottom: 6px; }
+    .value { font-size: 16px; font-weight: 700; word-break: break-word; }
+    table { width: 100%; border-collapse: collapse; margin-top: 18px; }
+    th, td { padding: 12px 0; border-bottom: 1px solid #e5e7eb; text-align: left; }
+    th:last-child, td:last-child { text-align: right; }
+    .total { margin-top: 18px; display: flex; justify-content: space-between; font-size: 22px; font-weight: 800; }
+    @media print { body { background: #fff; padding: 0; } .sheet { border: none; border-radius: 0; padding: 0; } }
+  </style>
+</head>
+<body>
+  <div class="sheet">
+    <div class="top">
+      <div>
+        <p class="brand">DinRetail Invoice</p>
+        <div class="muted">Transaction receipt for store records</div>
+      </div>
+      <div>
+        <div class="pill">${this.escapeInvoiceHtml(String(tx?.status ?? 'PENDING'))}</div>
+      </div>
+    </div>
+    <div class="grid">
+      <div class="card"><div class="label">Transaction ID</div><div class="value">${this.escapeInvoiceHtml(String(tx?.id ?? '—'))}</div></div>
+      <div class="card"><div class="label">Created</div><div class="value">${this.escapeInvoiceHtml(createdAt)}</div></div>
+      <div class="card"><div class="label">Store role</div><div class="value">${this.escapeInvoiceHtml(role)}</div></div>
+      <div class="card"><div class="label">Currency</div><div class="value">${this.escapeInvoiceHtml(String(tx?.currency ?? 'USD'))}</div></div>
+    </div>
+    <table>
+      <thead>
+        <tr><th>Product</th><th>SKU</th><th>Amount</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>${this.escapeInvoiceHtml(productTitle)}</td>
+          <td>${this.escapeInvoiceHtml(sku)}</td>
+          <td>${this.escapeInvoiceHtml(total)}</td>
+        </tr>
+      </tbody>
+    </table>
+    <div class="total"><span>Total</span><span>${this.escapeInvoiceHtml(total)}</span></div>
+  </div>
+</body>
+</html>`;
+  }
+
+  private escapeInvoiceHtml(value: string): string {
+    return value
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;');
   }
 
   ngOnDestroy(): void {
