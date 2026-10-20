@@ -5,6 +5,7 @@ import { QRCodeModule } from 'angularx-qrcode';
 import { ProductService } from '../../services/product.service';
 import { AuthService } from '../../services/auth.service';
 import { firstValueFrom } from 'rxjs';
+import { resolvePublicOrigin } from '../../shared/utils/origins.helper';
 
 type PickupStatusFilter = 'READY_FOR_PICKUP' | 'PICKED_UP' | 'READY';
 
@@ -30,7 +31,9 @@ type PickupTx = {
   createdAt?: string;
   updatedAt?: string;
   originatingStoreName?: string;
+  originatingStoreAddress?: string;
   fulfillingStoreName?: string;
+  fulfillingStoreAddress?: string;
   _claimLoading?: boolean;
 };
 
@@ -217,6 +220,12 @@ type PickupTx = {
       color: var(--color-muted);
     }
     .store-row strong { color: var(--color-ink); display: block; font-size: 12px; }
+    .store-row .addr {
+      margin-top: 4px;
+      line-height: 1.45;
+      color: var(--color-muted);
+      word-break: break-word;
+    }
     .qr-wrap {
       display: grid;
       place-items: center;
@@ -470,17 +479,19 @@ type PickupTx = {
                   <div>
                     <span style="font-size:11px">From (origin)</span>
                     <strong>{{ tx.originatingStoreName ?? 'Store' }}</strong>
+                    <div class="addr">{{ tx.originatingStoreAddress ?? 'Address unavailable' }}</div>
                   </div>
                   <div>
                     <span style="font-size:11px">Pickup at (fulfill)</span>
                     <strong>{{ tx.fulfillingStoreName ?? 'Store' }}</strong>
+                    <div class="addr">{{ tx.fulfillingStoreAddress ?? 'Address unavailable' }}</div>
                   </div>
                 </div>
 
                 <div class="qr-wrap">
                   @if (tx.qrSecureToken) {
                     <qrcode
-                      [qrdata]="tx.qrSecureToken"
+                      [qrdata]="pickupQrUrl(tx)"
                       [width]="220"
                       [errorCorrectionLevel]="'M'"
                       [elementType]="'svg'"
@@ -734,6 +745,15 @@ export class RunnerPickupPageComponent implements OnInit {
     } catch {
       return iso;
     }
+  }
+
+  pickupQrUrl(tx: PickupTx): string {
+    const token = (tx?.qrSecureToken ?? '').trim();
+    if (!token) return '';
+    const origin = resolvePublicOrigin();
+    const basePath = '/merchant/pickup';
+    const url = `${origin}${basePath}`;
+    return `${url}?pickup=${encodeURIComponent(token)}`;
   }
 
   async reload(): Promise<void> {

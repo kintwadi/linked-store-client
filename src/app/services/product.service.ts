@@ -540,7 +540,9 @@ export class ProductService {
     createdAt?: string;
     updatedAt?: string;
     originatingStoreName?: string;
+    originatingStoreAddress?: string;
     fulfillingStoreName?: string;
+    fulfillingStoreAddress?: string;
   }> {
     const api = resolveApiBase();
     return firstValueFrom(
@@ -617,7 +619,9 @@ export class ProductService {
       createdAt?: string;
       updatedAt?: string;
       originatingStoreName?: string;
+      originatingStoreAddress?: string;
       fulfillingStoreName?: string;
+      fulfillingStoreAddress?: string;
     }>;
     page: number;
     pageSize: number;

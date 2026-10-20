@@ -1,7 +1,7 @@
 import { Component, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule, ReactiveFormsModule, FormBuilder, FormGroup, Validators } from '@angular/forms';
-import { Router, RouterLink } from '@angular/router';
+import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { AuthService } from '../../services/auth.service';
 import { BrandService } from '../../services/brand.service';
 
@@ -635,6 +635,7 @@ export class StoreStaffLoginPageComponent {
     private readonly fb: FormBuilder,
     private readonly authService: AuthService,
     private readonly router: Router,
+    private readonly route: ActivatedRoute,
     private readonly brandService: BrandService,
   ) {
     this.loginForm = this.fb.group({
@@ -664,10 +665,15 @@ export class StoreStaffLoginPageComponent {
           u.role === 'CLERK' ||
           u.role === 'RUNNER'
         );
+      const redirectTo = this.route.snapshot.queryParamMap.get('redirectTo');
       if (isRunner) {
         await this.router.navigate(['/runner', 'pickup']);
       } else if (isAllowedAdminish) {
-        await this.router.navigate(['/admin']);
+        if (redirectTo) {
+          await this.router.navigateByUrl(redirectTo);
+        } else {
+          await this.router.navigate(['/admin']);
+        }
       } else {
         this.errorMessage.set('This login is for store staff only. Please use the regular customer login instead.');
       }

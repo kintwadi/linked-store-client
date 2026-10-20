@@ -1,4 +1,4 @@
-import { Component, signal } from '@angular/core';
+import { Component, OnInit, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { HttpClient } from '@angular/common/http';
@@ -308,7 +308,7 @@ import {
     </div>
   `,
 })
-export class MerchantPickupPageComponent {
+export class MerchantPickupPageComponent implements OnInit {
   readonly loading = signal(false);
   readonly tokenInput = signal('');
   readonly verifying = signal(false);
@@ -321,6 +321,15 @@ export class MerchantPickupPageComponent {
     private readonly router: Router,
     private readonly route: ActivatedRoute,
   ) {}
+
+  ngOnInit(): void {
+    const queryPickup = this.route.snapshot.queryParamMap.get('pickup');
+    const navPrefill = (history.state?.prefill ?? '') as string;
+    const initial = this.normalizePickupCredential(queryPickup || navPrefill || '');
+    if (initial) {
+      this.tokenInput.set(initial);
+    }
+  }
 
   private currentStoreId(): string | null {
     let cursor: ActivatedRoute | null = this.route;
@@ -359,13 +368,40 @@ export class MerchantPickupPageComponent {
     return "Scan runner's pickup QR to verify custody and settle the ledger. If scanning fails, manually enter the 8-digit fallback code.";
   }
 
+  private normalizePickupCredential(raw: string): string {
+    const input = (raw ?? '').trim();
+    if (!input) return '';
+    if (!/^https?:\/\//i.test(input)) {
+      return input;
+    }
+    try {
+      const url = new URL(input);
+      const pickup = url.searchParams.get('pickup');
+      if (pickup && pickup.trim()) {
+        return pickup.trim();
+      }
+      const secureToken = url.searchParams.get('secureToken');
+      if (secureToken && secureToken.trim()) {
+        return secureToken.trim();
+      }
+      const fallbackCode = url.searchParams.get('fallbackCode');
+      if (fallbackCode && fallbackCode.trim()) {
+        return fallbackCode.trim();
+      }
+      return input;
+    } catch {
+      return input;
+    }
+  }
+
   async onVerify(): Promise<void> {
-    const token = this.tokenInput().trim();
+    const token = this.normalizePickupCredential(this.tokenInput());
     if (!token) return;
 
     this.verifying.set(true);
     this.error.set(null);
     this.result.set(null);
+    this.tokenInput.set(token);
 
     try {
       const res = await this.products.verifyPickup(token);

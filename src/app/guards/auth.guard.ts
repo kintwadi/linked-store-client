@@ -2,11 +2,16 @@ import { inject } from '@angular/core';
 import { CanActivateFn, Router, UrlTree } from '@angular/router';
 import { AuthService } from '../services/auth.service';
 
-export const authGuard: CanActivateFn = (route): boolean | UrlTree => {
+export const authGuard: CanActivateFn = (route, state): boolean | UrlTree => {
   const authService = inject(AuthService);
   const router = inject(Router);
 
   if (!authService.isLoggedIn()) {
+    if ((route.data as { requireStoreStaffAboveRunner?: boolean } | undefined)?.requireStoreStaffAboveRunner) {
+      return router.createUrlTree(['/staff-login'], {
+        queryParams: { redirectTo: state.url },
+      });
+    }
     return router.createUrlTree(['/login']);
   }
 
