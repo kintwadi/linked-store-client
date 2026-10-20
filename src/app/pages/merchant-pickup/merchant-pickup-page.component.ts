@@ -1,6 +1,6 @@
 import { Component, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { RouterLink } from '@angular/router';
+import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { HttpClient } from '@angular/common/http';
 import { firstValueFrom } from 'rxjs';
 import { ProductService } from '../../services/product.service';
@@ -157,11 +157,11 @@ import {
   `],
   template: `
     <div class="wrap">
-      <a class="back" routerLink="/">← Back to home</a>
+      <a class="back" [routerLink]="backLink()">← {{ backLabel() }}</a>
 
       <div class="header">
-        <h1 class="page-title">Merchant Pickup</h1>
-        <p class="page-subtitle">Scan runner's pickup QR to verify custody and settle the ledger. If scanning fails, manually enter the 8-digit fallback code.</p>
+        <h1 class="page-title">{{ pageTitle() }}</h1>
+        <p class="page-subtitle">{{ pageSubtitle() }}</p>
       </div>
 
       <section class="card form-card">
@@ -318,7 +318,46 @@ export class MerchantPickupPageComponent {
   constructor(
     private readonly products: ProductService,
     private readonly http: HttpClient,
+    private readonly router: Router,
+    private readonly route: ActivatedRoute,
   ) {}
+
+  private currentStoreId(): string | null {
+    let cursor: ActivatedRoute | null = this.route;
+    while (cursor) {
+      const storeId = cursor.snapshot.paramMap.get('storeId');
+      if (storeId) return storeId;
+      cursor = cursor.parent;
+    }
+    return null;
+  }
+
+  inDashboardContext(): boolean {
+    return this.router.url.includes('/admin/stores/');
+  }
+
+  backLink(): string[] {
+    const storeId = this.currentStoreId();
+    if (this.inDashboardContext() && storeId) {
+      return ['/admin', 'stores', storeId, 'transactions'];
+    }
+    return ['/'];
+  }
+
+  backLabel(): string {
+    return this.inDashboardContext() ? 'Back to dashboard' : 'Back to home';
+  }
+
+  pageTitle(): string {
+    return this.inDashboardContext() ? 'Pickup Verification' : 'Merchant Pickup';
+  }
+
+  pageSubtitle(): string {
+    if (this.inDashboardContext()) {
+      return 'The fulfilling store scans the runner-provided QR code or manually enters the fallback code to verify pickup and release funds to all participant accounts.';
+    }
+    return "Scan runner's pickup QR to verify custody and settle the ledger. If scanning fails, manually enter the 8-digit fallback code.";
+  }
 
   async onVerify(): Promise<void> {
     const token = this.tokenInput().trim();

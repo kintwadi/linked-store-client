@@ -25,7 +25,7 @@ interface Store {
   transactionCount?: number;
 }
 
-type TabKey = 'products' | 'transactions' | 'returns' | 'subscription' | 'settings';
+type TabKey = 'products' | 'transactions' | 'pickup' | 'returns' | 'subscription' | 'settings';
 
 interface InspectionRow {
   id: string;
@@ -876,6 +876,10 @@ interface PaginatedInspections {
                 <svg viewBox="0 0 24 24"><rect x="2" y="5" width="20" height="14" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/></svg>
                 Transactions
               </a>
+              <a class="tab" [class.active]="activeTab() === 'pickup'" routerLink="pickup">
+                <svg viewBox="0 0 24 24"><path d="M4 7h4"/><path d="M4 17h4"/><path d="M16 7h4"/><path d="M16 17h4"/><path d="M7 4v4"/><path d="M17 4v4"/><path d="M7 16v4"/><path d="M17 16v4"/><path d="M9.5 9.5h5v5h-5z"/></svg>
+                Pickup Verify
+              </a>
               <a class="tab" [class.active]="activeTab() === 'returns'" (click)="activeTab.set('returns')">
                 <svg viewBox="0 0 24 24"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/><path d="M12 7v5l3 2"/></svg>
                 Returns
@@ -1587,6 +1591,8 @@ export class StoreDashboardShellComponent implements OnInit, OnDestroy {
       const url = this.router.url.toLowerCase();
       if (url.includes('/transactions')) {
         this.activeTab.set('transactions');
+      } else if (url.includes('/pickup')) {
+        this.activeTab.set('pickup');
       } else if (url.includes('/returns')) {
         this.activeTab.set('returns');
       } else if (url.includes('/subscription') || this.activeTab() === 'subscription') {

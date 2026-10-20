@@ -48,6 +48,7 @@ export const routes: Routes = [
     { path: 'products/new', component: StoreProductFormComponent },
     { path: 'products/:variantId', component: StoreProductFormComponent },
     { path: 'transactions', component: StoreTransactionsListComponent },
+    { path: 'pickup', component: MerchantPickupPageComponent, title: 'Pickup Verification' },
   ]},
   { path: 'admin/refunds/:transactionId', component: AdminRefundPageComponent, canActivate: [authGuard], data: { requireStoreAdmin: true } },
   { path: '**',                      redirectTo: '' },
