@@ -84,7 +84,7 @@ interface InspectionCounts {
 }
 
 interface StripeDisconnectTarget {
-  kind: 'platform' | 'store' | 'me';
+  kind: 'platform' | 'store';
   accountId: string;
   heading: string;
   subtitle: string;
@@ -2871,13 +2871,6 @@ interface PaginatedInspections {
                                     [disabled]="onboarding['me']" (click)="onboardMyStore()">
                               🔄 Re-open Stripe Onboarding
                             </button>
-                            @if (myStore()?.stripeConnectId) {
-                              <button class="btn btn-secondary-warn"
-                                      [disabled]="disconnecting['me']"
-                                      (click)="disconnectMyStoreAccount()">
-                                @if (disconnecting['me']) { Disconnecting… } @else { Disconnect Stripe }
-                              </button>
-                            }
                             @if (myStore()?._dashboardSafeUrl) {
                               <a class="btn btn-secondary"
                                  style="background:#047857;color:#fff;border-color:#047857;"
@@ -5153,48 +5146,6 @@ export class AdminDashboardPageComponent implements OnInit, OnDestroy {
     }
   }
 
-  async disconnectMyStoreAccount(): Promise<void> {
-    const store = this.myStore();
-    if (!store) {
-      this.storesError.set('No store information loaded — refresh and try again.');
-      this.clearStoreMessagesSoon();
-      return;
-    }
-    this.openStripeDisconnect({
-      kind: 'me',
-      accountId: store?.stripeConnectId || '(unknown)',
-      heading: 'Disconnect your store Stripe account',
-      subtitle: 'Your store will be able to start a brand new Connect onboarding the next time you choose Connect.',
-      storeName: store?.businessName ?? null,
-      storeId: store?.id ?? null,
-    });
-  }
-
-  private async performMyStoreDisconnect(): Promise<void> {
-    this.disconnecting['me'] = true;
-    this.touch();
-    this.storesError.set(null);
-    this.storesSuccess.set(null);
-    try {
-      const api = this.api();
-      const res: any = await firstValueFrom(this.http.delete(`${api}/admin/stores/me/connect/account`));
-      if (res?.status === 'deleted') {
-        this.storesSuccess.set(res?.message ?? 'Store Stripe account removed from Stripe and disconnected.');
-        this.clearStoreMessagesSoon();
-      } else {
-        this.storesError.set(
-          res?.message ?? 'Stripe kept the account in its dashboard. The app only removed the local link.'
-        );
-      }
-      await this.loadStores();
-    } catch (err: any) {
-      this.storesError.set(err?.error?.message ?? err?.message ?? 'Failed to disconnect Stripe account.');
-    } finally {
-      this.disconnecting['me'] = false;
-      this.touch();
-    }
-  }
-
   async loginLinkMyStore(): Promise<void> {
     const store = this.myStore();
     if (!store) {
@@ -5342,7 +5293,6 @@ export class AdminDashboardPageComponent implements OnInit, OnDestroy {
     const target = this.stripeDisconnectTarget();
     if (!target) return false;
     if (target.kind === 'platform') return this.contractDisconnecting();
-    if (target.kind === 'me') return !!this.disconnecting['me'];
     return !!this.disconnecting[target.storeId ?? ''];
   }
   stripeDisconnectConfirmLabel(): string {
@@ -5350,8 +5300,6 @@ export class AdminDashboardPageComponent implements OnInit, OnDestroy {
     switch (target?.kind) {
       case 'platform':
         return 'Disconnect platform account';
-      case 'me':
-        return 'Disconnect my store account';
       case 'store':
         return 'Disconnect store account';
       default:
@@ -5363,8 +5311,6 @@ export class AdminDashboardPageComponent implements OnInit, OnDestroy {
     switch (target?.kind) {
       case 'platform':
         return 'Disconnecting platform…';
-      case 'me':
-        return 'Disconnecting store…';
       case 'store':
         return 'Disconnecting store…';
       default:
@@ -5378,9 +5324,6 @@ export class AdminDashboardPageComponent implements OnInit, OnDestroy {
     switch (target.kind) {
       case 'platform':
         await this.performPlatformDisconnect();
-        break;
-      case 'me':
-        await this.performMyStoreDisconnect();
         break;
       case 'store':
         await this.performStoreDisconnect(target.storeId);
