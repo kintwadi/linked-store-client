@@ -82,18 +82,4 @@ export class PlatformContractService {
     });
     return saved;
   }
-
-  async createPlatformOnboardingLink(payload?: { country?: string; defaultCurrency?: string }): Promise<{ url: string; status: string; stripeConnectId: string }> {
-    const url = `${resolveApiBase()}/platform-contract/admin/platform-onboarding`;
-    return firstValueFrom(
-      this.http.post<{ url: string; status: string; stripeConnectId: string }>(url, payload ?? {})
-    );
-  }
-
-  async disconnectPlatformAccount(): Promise<{ status: string; message: string; stripeDeleted: boolean; previousStripeConnectId: string | null }> {
-    const url = `${resolveApiBase()}/platform-contract/admin/platform-account`;
-    return firstValueFrom(
-      this.http.delete<{ status: string; message: string; stripeDeleted: boolean; previousStripeConnectId: string | null }>(url)
-    );
-  }
 }
