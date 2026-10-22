@@ -82,6 +82,15 @@ interface InspectionCounts {
   restockedCount: number;
   totalCount: number;
 }
+
+interface StripeDisconnectTarget {
+  kind: 'platform' | 'store' | 'me';
+  accountId: string;
+  heading: string;
+  subtitle: string;
+  storeName?: string | null;
+  storeId?: string | null;
+}
 interface PaginatedInspections {
   content: InspectionRow[];
   page: number;
@@ -1154,6 +1163,37 @@ interface PaginatedInspections {
       width: 18px;
       display: inline-flex;
       justify-content: center;
+    }
+    .confirm-account-card {
+      border: 1px solid #e2e8f0;
+      border-radius: 14px;
+      padding: 14px 16px;
+      background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
+      display: grid;
+      gap: 8px;
+    }
+    .confirm-account-label {
+      font-size: 11px;
+      font-weight: 800;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: #64748b;
+    }
+    .confirm-account-value {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
+      color: #0f172a;
+    }
+    .confirm-account-value strong {
+      font-size: 14px;
+      color: #0f172a;
+    }
+    .confirm-account-meta {
+      font-size: 13px;
+      line-height: 1.5;
+      color: #475569;
     }
 
     .mono {
@@ -3643,6 +3683,73 @@ interface PaginatedInspections {
         </div>
       }
 
+      @if (stripeDisconnectOpen()) {
+        @if (stripeDisconnectTarget(); as target) {
+          <div class="modal-backdrop" (click.self)="closeStripeDisconnect()">
+            <div class="modal" role="alertdialog" aria-modal="true" aria-labelledby="stripe-disconnect-title">
+              <div class="modal-header danger">
+                <div class="modal-title delete">
+                  <span class="ico">⇄</span>
+                </div>
+                <div class="modal-title-text">
+                  <h3 id="stripe-disconnect-title">{{ target.heading }}</h3>
+                  <span class="muted">{{ target.subtitle }}</span>
+                </div>
+                <button class="modal-close"
+                        (click)="closeStripeDisconnect()"
+                        [disabled]="isStripeDisconnectBusy()"
+                        aria-label="Close">×</button>
+              </div>
+              <div class="modal-body">
+                <p class="confirm-text">
+                  This removes the current Stripe link from the dashboard so the next
+                  <strong>Connect</strong> action can start a fresh onboarding flow.
+                </p>
+
+                <div class="confirm-account-card">
+                  <span class="confirm-account-label">Connected account</span>
+                  <div class="confirm-account-value">
+                    <strong class="mono">{{ target.accountId }}</strong>
+                  </div>
+                  @if (target.storeName || target.storeId) {
+                    <div class="confirm-account-meta">
+                      @if (target.storeName) {
+                        <div><strong>{{ target.storeName }}</strong></div>
+                      }
+                      @if (target.storeId) {
+                        <div>Store ID: <span class="mono">{{ target.storeId }}</span></div>
+                      }
+                    </div>
+                  }
+                </div>
+
+                <ul class="confirm-box-list">
+                  <li><span class="ico">↺</span> A new Stripe onboarding can be launched afterward.</li>
+                  <li><span class="ico">📋</span> Existing transactions and audit history stay available in the dashboard.</li>
+                  <li><span class="ico">⚠️</span> If Stripe cannot delete the remote account, the app still unlinks it locally and returns a warning message.</li>
+                </ul>
+              </div>
+              <div class="modal-footer">
+                <button class="btn btn-secondary"
+                        [disabled]="isStripeDisconnectBusy()"
+                        (click)="closeStripeDisconnect()">
+                  Keep account
+                </button>
+                <button class="btn btn-danger-filled"
+                        [disabled]="isStripeDisconnectBusy()"
+                        (click)="confirmStripeDisconnect()">
+                  @if (isStripeDisconnectBusy()) {
+                    <span class="ico">⟳</span> {{ stripeDisconnectBusyLabel() }}
+                  } @else {
+                    <span class="ico">⇄</span> {{ stripeDisconnectConfirmLabel() }}
+                  }
+                </button>
+              </div>
+            </div>
+          </div>
+        }
+      }
+
         <!-- ============ PLANS TAB ============ -->
         @if (activeTab() === 'plans') {
           <section class="panel">
@@ -4279,6 +4386,8 @@ export class AdminDashboardPageComponent implements OnInit, OnDestroy {
   // Delete user modal
   readonly deleteUserOpen = signal(false);
   readonly deleteUserTarget = signal<any | null>(null);
+  readonly stripeDisconnectOpen = signal(false);
+  readonly stripeDisconnectTarget = signal<StripeDisconnectTarget | null>(null);
 
   readonly onboarding: Record<string, boolean> = {};
   readonly loginLinking: Record<string, boolean> = {};
@@ -4946,12 +5055,22 @@ export class AdminDashboardPageComponent implements OnInit, OnDestroy {
       this.clearStoreMessagesSoon();
       return;
     }
-    const connectId = store?.stripeConnectId;
-    const confirmed = window.confirm(
-      `Disconnect Stripe account ${connectId || '(unknown)'} from ${store.businessName || 'this store'}? The next onboarding will create a new account.`
-    );
-    if (!confirmed) return;
+    this.openStripeDisconnect({
+      kind: 'store',
+      accountId: store?.stripeConnectId || '(unknown)',
+      heading: 'Disconnect store Stripe account',
+      subtitle: `${store?.businessName || 'This store'} will need a fresh Connect onboarding before payouts can resume.`,
+      storeName: store?.businessName ?? null,
+      storeId: id,
+    });
+  }
 
+  private async performStoreDisconnect(id: string | null | undefined): Promise<void> {
+    if (!id) {
+      this.storesError.set('Store record has no id — please refresh and try again.');
+      this.clearStoreMessagesSoon();
+      return;
+    }
     this.disconnecting[id] = true;
     this.touch();
     this.storesError.set(null);
@@ -4959,10 +5078,6 @@ export class AdminDashboardPageComponent implements OnInit, OnDestroy {
     try {
       const api = this.api();
       const res: any = await firstValueFrom(this.http.delete(`${api}/admin/stores/${encodeURIComponent(id)}/connect/account`));
-      store.stripeConnectId = '';
-      store.onboarded = false;
-      store._dashboardUrl = null;
-      store._dashboardSafeUrl = null;
       this.storesSuccess.set(res?.message ?? 'Store Stripe account disconnected.');
       this.clearStoreMessagesSoon();
       await this.loadStores();
@@ -5039,11 +5154,17 @@ export class AdminDashboardPageComponent implements OnInit, OnDestroy {
       this.clearStoreMessagesSoon();
       return;
     }
-    const confirmed = window.confirm(
-      `Disconnect Stripe account ${store.stripeConnectId || '(unknown)'} from your store? The next onboarding will create a new account.`
-    );
-    if (!confirmed) return;
+    this.openStripeDisconnect({
+      kind: 'me',
+      accountId: store?.stripeConnectId || '(unknown)',
+      heading: 'Disconnect your store Stripe account',
+      subtitle: 'Your store will be able to start a brand new Connect onboarding the next time you choose Connect.',
+      storeName: store?.businessName ?? null,
+      storeId: store?.id ?? null,
+    });
+  }
 
+  private async performMyStoreDisconnect(): Promise<void> {
     this.disconnecting['me'] = true;
     this.touch();
     this.storesError.set(null);
@@ -5191,6 +5312,69 @@ export class AdminDashboardPageComponent implements OnInit, OnDestroy {
       this.deletingUser[id] = false;
       this.touch();
     }
+  }
+
+  openStripeDisconnect(target: StripeDisconnectTarget): void {
+    this.stripeDisconnectTarget.set(target);
+    this.stripeDisconnectOpen.set(true);
+  }
+  closeStripeDisconnect(): void {
+    if (this.isStripeDisconnectBusy()) return;
+    this.resetStripeDisconnectModal();
+  }
+  private resetStripeDisconnectModal(): void {
+    this.stripeDisconnectTarget.set(null);
+    this.stripeDisconnectOpen.set(false);
+  }
+  isStripeDisconnectBusy(): boolean {
+    const target = this.stripeDisconnectTarget();
+    if (!target) return false;
+    if (target.kind === 'platform') return this.contractDisconnecting();
+    if (target.kind === 'me') return !!this.disconnecting['me'];
+    return !!this.disconnecting[target.storeId ?? ''];
+  }
+  stripeDisconnectConfirmLabel(): string {
+    const target = this.stripeDisconnectTarget();
+    switch (target?.kind) {
+      case 'platform':
+        return 'Disconnect platform account';
+      case 'me':
+        return 'Disconnect my store account';
+      case 'store':
+        return 'Disconnect store account';
+      default:
+        return 'Disconnect account';
+    }
+  }
+  stripeDisconnectBusyLabel(): string {
+    const target = this.stripeDisconnectTarget();
+    switch (target?.kind) {
+      case 'platform':
+        return 'Disconnecting platform…';
+      case 'me':
+        return 'Disconnecting store…';
+      case 'store':
+        return 'Disconnecting store…';
+      default:
+        return 'Disconnecting…';
+    }
+  }
+  async confirmStripeDisconnect(): Promise<void> {
+    const target = this.stripeDisconnectTarget();
+    if (!target) return;
+
+    switch (target.kind) {
+      case 'platform':
+        await this.performPlatformDisconnect();
+        break;
+      case 'me':
+        await this.performMyStoreDisconnect();
+        break;
+      case 'store':
+        await this.performStoreDisconnect(target.storeId);
+        break;
+    }
+    this.resetStripeDisconnectModal();
   }
 
   // ---------------- TRANSACTIONS ----------------
@@ -5419,11 +5603,21 @@ export class AdminDashboardPageComponent implements OnInit, OnDestroy {
       this.contractError.set('No platform Stripe account is currently linked.');
       return;
     }
-    const confirmed = window.confirm(
-      `Disconnect platform Stripe account ${connectId}? This clears the linked account so the next Connect action can create a new one.`
-    );
-    if (!confirmed) return;
+    this.openStripeDisconnect({
+      kind: 'platform',
+      accountId: connectId,
+      heading: 'Disconnect platform Stripe account',
+      subtitle: 'This clears the payout account saved in the platform contract so a fresh Connect onboarding can be started next.',
+    });
+  }
 
+  private async performPlatformDisconnect(): Promise<void> {
+    const current = this.contractAdmin();
+    const connectId = current?.platformPayoutConnectId;
+    if (!connectId) {
+      this.contractError.set('No platform Stripe account is currently linked.');
+      return;
+    }
     this.contractDisconnecting.set(true);
     this.contractError.set(null);
     this.contractSuccess.set(null);
