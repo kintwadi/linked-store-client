@@ -268,6 +268,13 @@ import {
       border-radius: var(--radius-sm);
       padding: 14px 16px;
       font-size: 14px;
+      display: grid;
+      gap: 12px;
+    }
+    .error-actions {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
     }
     .message-box {
       padding: 10px 12px;
@@ -374,7 +381,16 @@ import {
       </section>
 
       @if (error()) {
-        <div class="error-box">{{ error() }}</div>
+        <div class="error-box">
+          <span>{{ error() }}</span>
+          @if (needsSignIn()) {
+            <div class="error-actions print-hide">
+              <button class="btn btn-primary" type="button" (click)="signIn()">
+                Sign in to verify pickups
+              </button>
+            </div>
+          }
+        </div>
       }
 
       @if (result()) {
@@ -524,6 +540,7 @@ export class MerchantPickupPageComponent implements OnInit {
   readonly verifying = signal(false);
   readonly result = signal<any>(null);
   readonly error = signal<string | null>(null);
+  readonly needsSignIn = signal(false);
 
   constructor(
     private readonly products: ProductService,
@@ -610,6 +627,7 @@ export class MerchantPickupPageComponent implements OnInit {
 
     this.verifying.set(true);
     this.error.set(null);
+    this.needsSignIn.set(false);
     this.result.set(null);
     this.tokenInput.set(token);
 
@@ -617,11 +635,40 @@ export class MerchantPickupPageComponent implements OnInit {
       const res = await this.products.verifyPickup(token);
       this.result.set(res);
     } catch (err: any) {
-      const msg = err?.message ?? 'Verification failed. Please check the credential and try again.';
-      this.error.set(msg);
+      const status = Number(err?.status ?? 0);
+      const backendMessage =
+        (typeof err?.error?.message === 'string' && err.error.message.trim()) ||
+        (typeof err?.error === 'string' && err.error.trim()) ||
+        '';
+      let message = backendMessage;
+      if (!message) {
+        if (status === 401) {
+          message = 'Your session has expired. Please sign in again to verify this pickup.';
+        } else if (status === 403) {
+          message =
+            'Your account is not allowed to verify pickups for this store. Sign in with a store team account of the fulfilling store.';
+        } else {
+          message = err?.message ?? 'Verification failed. Please check the credential and try again.';
+        }
+      }
+      this.error.set(message);
+      this.needsSignIn.set(status === 401 || status === 403);
     } finally {
       this.verifying.set(false);
     }
+  }
+
+  /** Full pickup link for the current context, so a sign-in can return here. */
+  private pickupRedirectTarget(): string {
+    const token = (this.tokenInput() || '').trim();
+    const path = this.inDashboardContext() ? this.router.url.split('?')[0] : '/merchant/pickup';
+    return token ? `${path}?pickup=${encodeURIComponent(token)}` : path;
+  }
+
+  async signIn(): Promise<void> {
+    await this.router.navigate(['/staff-login'], {
+      queryParams: { redirectTo: this.pickupRedirectTarget() },
+    });
   }
 
   formatMargin(cents: number, currency: string | undefined): string {

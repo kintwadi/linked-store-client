@@ -2,8 +2,9 @@ import { Component, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule, ReactiveFormsModule, FormBuilder, FormGroup, Validators } from '@angular/forms';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
-import { AuthService } from '../../services/auth.service';
+import { AuthService, AuthUser } from '../../services/auth.service';
 import { BrandService } from '../../services/brand.service';
+import { canVerifyPickups } from '../../guards/auth.guard';
 
 @Component({
   selector: 'app-store-staff-login-page',
@@ -644,6 +645,13 @@ export class StoreStaffLoginPageComponent {
     });
   }
 
+  private describeAccount(u: any): string {
+    if (u?.isGlobalAdmin || u?.role === 'GLOBAL_ADMIN') return 'a platform (global admin) account';
+    if (u?.role === 'RUNNER') return 'a runner account';
+    if (u?.role) return `a ${String(u.role).toLowerCase().replace(/_/g, ' ')} account`;
+    return 'an unknown account';
+  }
+
   async onSubmit(): Promise<void> {
     if (!this.loginForm.valid) return;
     this.submitting.set(true);
@@ -666,9 +674,17 @@ export class StoreStaffLoginPageComponent {
           u.role === 'RUNNER'
         );
       const redirectTo = this.route.snapshot.queryParamMap.get('redirectTo');
+      const isPickupTarget = !!redirectTo && /\/pickup(\?|$)/.test(redirectTo);
       if (isRunner) {
         await this.router.navigate(['/runner', 'pickup']);
       } else if (isAllowedAdminish) {
+        if (isPickupTarget && !canVerifyPickups(u as AuthUser)) {
+          this.errorMessage.set(
+            'Pickup verification is limited to store team members above runner — Owner, Store Admin, Store Representative or Clerk. ' +
+            'You are signed in as ' + this.describeAccount(u) + '. Please sign in with a store team account for the fulfilling store.'
+          );
+          return;
+        }
         if (redirectTo) {
           await this.router.navigateByUrl(redirectTo);
         } else {
