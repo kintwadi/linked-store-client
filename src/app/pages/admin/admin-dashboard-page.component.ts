@@ -5078,8 +5078,14 @@ export class AdminDashboardPageComponent implements OnInit, OnDestroy {
     try {
       const api = this.api();
       const res: any = await firstValueFrom(this.http.delete(`${api}/admin/stores/${encodeURIComponent(id)}/connect/account`));
-      this.storesSuccess.set(res?.message ?? 'Store Stripe account disconnected.');
-      this.clearStoreMessagesSoon();
+      if (res?.status === 'deleted') {
+        this.storesSuccess.set(res?.message ?? 'Store Stripe account removed from Stripe and disconnected.');
+        this.clearStoreMessagesSoon();
+      } else {
+        this.storesError.set(
+          res?.message ?? 'Store Stripe account was unlinked in the app, but Stripe kept the account in its dashboard.'
+        );
+      }
       await this.loadStores();
     } catch (err: any) {
       this.storesError.set(err?.error?.message ?? err?.message ?? 'Failed to disconnect Stripe account.');
@@ -5172,8 +5178,14 @@ export class AdminDashboardPageComponent implements OnInit, OnDestroy {
     try {
       const api = this.api();
       const res: any = await firstValueFrom(this.http.delete(`${api}/admin/stores/me/connect/account`));
-      this.storesSuccess.set(res?.message ?? 'Store Stripe account disconnected.');
-      this.clearStoreMessagesSoon();
+      if (res?.status === 'deleted') {
+        this.storesSuccess.set(res?.message ?? 'Store Stripe account removed from Stripe and disconnected.');
+        this.clearStoreMessagesSoon();
+      } else {
+        this.storesError.set(
+          res?.message ?? 'Stripe kept the account in its dashboard. The app only removed the local link.'
+        );
+      }
       await this.loadStores();
     } catch (err: any) {
       this.storesError.set(err?.error?.message ?? err?.message ?? 'Failed to disconnect Stripe account.');
@@ -5627,8 +5639,14 @@ export class AdminDashboardPageComponent implements OnInit, OnDestroy {
       if (current) {
         this.contractAdmin.set({ ...current, platformPayoutConnectId: null });
       }
-      this.contractSuccess.set(res?.message ?? 'Platform Stripe account disconnected.');
-      setTimeout(() => this.contractSuccess.set(null), 6000);
+      if (res?.stripeDeleted) {
+        this.contractSuccess.set(res?.message ?? 'Platform Stripe account removed from Stripe and disconnected.');
+        setTimeout(() => this.contractSuccess.set(null), 6000);
+      } else {
+        this.contractError.set(
+          res?.message ?? 'Stripe kept the connected account in its dashboard. The app only removed the local link.'
+        );
+      }
     } catch (err: any) {
       this.contractError.set(err?.error?.message ?? err?.error ?? err?.message ?? 'Failed to disconnect platform Stripe account.');
     } finally {
