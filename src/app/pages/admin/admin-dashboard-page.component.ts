@@ -2678,6 +2678,14 @@ interface PaginatedInspections {
                                   </button>
                                 }
                               }
+                              @if (store.stripeConnectId && (store.id | can:'payouts')) {
+                                <button class="btn btn-secondary-warn"
+                                        [disabled]="disconnecting[store.id]"
+                                        (click)="disconnectStoreAccount(store)">
+                                  <span class="ico">⨯</span>
+                                  @if (disconnecting[store.id]) { Disconnecting… } @else { Disconnect Stripe }
+                                </button>
+                              }
                               <button class="btn btn-danger"
                                       [disabled]="deleting[store.id]"
                                       (click)="openDeleteStore(store)">
@@ -2823,6 +2831,13 @@ interface PaginatedInspections {
                                     [disabled]="onboarding['me']" (click)="onboardMyStore()">
                               🔄 Re-open Stripe Onboarding
                             </button>
+                            @if (myStore()?.stripeConnectId) {
+                              <button class="btn btn-secondary-warn"
+                                      [disabled]="disconnecting['me']"
+                                      (click)="disconnectMyStoreAccount()">
+                                @if (disconnecting['me']) { Disconnecting… } @else { Disconnect Stripe }
+                              </button>
+                            }
                             @if (myStore()?._dashboardSafeUrl) {
                               <a class="btn btn-secondary"
                                  style="background:#047857;color:#fff;border-color:#047857;"
@@ -4141,6 +4156,14 @@ interface PaginatedInspections {
                               @else if (contractAdmin()?.platformPayoutConnectId) { Manage }
                               @else { Connect }
                             </button>
+                            @if (contractAdmin()?.platformPayoutConnectId) {
+                              <button type="button" class="btn btn-secondary-warn"
+                                      [disabled]="contractDisconnecting()"
+                                      (click)="disconnectPlatformAccount()">
+                                @if (contractDisconnecting()) { Disconnecting… }
+                                @else { Disconnect }
+                              </button>
+                            }
                           </div>
                           <span style="font-size: 11px; color: #6b7280;">
                             The connected account that receives platform service fee payouts.
@@ -4261,6 +4284,7 @@ export class AdminDashboardPageComponent implements OnInit, OnDestroy {
   readonly loginLinking: Record<string, boolean> = {};
   readonly suspending: Record<string, boolean> = {};
   readonly deleting: Record<string, boolean> = {};
+  readonly disconnecting: Record<string, boolean> = {};
   readonly togglingUserStatus: Record<string, boolean> = {};
   readonly deletingUser: Record<string, boolean> = {};
   readonly acceptingTx: Record<string, boolean> = {};
@@ -4301,6 +4325,7 @@ export class AdminDashboardPageComponent implements OnInit, OnDestroy {
   readonly contractSuccess = signal<string | null>(null);
   readonly contractSaving = signal(false);
   readonly contractOnboarding = signal(false);
+  readonly contractDisconnecting = signal(false);
   readonly payoutCountries: { code: string; label: string }[] = [
     { code: 'US', label: 'United States (USD)' },
     { code: 'CA', label: 'Canada (CAD)' },
@@ -4914,6 +4939,41 @@ export class AdminDashboardPageComponent implements OnInit, OnDestroy {
     }
   }
 
+  async disconnectStoreAccount(store: any): Promise<void> {
+    const id = store?.id;
+    if (!id) {
+      this.storesError.set('Store record has no id — please refresh and try again.');
+      this.clearStoreMessagesSoon();
+      return;
+    }
+    const connectId = store?.stripeConnectId;
+    const confirmed = window.confirm(
+      `Disconnect Stripe account ${connectId || '(unknown)'} from ${store.businessName || 'this store'}? The next onboarding will create a new account.`
+    );
+    if (!confirmed) return;
+
+    this.disconnecting[id] = true;
+    this.touch();
+    this.storesError.set(null);
+    this.storesSuccess.set(null);
+    try {
+      const api = this.api();
+      const res: any = await firstValueFrom(this.http.delete(`${api}/admin/stores/${encodeURIComponent(id)}/connect/account`));
+      store.stripeConnectId = '';
+      store.onboarded = false;
+      store._dashboardUrl = null;
+      store._dashboardSafeUrl = null;
+      this.storesSuccess.set(res?.message ?? 'Store Stripe account disconnected.');
+      this.clearStoreMessagesSoon();
+      await this.loadStores();
+    } catch (err: any) {
+      this.storesError.set(err?.error?.message ?? err?.message ?? 'Failed to disconnect Stripe account.');
+    } finally {
+      this.disconnecting[id] = false;
+      this.touch();
+    }
+  }
+
   async loginLinkStore(store: any): Promise<void> {
     const id = store.id;
     if (!id) {
@@ -4968,6 +5028,36 @@ export class AdminDashboardPageComponent implements OnInit, OnDestroy {
       this.storesError.set(err?.error?.message ?? err?.message ?? 'Failed to generate onboarding link.');
     } finally {
       this.onboarding['me'] = false;
+      this.touch();
+    }
+  }
+
+  async disconnectMyStoreAccount(): Promise<void> {
+    const store = this.myStore();
+    if (!store) {
+      this.storesError.set('No store information loaded — refresh and try again.');
+      this.clearStoreMessagesSoon();
+      return;
+    }
+    const confirmed = window.confirm(
+      `Disconnect Stripe account ${store.stripeConnectId || '(unknown)'} from your store? The next onboarding will create a new account.`
+    );
+    if (!confirmed) return;
+
+    this.disconnecting['me'] = true;
+    this.touch();
+    this.storesError.set(null);
+    this.storesSuccess.set(null);
+    try {
+      const api = this.api();
+      const res: any = await firstValueFrom(this.http.delete(`${api}/admin/stores/me/connect/account`));
+      this.storesSuccess.set(res?.message ?? 'Store Stripe account disconnected.');
+      this.clearStoreMessagesSoon();
+      await this.loadStores();
+    } catch (err: any) {
+      this.storesError.set(err?.error?.message ?? err?.message ?? 'Failed to disconnect Stripe account.');
+    } finally {
+      this.disconnecting['me'] = false;
       this.touch();
     }
   }
@@ -5318,6 +5408,37 @@ export class AdminDashboardPageComponent implements OnInit, OnDestroy {
       this.contractError.set(err?.error?.message ?? err?.error ?? err?.message ?? 'Failed to start platform onboarding.');
     } finally {
       this.contractOnboarding.set(false);
+    }
+  }
+
+  async disconnectPlatformAccount() {
+    if (!this.isGlobalAdmin()) return;
+    const current = this.contractAdmin();
+    const connectId = current?.platformPayoutConnectId;
+    if (!connectId) {
+      this.contractError.set('No platform Stripe account is currently linked.');
+      return;
+    }
+    const confirmed = window.confirm(
+      `Disconnect platform Stripe account ${connectId}? This clears the linked account so the next Connect action can create a new one.`
+    );
+    if (!confirmed) return;
+
+    this.contractDisconnecting.set(true);
+    this.contractError.set(null);
+    this.contractSuccess.set(null);
+    try {
+      const res = await this.platformContractService.disconnectPlatformAccount();
+      this.contractForm.patchValue({ platformPayoutConnectId: '' });
+      if (current) {
+        this.contractAdmin.set({ ...current, platformPayoutConnectId: null });
+      }
+      this.contractSuccess.set(res?.message ?? 'Platform Stripe account disconnected.');
+      setTimeout(() => this.contractSuccess.set(null), 6000);
+    } catch (err: any) {
+      this.contractError.set(err?.error?.message ?? err?.error ?? err?.message ?? 'Failed to disconnect platform Stripe account.');
+    } finally {
+      this.contractDisconnecting.set(false);
     }
   }
 
