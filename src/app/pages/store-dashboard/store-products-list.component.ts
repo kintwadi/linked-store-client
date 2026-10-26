@@ -906,6 +906,169 @@ const PILL_CLASS_FROM_KEY: Record<string, string> = {
       border: 1px solid var(--gray-200); font-size: 10.5px;
       color: var(--gray-600); font-family: ui-monospace, monospace;
     }
+    .dialog-backdrop {
+      position: fixed;
+      inset: 0;
+      z-index: 1200;
+      background: rgba(15, 23, 42, 0.48);
+      backdrop-filter: blur(10px);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+      animation: fadeIn 0.18s ease-out;
+    }
+    .dialog-card {
+      width: min(100%, 460px);
+      border-radius: 24px;
+      overflow: hidden;
+      border: 1px solid rgba(255,255,255,0.55);
+      background:
+        radial-gradient(circle at top left, rgba(239,68,68,0.14), transparent 42%),
+        linear-gradient(180deg, rgba(255,255,255,0.98) 0%, rgba(248,250,252,0.97) 100%);
+      box-shadow: 0 24px 60px rgba(15, 23, 42, 0.24);
+    }
+    .dialog-head {
+      display: flex;
+      align-items: flex-start;
+      gap: 14px;
+      padding: 24px 24px 18px;
+    }
+    .dialog-icon {
+      width: 48px;
+      height: 48px;
+      flex: 0 0 48px;
+      border-radius: 16px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      color: #fff;
+      background: linear-gradient(135deg, #ef4444 0%, #f97316 100%);
+      box-shadow: 0 12px 24px rgba(239,68,68,0.24);
+    }
+    .dialog-icon svg {
+      width: 22px;
+      height: 22px;
+      stroke: currentColor;
+      fill: none;
+    }
+    .dialog-copy {
+      flex: 1;
+      min-width: 0;
+    }
+    .dialog-eyebrow {
+      margin: 0 0 6px 0;
+      font-size: 11px;
+      font-weight: 800;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: #b91c1c;
+    }
+    .dialog-title {
+      margin: 0;
+      font-size: 22px;
+      font-weight: 800;
+      letter-spacing: -0.02em;
+      color: var(--gray-900);
+    }
+    .dialog-close {
+      width: 36px;
+      height: 36px;
+      border-radius: 12px;
+      border: 1px solid rgba(148, 163, 184, 0.28);
+      background: rgba(255,255,255,0.8);
+      color: var(--gray-500);
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      transition: all .16s ease;
+      flex-shrink: 0;
+    }
+    .dialog-close:hover {
+      color: var(--gray-800);
+      background: #fff;
+      border-color: rgba(79,70,229,0.28);
+    }
+    .dialog-body {
+      padding: 0 24px 20px;
+      color: var(--gray-600);
+      font-size: 14.5px;
+      line-height: 1.7;
+    }
+    .dialog-body p {
+      margin: 0 0 14px 0;
+    }
+    .dialog-tip {
+      display: flex;
+      gap: 10px;
+      align-items: flex-start;
+      padding: 14px 16px;
+      border-radius: 16px;
+      background: rgba(255,255,255,0.72);
+      border: 1px solid rgba(148,163,184,0.18);
+      color: var(--gray-700);
+    }
+    .dialog-tip svg {
+      width: 18px;
+      height: 18px;
+      margin-top: 1px;
+      flex-shrink: 0;
+      stroke: #6366f1;
+      fill: none;
+    }
+    .dialog-actions {
+      display: flex;
+      justify-content: flex-end;
+      gap: 10px;
+      padding: 0 24px 24px;
+      flex-wrap: wrap;
+    }
+    .btn-secondary {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      padding: 10px 18px;
+      min-height: 42px;
+      border-radius: 12px;
+      border: 1px solid var(--gray-200);
+      background: #fff;
+      color: var(--gray-700);
+      font-size: 14px;
+      font-weight: 700;
+      cursor: pointer;
+      transition: all .16s ease;
+    }
+    .btn-secondary:hover {
+      border-color: var(--gray-300);
+      background: var(--gray-50);
+      color: var(--gray-900);
+    }
+    @media (max-width: 640px) {
+      .dialog-backdrop {
+        padding: 16px;
+        align-items: flex-end;
+      }
+      .dialog-card {
+        width: 100%;
+        border-radius: 22px 22px 18px 18px;
+      }
+      .dialog-head,
+      .dialog-body,
+      .dialog-actions {
+        padding-left: 18px;
+        padding-right: 18px;
+      }
+      .dialog-actions {
+        flex-direction: column-reverse;
+      }
+      .dialog-actions .btn-primary,
+      .dialog-actions .btn-secondary {
+        width: 100%;
+        justify-content: center;
+      }
+    }
   `],
   template: `
     <div class="main-layout" [class.with-sidebar]="mode() === 'unified'">
@@ -1430,6 +1593,50 @@ const PILL_CLASS_FROM_KEY: Record<string, string> = {
         </div>
       </main>
     </div>
+
+    @if (inventoryErrorOpen()) {
+      <div class="dialog-backdrop" (click.self)="closeInventoryError()">
+        <div class="dialog-card" role="dialog" aria-modal="true" aria-labelledby="inventory-error-title">
+          <div class="dialog-head">
+            <span class="dialog-icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M12 9v4"></path>
+                <path d="M12 17h.01"></path>
+                <path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path>
+              </svg>
+            </span>
+            <div class="dialog-copy">
+              <p class="dialog-eyebrow">Inventory issue</p>
+              <h3 class="dialog-title" id="inventory-error-title">We couldn’t load your inventory</h3>
+            </div>
+            <button type="button" class="dialog-close" (click)="closeInventoryError()" aria-label="Close dialog">✕</button>
+          </div>
+          <div class="dialog-body">
+            <p>{{ inventoryErrorMessage() }}</p>
+            <div class="dialog-tip">
+              <svg viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <circle cx="12" cy="12" r="10"></circle>
+                <path d="M12 16v-4"></path>
+                <path d="M12 8h.01"></path>
+              </svg>
+              <div>Try refreshing this page. If the problem keeps happening, check your session or reconnect to the network and try again.</div>
+            </div>
+          </div>
+          <div class="dialog-actions">
+            <button type="button" class="btn-secondary" (click)="closeInventoryError()">Close</button>
+            <button type="button" class="btn-primary" (click)="retryInventoryLoad()">
+              <svg viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <polyline points="23 4 23 10 17 10"></polyline>
+                <polyline points="1 20 1 14 7 14"></polyline>
+                <path d="M3.51 9a9 9 0 0 1 14.13-3.36L23 10"></path>
+                <path d="M20.49 15a9 9 0 0 1-14.13 3.36L1 14"></path>
+              </svg>
+              Try again
+            </button>
+          </div>
+        </div>
+      </div>
+    }
   `,
 })
 export class StoreProductsListComponent implements OnInit {
@@ -1451,6 +1658,8 @@ export class StoreProductsListComponent implements OnInit {
 
   readonly loading = signal(true);
   readonly content = signal<InventoryVariant[]>([]);
+  readonly inventoryErrorOpen = signal(false);
+  readonly inventoryErrorMessage = signal('Failed to load inventory. Please refresh the page.');
 
   // ===== Pagination state =====
   readonly page = signal(0);
@@ -1614,6 +1823,23 @@ export class StoreProductsListComponent implements OnInit {
       storeId: this.storeId(),
     });
     this._initialDone = true;
+  }
+
+  closeInventoryError(): void {
+    this.inventoryErrorOpen.set(false);
+  }
+
+  retryInventoryLoad(): void {
+    this.inventoryErrorOpen.set(false);
+    void this.fetchPage({
+      page: this.page(),
+      size: this.size(),
+      query: this.debouncedSearchQuery(),
+      storeIds: this.selectedStoreIds(),
+      statuses: this.selectedStatuses(),
+      mode: this.mode(),
+      storeId: this.storeId(),
+    });
   }
 
   onSearchInput(value: string): void {
@@ -1828,7 +2054,8 @@ export class StoreProductsListComponent implements OnInit {
       this.content.set([]);
       this.totalElements.set(0);
       this.totalPages.set(0);
-      alert('Failed to load inventory. Please refresh the page.');
+      this.inventoryErrorMessage.set('Failed to load inventory. Please refresh the page.');
+      this.inventoryErrorOpen.set(true);
     } finally {
       this.loading.set(false);
     }
