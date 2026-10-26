@@ -1,7 +1,10 @@
-import { Component, signal } from '@angular/core';
+import { Component, OnInit, inject, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { Router, RouterLink } from '@angular/router';
+import { HttpClient } from '@angular/common/http';
+import { firstValueFrom } from 'rxjs';
+import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { Product } from '../../shared/models/product.model';
+import { resolveApiBasePublic } from '../../shared/utils/origins.helper';
 
 @Component({
   selector: 'app-checkout-cancel-page',
@@ -70,7 +73,15 @@ import { Product } from '../../shared/models/product.model';
     <div class="wrap">
       <div class="icon" aria-hidden="true">×</div>
       <h1>Payment not completed</h1>
-      <p class="sub">No charges were made. You can try again whenever you're ready.</p>
+      @if (cancellingReservation()) {
+        <p class="sub">Releasing your reserved item now…</p>
+      } @else if (reservationReleased()) {
+        <p class="sub">No charges were made. Your reservation was canceled and the item was returned to inventory.</p>
+      } @else if (cancelError()) {
+        <p class="sub">{{ cancelError() }}</p>
+      } @else {
+        <p class="sub">No charges were made. You can try again whenever you're ready.</p>
+      }
       <div class="actions">
         <button class="btn btn-primary" (click)="onBack()">Back to checkout</button>
         <a class="btn btn-ghost" routerLink="/">Home</a>
@@ -78,12 +89,34 @@ import { Product } from '../../shared/models/product.model';
     </div>
   `,
 })
-export class CheckoutCancelPageComponent {
+export class CheckoutCancelPageComponent implements OnInit {
+  private readonly route = inject(ActivatedRoute);
+  private readonly http = inject(HttpClient);
   readonly product = signal<Product | null>(null);
+  readonly cancellingReservation = signal(false);
+  readonly reservationReleased = signal(false);
+  readonly cancelError = signal<string | null>(null);
 
   constructor(private readonly router: Router) {
     const last = history.state?.product as Product | undefined;
     if (last?.id) this.product.set(last);
+  }
+
+  async ngOnInit(): Promise<void> {
+    const txId = this.route.snapshot.queryParamMap.get('txId')?.trim();
+    if (!txId) return;
+    this.cancellingReservation.set(true);
+    this.cancelError.set(null);
+    try {
+      const api = resolveApiBasePublic();
+      await firstValueFrom(this.http.post(`${api}/reservations/${encodeURIComponent(txId)}/cancel`, {}));
+      this.reservationReleased.set(true);
+    } catch (err: any) {
+      const message = err?.error?.error ?? err?.error?.message ?? err?.message ?? 'We could not release the reservation automatically.';
+      this.cancelError.set(message);
+    } finally {
+      this.cancellingReservation.set(false);
+    }
   }
 
   onBack(): void {
